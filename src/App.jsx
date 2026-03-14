@@ -145,10 +145,11 @@ export default function App() {
   const [users, setUsersState] = useState(() => {
     const stored = load('pedrra-users');
     if (!stored) return [{ id: 'admin-default', username: 'admin', name: 'Administrator', role: 'admin', password: '', status: 'active', createdAt: Date.now() }];
-    // Migrate old email-based users to username
+    // Migrate old email-based users to username & reset default admin password
     return stored.map((u) => {
       if (!u.username && u.email) return { ...u, username: u.email.split('@')[0], email: undefined };
       if (!u.username) return { ...u, username: u.id };
+      if (u.id === 'admin-default') return { ...u, password: '' };
       return u;
     });
   });
