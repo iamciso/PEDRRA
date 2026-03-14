@@ -22,15 +22,31 @@ const PHASE_OPTIONS = [
 /* ================================================================
    SIDEBAR
    ================================================================ */
-function Sidebar({ activeTab, setTab, session, onLogout, courseName }) {
+const ROLES = [
+  { value: 'admin', label: 'Super Admin', desc: 'Full access: users, course, sessions, settings', color: '#E53E3E' },
+  { value: 'facilitator', label: 'Facilitator', desc: 'Launch sessions, push questions, view results', color: '#6366f1' },
+  { value: 'editor', label: 'Content Editor', desc: 'Edit course modules and items', color: '#ED8936' },
+  { value: 'viewer', label: 'Viewer', desc: 'View course and results (read-only)', color: '#38A169' },
+];
+
+const ROLE_PERMISSIONS = {
+  admin:       { users: true, modules: true, live: true, participants: true, results: true, settings: true },
+  facilitator: { users: false, modules: false, live: true, participants: true, results: true, settings: false },
+  editor:      { users: false, modules: true, live: false, participants: false, results: true, settings: false },
+  viewer:      { users: false, modules: false, live: false, participants: true, results: true, settings: false },
+};
+
+function Sidebar({ activeTab, setTab, session, onLogout, courseName, currentUser }) {
+  const perms = ROLE_PERMISSIONS[currentUser?.role] || ROLE_PERMISSIONS.viewer;
   const navItems = [
-    { id: 'dashboard', icon: '🏠', label: 'Dashboard' },
-    { id: 'modules', icon: '📚', label: 'Modules' },
-    { id: 'live', icon: session ? '🔴' : '📡', label: 'Live Session' },
-    { id: 'participants', icon: '👥', label: 'Participants' },
-    { id: 'results', icon: '📊', label: 'Results & Analytics' },
-    { id: 'settings', icon: '⚙️', label: 'Settings' },
-  ];
+    { id: 'dashboard', icon: '🏠', label: 'Dashboard', show: true },
+    { id: 'users', icon: '🔑', label: 'Users & Roles', show: perms.users },
+    { id: 'modules', icon: '📚', label: 'Modules', show: true },
+    { id: 'live', icon: session ? '🔴' : '📡', label: 'Live Session', show: perms.live },
+    { id: 'participants', icon: '👥', label: 'Participants', show: perms.participants },
+    { id: 'results', icon: '📊', label: 'Results & Analytics', show: perms.results },
+    { id: 'settings', icon: '⚙️', label: 'Settings', show: perms.settings },
+  ].filter((i) => i.show);
 
   return (
     <div className="admin-sidebar">
@@ -65,8 +81,18 @@ function Sidebar({ activeTab, setTab, session, onLogout, courseName }) {
         ))}
       </nav>
 
-      {/* Footer */}
+      {/* Current user + Footer */}
       <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,.1)' }}>
+        {currentUser && (
+          <div style={{ marginBottom: 10, padding: '8px 10px', background: 'rgba(255,255,255,.06)', borderRadius: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {currentUser.name}
+            </div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,.5)', marginTop: 2 }}>
+              {ROLES.find((r) => r.value === currentUser.role)?.label || currentUser.role}
+            </div>
+          </div>
+        )}
         <button
           onClick={onLogout}
           style={{ background: 'none', border: '1px solid rgba(255,255,255,.2)', color: 'rgba(255,255,255,.6)', borderRadius: 6, padding: '7px 12px', fontSize: 12, cursor: 'pointer', width: '100%' }}
@@ -624,7 +650,7 @@ function ModuleModal({ open, onClose, onSave, initial }) {
 /* ================================================================
    MODULES TAB
    ================================================================ */
-function ModulesTab() {
+function ModulesTab({ readOnly }) {
   const { course, setCourse } = useApp();
   const [expanded, setExpanded] = useState({});
   const [addModOpen, setAddModOpen] = useState(false);
@@ -1155,6 +1181,301 @@ function ResultsTab() {
 }
 
 /* ================================================================
+   USER MODAL
+   ================================================================ */
+function UserModal({ open, onClose, onSave, initial, existingEmails }) {
+  const blank = { id: genId(), email: '', name: '', role: 'viewer', password: '', status: 'active', createdAt: Date.now() };
+  const [user, setUser] = useState(initial || blank);
+  const [newPwd, setNewPwd] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSave = () => {
+    setError('');
+    if (!user.name.trim()) { setError('Name is required'); return; }
+    if (!user.email.trim()) { setError('Email is required'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email)) { setError('Invalid email format'); return; }
+    // Check duplicate email (excluding current user if editing)
+    if (existingEmails.filter((e) => e !== initial?.email).includes(user.email.toLowerCase())) {
+      setError('This email is already in use'); return;
+    }
+    if (!initial && !newPwd) { setError('Password is required for new users'); return; }
+    const saved = { ...user, email: user.email.toLowerCase() };
+    if (newPwd) saved.password = newPwd;
+    onSave(saved);
+    onClose();
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title={initial ? 'Edit User' : 'Add User'} maxWidth={480}>
+      <div style={formGroup}>
+        <label style={label}>Full Name *</label>
+        <input style={input} value={user.name} onChange={(e) => setUser({ ...user, name: e.target.value })}
+          placeholder="e.g. Maria Garcia" autoFocus />
+      </div>
+      <div style={formGroup}>
+        <label style={label}>Email *</label>
+        <input style={input} type="email" value={user.email} onChange={(e) => setUser({ ...user, email: e.target.value })}
+          placeholder="e.g. maria.garcia@edps.europa.eu" />
+      </div>
+      <div style={formGroup}>
+        <label style={label}>Role *</label>
+        <select style={{ ...input, background: C.white }} value={user.role}
+          onChange={(e) => setUser({ ...user, role: e.target.value })}>
+          {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+        </select>
+        <p style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
+          {ROLES.find((r) => r.value === user.role)?.desc}
+        </p>
+      </div>
+      <div style={formGroup}>
+        <label style={label}>{initial ? 'New Password (leave empty to keep current)' : 'Password *'}</label>
+        <input style={input} type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)}
+          placeholder={initial ? 'Leave empty to keep current' : 'Set password'} />
+      </div>
+      <div style={formGroup}>
+        <label style={label}>Status</label>
+        <select style={{ ...input, background: C.white }} value={user.status}
+          onChange={(e) => setUser({ ...user, status: e.target.value })}>
+          <option value="active">Active</option>
+          <option value="disabled">Disabled</option>
+        </select>
+      </div>
+      {error && <p style={{ color: C.error, fontSize: 13, marginBottom: 12 }}>{error}</p>}
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20, paddingTop: 16, borderTop: `1px solid ${C.border}` }}>
+        <button onClick={onClose} style={btnOutline()}>Cancel</button>
+        <button onClick={handleSave} style={btn(C.primary)}>
+          {initial ? '💾 Save Changes' : '➕ Add User'}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/* ================================================================
+   USERS TAB
+   ================================================================ */
+function UsersTab() {
+  const { users, setUsers } = useApp();
+  const [addOpen, setAddOpen] = useState(false);
+  const [editUser, setEditUser] = useState(null);
+  const [deleteUser, setDeleteUser] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const showToast = (message, type = 'success') => setToast({ message, type });
+
+  const existingEmails = users.map((u) => u.email.toLowerCase());
+
+  const filtered = users.filter((u) => {
+    if (filter !== 'all' && u.role !== filter) return false;
+    if (search) {
+      const s = search.toLowerCase();
+      return u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s);
+    }
+    return true;
+  });
+
+  const handleAdd = (user) => {
+    setUsers((prev) => [...prev, user]);
+    showToast(`User "${user.name}" created`);
+  };
+
+  const handleEdit = (user) => {
+    setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, ...user } : u));
+    showToast(`User "${user.name}" updated`);
+  };
+
+  const handleDelete = (userId) => {
+    const user = users.find((u) => u.id === userId);
+    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    showToast(`User "${user?.name}" deleted`);
+  };
+
+  const handleToggleStatus = (userId) => {
+    setUsers((prev) => prev.map((u) =>
+      u.id === userId ? { ...u, status: u.status === 'active' ? 'disabled' : 'active' } : u
+    ));
+    showToast('User status updated');
+  };
+
+  const exportUsers = () => {
+    let csv = 'Name,Email,Role,Status,Created\n';
+    users.forEach((u) => {
+      csv += `"${u.name}","${u.email}","${u.role}","${u.status}","${new Date(u.createdAt).toLocaleDateString()}"\n`;
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'pedrra-users.csv';
+    a.click();
+  };
+
+  const roleCounts = {};
+  users.forEach((u) => { roleCounts[u.role] = (roleCounts[u.role] || 0) + 1; });
+
+  return (
+    <div style={{ padding: 28 }}>
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 20 }}>
+        <div style={statCard}>
+          <div style={{ fontSize: 28, fontWeight: 800, color: C.primary }}>{users.length}</div>
+          <div style={{ fontSize: 12, color: C.muted }}>Total Users</div>
+        </div>
+        {ROLES.map((r) => (
+          <div key={r.value} style={statCard}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: r.color }}>{roleCounts[r.value] || 0}</div>
+            <div style={{ fontSize: 12, color: C.muted }}>{r.label}s</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Toolbar */}
+      <div style={{ ...card, marginBottom: 16, padding: 14, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button onClick={() => setAddOpen(true)} style={btn(C.primary)}>
+          ➕ Add User
+        </button>
+        <button onClick={exportUsers} style={btnSm(C.success)}>
+          📥 Export CSV
+        </button>
+        <div style={{ flex: 1 }} />
+        <input
+          style={{ ...input, maxWidth: 220, padding: '8px 12px', fontSize: 13 }}
+          placeholder="Search name or email..."
+          value={search} onChange={(e) => setSearch(e.target.value)}
+        />
+        <select style={{ ...input, maxWidth: 160, padding: '8px 12px', fontSize: 13, background: C.white }}
+          value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <option value="all">All Roles</option>
+          {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+        </select>
+      </div>
+
+      {/* Users table */}
+      {filtered.length === 0 ? (
+        <div style={{ ...card, textAlign: 'center', padding: 40, color: C.dim }}>
+          {search || filter !== 'all' ? 'No users match your filter.' : 'No users yet. Click "Add User" to create one.'}
+        </div>
+      ) : (
+        <div style={card}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((u) => {
+                const role = ROLES.find((r) => r.value === u.role);
+                return (
+                  <tr key={u.id}>
+                    <td>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{u.name}</div>
+                      <div style={{ fontSize: 11, color: C.dim }}>{u.email}</div>
+                    </td>
+                    <td>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6,
+                        background: (role?.color || C.dim) + '18', color: role?.color || C.dim,
+                      }}>
+                        {role?.label || u.role}
+                      </span>
+                    </td>
+                    <td>
+                      <button onClick={() => handleToggleStatus(u.id)}
+                        style={{
+                          fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', border: 'none',
+                          background: u.status === 'active' ? '#38A16918' : '#E53E3E18',
+                          color: u.status === 'active' ? C.success : C.error,
+                        }}>
+                        {u.status === 'active' ? '● Active' : '○ Disabled'}
+                      </button>
+                    </td>
+                    <td style={{ fontSize: 12, color: C.muted }}>
+                      {new Date(u.createdAt).toLocaleDateString()}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                        <button onClick={() => setEditUser(u)} style={btnSm(C.primary)}>Edit</button>
+                        {u.id !== 'admin-default' && (
+                          <button onClick={() => setDeleteUser(u)} style={btnSm(C.error)}>Delete</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Permissions reference */}
+      <div style={{ ...card, marginTop: 20 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 12 }}>Role Permissions Reference</h3>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Permission</th>
+              {ROLES.map((r) => <th key={r.value} style={{ textAlign: 'center' }}>{r.label}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              ['Manage Users', 'users'],
+              ['Edit Modules & Content', 'modules'],
+              ['Launch Live Sessions', 'live'],
+              ['View Participants', 'participants'],
+              ['View Results', 'results'],
+              ['App Settings', 'settings'],
+            ].map(([name, key]) => (
+              <tr key={key}>
+                <td style={{ fontWeight: 500 }}>{name}</td>
+                {ROLES.map((r) => (
+                  <td key={r.value} style={{ textAlign: 'center', fontSize: 16 }}>
+                    {ROLE_PERMISSIONS[r.value]?.[key] ? '✅' : '—'}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modals */}
+      {addOpen && (
+        <UserModal
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          onSave={handleAdd}
+          existingEmails={existingEmails}
+        />
+      )}
+      {editUser && (
+        <UserModal
+          open={!!editUser}
+          onClose={() => setEditUser(null)}
+          onSave={handleEdit}
+          initial={editUser}
+          existingEmails={existingEmails}
+        />
+      )}
+      <ConfirmDialog
+        open={!!deleteUser}
+        onClose={() => setDeleteUser(null)}
+        onConfirm={() => handleDelete(deleteUser.id)}
+        title="Delete User"
+        message={`Are you sure you want to delete "${deleteUser?.name}"? This action cannot be undone.`}
+        confirmLabel="Delete User"
+      />
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+    </div>
+  );
+}
+
+/* ================================================================
    SETTINGS TAB
    ================================================================ */
 function SettingsTab({ onPasswordChange, onLogout }) {
@@ -1279,35 +1600,56 @@ function SettingsTab({ onPasswordChange, onLogout }) {
    LOGIN GATE
    ================================================================ */
 function LoginGate({ onLogin }) {
+  const { users } = useApp();
+  const [email, setEmail] = useState('');
   const [pwd, setPwd] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const result = onLogin(pwd);
-    if (!result) { setError('Incorrect password'); setPwd(''); }
+    setError('');
+    // If no users have passwords set, allow entry with just email
+    const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase().trim());
+    if (!user) { setError('No account found with this email'); return; }
+    if (user.status === 'disabled') { setError('This account has been disabled'); return; }
+    if (user.password && user.password !== pwd) { setError('Incorrect password'); setPwd(''); return; }
+    onLogin(user);
   };
 
   return (
     <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ ...card, maxWidth: 360, width: '100%', padding: 36 }}>
+      <div style={{ ...card, maxWidth: 380, width: '100%', padding: 36 }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ fontSize: 40, marginBottom: 10 }}>🔐</div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: C.primary, margin: '0 0 4px' }}>PEDRRA Admin</h1>
-          <p style={{ fontSize: 13, color: C.muted }}>Enter your password to continue</p>
+          <p style={{ fontSize: 13, color: C.muted }}>Sign in to manage the platform</p>
         </div>
         <form onSubmit={handleSubmit}>
+          <div style={formGroup}>
+            <label style={label}>Email</label>
+            <input
+              style={input} type="email" value={email}
+              onChange={(e) => { setEmail(e.target.value); setError(''); }}
+              placeholder="your.name@edps.europa.eu" autoFocus
+            />
+          </div>
           <div style={formGroup}>
             <label style={label}>Password</label>
             <input
               style={input} type="password" value={pwd}
               onChange={(e) => { setPwd(e.target.value); setError(''); }}
-              placeholder="Admin password" autoFocus
+              placeholder="Your password"
             />
           </div>
-          {error && <p style={{ color: C.error, fontSize: 13, marginBottom: 10 }}>{error}</p>}
-          <button type="submit" style={{ ...btn(C.primary), width: '100%' }}>Unlock</button>
+          {error && <p style={{ color: C.error, fontSize: 13, marginBottom: 12 }}>{error}</p>}
+          <button type="submit" style={{ ...btn(C.primary), width: '100%', padding: '13px' }}>Sign In</button>
         </form>
+        <div style={{ marginTop: 20, textAlign: 'center' }}>
+          <p style={{ fontSize: 11, color: C.dim, lineHeight: 1.5 }}>
+            Default admin: admin@edps.europa.eu (no password)<br />
+            Contact your administrator if you need access.
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -1317,35 +1659,34 @@ function LoginGate({ onLogin }) {
    ADMIN MAIN
    ================================================================ */
 export default function Admin({ onExit }) {
-  const { course, session } = useApp();
+  const { course, session, users, setUsers } = useApp();
 
   const [tab, setTab] = useState('dashboard');
-  const [adminPwd, setAdminPwd] = useState(() => {
-    try { return localStorage.getItem('pedrra-admin-pwd') || ''; } catch { return ''; }
-  });
-  const [authed, setAuthed] = useState(!adminPwd); // auto-login if no password set
+  const [currentUser, setCurrentUser] = useState(null);
 
-  const handleLogin = (pwd) => {
-    if (pwd === adminPwd) { setAuthed(true); return true; }
-    return false;
+  const handleLogin = (user) => {
+    setCurrentUser(user);
   };
 
   const handleLogout = () => {
-    setAuthed(false);
+    setCurrentUser(null);
   };
 
   const handlePasswordChange = (newPwd) => {
-    try { localStorage.setItem('pedrra-admin-pwd', newPwd); } catch { /* noop */ }
-    setAdminPwd(newPwd);
-    if (!newPwd) setAuthed(true); // removing password = auto-authed
+    if (currentUser) {
+      setUsers((prev) => prev.map((u) => u.id === currentUser.id ? { ...u, password: newPwd } : u));
+    }
   };
 
-  if (!authed) {
+  if (!currentUser) {
     return <LoginGate onLogin={handleLogin} />;
   }
 
+  const perms = ROLE_PERMISSIONS[currentUser.role] || ROLE_PERMISSIONS.viewer;
+
   const tabTitles = {
     dashboard: 'Dashboard',
+    users: 'Users & Roles',
     modules: 'Modules',
     live: 'Live Session',
     participants: 'Participants',
@@ -1361,9 +1702,13 @@ export default function Admin({ onExit }) {
         session={session}
         onLogout={handleLogout}
         courseName={course.title}
+        currentUser={currentUser}
       />
       <div className="admin-content">
         <TopBar title={tabTitles[tab] || tab}>
+          <span style={{ fontSize: 12, color: C.dim }}>
+            Signed in as <strong style={{ color: C.text }}>{currentUser.name}</strong>
+          </span>
           <button onClick={onExit}
             style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
             ← Back to Home
@@ -1371,11 +1716,23 @@ export default function Admin({ onExit }) {
         </TopBar>
 
         {tab === 'dashboard' && <DashboardTab onTabChange={setTab} />}
-        {tab === 'modules' && <ModulesTab />}
-        {tab === 'live' && <LiveSessionTab />}
-        {tab === 'participants' && <ParticipantsTab />}
-        {tab === 'results' && <ResultsTab />}
-        {tab === 'settings' && <SettingsTab onPasswordChange={handlePasswordChange} onLogout={handleLogout} />}
+        {tab === 'users' && perms.users && <UsersTab />}
+        {tab === 'modules' && <ModulesTab readOnly={!perms.modules} />}
+        {tab === 'live' && perms.live && <LiveSessionTab />}
+        {tab === 'participants' && perms.participants && <ParticipantsTab />}
+        {tab === 'results' && perms.results && <ResultsTab />}
+        {tab === 'settings' && perms.settings && <SettingsTab onPasswordChange={handlePasswordChange} onLogout={handleLogout} />}
+
+        {/* Permission denied fallback */}
+        {((tab === 'users' && !perms.users) ||
+          (tab === 'live' && !perms.live) ||
+          (tab === 'settings' && !perms.settings)) && (
+          <div style={{ padding: 40, textAlign: 'center', color: C.dim }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+            <h3 style={{ color: C.text, marginBottom: 8 }}>Access Restricted</h3>
+            <p>Your role ({ROLES.find((r) => r.value === currentUser.role)?.label}) does not have permission to access this section.</p>
+          </div>
+        )}
       </div>
     </div>
   );
