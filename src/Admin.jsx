@@ -1183,8 +1183,8 @@ function ResultsTab() {
 /* ================================================================
    USER MODAL
    ================================================================ */
-function UserModal({ open, onClose, onSave, initial, existingEmails }) {
-  const blank = { id: genId(), email: '', name: '', role: 'viewer', password: '', status: 'active', createdAt: Date.now() };
+function UserModal({ open, onClose, onSave, initial, existingUsernames }) {
+  const blank = { id: genId(), username: '', name: '', role: 'viewer', password: '', status: 'active', createdAt: Date.now() };
   const [user, setUser] = useState(initial || blank);
   const [newPwd, setNewPwd] = useState('');
   const [error, setError] = useState('');
@@ -1192,14 +1192,13 @@ function UserModal({ open, onClose, onSave, initial, existingEmails }) {
   const handleSave = () => {
     setError('');
     if (!user.name.trim()) { setError('Name is required'); return; }
-    if (!user.email.trim()) { setError('Email is required'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email)) { setError('Invalid email format'); return; }
-    // Check duplicate email (excluding current user if editing)
-    if (existingEmails.filter((e) => e !== initial?.email).includes(user.email.toLowerCase())) {
-      setError('This email is already in use'); return;
+    if (!user.username.trim()) { setError('Username is required'); return; }
+    if (!/^[a-zA-Z0-9._-]{3,30}$/.test(user.username)) { setError('Username must be 3-30 characters (letters, numbers, . _ -)'); return; }
+    if (existingUsernames.filter((u) => u !== initial?.username).includes(user.username.toLowerCase())) {
+      setError('This username is already taken'); return;
     }
     if (!initial && !newPwd) { setError('Password is required for new users'); return; }
-    const saved = { ...user, email: user.email.toLowerCase() };
+    const saved = { ...user, username: user.username.toLowerCase() };
     if (newPwd) saved.password = newPwd;
     onSave(saved);
     onClose();
@@ -1208,14 +1207,15 @@ function UserModal({ open, onClose, onSave, initial, existingEmails }) {
   return (
     <Modal open={open} onClose={onClose} title={initial ? 'Edit User' : 'Add User'} maxWidth={480}>
       <div style={formGroup}>
-        <label style={label}>Full Name *</label>
+        <label style={label}>Display Name *</label>
         <input style={input} value={user.name} onChange={(e) => setUser({ ...user, name: e.target.value })}
           placeholder="e.g. Maria Garcia" autoFocus />
       </div>
       <div style={formGroup}>
-        <label style={label}>Email *</label>
-        <input style={input} type="email" value={user.email} onChange={(e) => setUser({ ...user, email: e.target.value })}
-          placeholder="e.g. maria.garcia@edps.europa.eu" />
+        <label style={label}>Username *</label>
+        <input style={input} value={user.username} onChange={(e) => setUser({ ...user, username: e.target.value.replace(/\s/g, '') })}
+          placeholder="e.g. maria.garcia" />
+        <p style={{ fontSize: 11, color: C.dim, marginTop: 3 }}>Letters, numbers, dots, dashes. No spaces.</p>
       </div>
       <div style={formGroup}>
         <label style={label}>Role *</label>
@@ -1264,13 +1264,13 @@ function UsersTab() {
   const [search, setSearch] = useState('');
   const showToast = (message, type = 'success') => setToast({ message, type });
 
-  const existingEmails = users.map((u) => u.email.toLowerCase());
+  const existingUsernames = users.map((u) => u.username.toLowerCase());
 
   const filtered = users.filter((u) => {
     if (filter !== 'all' && u.role !== filter) return false;
     if (search) {
       const s = search.toLowerCase();
-      return u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s);
+      return u.name.toLowerCase().includes(s) || u.username.toLowerCase().includes(s);
     }
     return true;
   });
@@ -1299,9 +1299,9 @@ function UsersTab() {
   };
 
   const exportUsers = () => {
-    let csv = 'Name,Email,Role,Status,Created\n';
+    let csv = 'Name,Username,Role,Status,Created\n';
     users.forEach((u) => {
-      csv += `"${u.name}","${u.email}","${u.role}","${u.status}","${new Date(u.createdAt).toLocaleDateString()}"\n`;
+      csv += `"${u.name}","${u.username}","${u.role}","${u.status}","${new Date(u.createdAt).toLocaleDateString()}"\n`;
     });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
@@ -1339,7 +1339,7 @@ function UsersTab() {
         <div style={{ flex: 1 }} />
         <input
           style={{ ...input, maxWidth: 220, padding: '8px 12px', fontSize: 13 }}
-          placeholder="Search name or email..."
+          placeholder="Search name or username..."
           value={search} onChange={(e) => setSearch(e.target.value)}
         />
         <select style={{ ...input, maxWidth: 160, padding: '8px 12px', fontSize: 13, background: C.white }}
@@ -1373,7 +1373,7 @@ function UsersTab() {
                   <tr key={u.id}>
                     <td>
                       <div style={{ fontWeight: 600, fontSize: 13 }}>{u.name}</div>
-                      <div style={{ fontSize: 11, color: C.dim }}>{u.email}</div>
+                      <div style={{ fontSize: 11, color: C.dim }}>@{u.username}</div>
                     </td>
                     <td>
                       <span style={{
@@ -1450,7 +1450,7 @@ function UsersTab() {
           open={addOpen}
           onClose={() => setAddOpen(false)}
           onSave={handleAdd}
-          existingEmails={existingEmails}
+          existingUsernames={existingUsernames}
         />
       )}
       {editUser && (
@@ -1459,7 +1459,7 @@ function UsersTab() {
           onClose={() => setEditUser(null)}
           onSave={handleEdit}
           initial={editUser}
-          existingEmails={existingEmails}
+          existingUsernames={existingUsernames}
         />
       )}
       <ConfirmDialog
@@ -1601,16 +1601,15 @@ function SettingsTab({ onPasswordChange, onLogout }) {
    ================================================================ */
 function LoginGate({ onLogin }) {
   const { users } = useApp();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [pwd, setPwd] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
-    // If no users have passwords set, allow entry with just email
-    const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase().trim());
-    if (!user) { setError('No account found with this email'); return; }
+    const user = users.find((u) => u.username.toLowerCase() === username.toLowerCase().trim());
+    if (!user) { setError('No account found with this username'); return; }
     if (user.status === 'disabled') { setError('This account has been disabled'); return; }
     if (user.password && user.password !== pwd) { setError('Incorrect password'); setPwd(''); return; }
     onLogin(user);
@@ -1626,11 +1625,11 @@ function LoginGate({ onLogin }) {
         </div>
         <form onSubmit={handleSubmit}>
           <div style={formGroup}>
-            <label style={label}>Email</label>
+            <label style={label}>Username</label>
             <input
-              style={input} type="email" value={email}
-              onChange={(e) => { setEmail(e.target.value); setError(''); }}
-              placeholder="your.name@edps.europa.eu" autoFocus
+              style={input} type="text" value={username}
+              onChange={(e) => { setUsername(e.target.value); setError(''); }}
+              placeholder="admin" autoFocus
             />
           </div>
           <div style={formGroup}>
@@ -1646,7 +1645,7 @@ function LoginGate({ onLogin }) {
         </form>
         <div style={{ marginTop: 20, textAlign: 'center' }}>
           <p style={{ fontSize: 11, color: C.dim, lineHeight: 1.5 }}>
-            Default admin: admin@edps.europa.eu (no password)<br />
+            Default admin: admin (no password)<br />
             Contact your administrator if you need access.
           </p>
         </div>

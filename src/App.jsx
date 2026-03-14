@@ -143,7 +143,7 @@ export default function App() {
   const [responses, setResponses] = useState(() => load('pedrra-responses') || {});
   const [activeQ, setActiveQ] = useState(() => load('pedrra-activeq'));
   const [users, setUsersState] = useState(() => load('pedrra-users') || [
-    { id: 'admin-default', email: 'admin@edps.europa.eu', name: 'Administrator', role: 'admin', password: '', status: 'active', createdAt: Date.now() },
+    { id: 'admin-default', username: 'admin', name: 'Administrator', role: 'admin', password: '', status: 'active', createdAt: Date.now() },
   ]);
   const [timer, setTimer] = useState(0);
   const timerRef = useRef(null);
