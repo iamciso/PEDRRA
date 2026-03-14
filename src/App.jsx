@@ -142,9 +142,16 @@ export default function App() {
   const [participants, setParticipants] = useState(() => load('pedrra-participants') || []);
   const [responses, setResponses] = useState(() => load('pedrra-responses') || {});
   const [activeQ, setActiveQ] = useState(() => load('pedrra-activeq'));
-  const [users, setUsersState] = useState(() => load('pedrra-users') || [
-    { id: 'admin-default', username: 'admin', name: 'Administrator', role: 'admin', password: '', status: 'active', createdAt: Date.now() },
-  ]);
+  const [users, setUsersState] = useState(() => {
+    const stored = load('pedrra-users');
+    if (!stored) return [{ id: 'admin-default', username: 'admin', name: 'Administrator', role: 'admin', password: '', status: 'active', createdAt: Date.now() }];
+    // Migrate old email-based users to username
+    return stored.map((u) => {
+      if (!u.username && u.email) return { ...u, username: u.email.split('@')[0], email: undefined };
+      if (!u.username) return { ...u, username: u.id };
+      return u;
+    });
+  });
   const [timer, setTimer] = useState(0);
   const timerRef = useRef(null);
 
