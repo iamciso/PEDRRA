@@ -1,6 +1,10 @@
 export const DEFAULT_COURSE = {
+  id: 'course-pedrra1',
   title: 'PEDRRA I',
   desc: 'Interactive training on personal data breach risk assessment.',
+  icon: '🛡️',
+  color: '#0C4DA2',
+  createdAt: 1710000000000,
   modules: [
     /* ── M1: Pre-Reading ─────────────────────────────── */
     { id: 'm1', title: 'Pre-Reading', icon: '\u{1F4D6}', phase: 'before',
@@ -42,7 +46,13 @@ export const DEFAULT_COURSE = {
         { t: 'Welcome to PEDRRA', c: 'PErsonal Data bReach Risk Assessment\n\nEuropean Data Protection Supervisor', l: 'title' },
         { t: 'Programme', c: '09:30 Welcome\n10:00 Scenario 1\n11:00 Break\n11:15 Lecture\n12:15 Lunch\n13:15 Scenario 2\n14:30 Quiz\n15:15 Debrief', l: 'content' },
         { t: 'Ground Rules', c: '\u{1F512} Chatham House Rule\n\u{1F91D} No blame\n\u{1F5E3}\uFE0F Every voice matters\n\u{1F4F1} Phone ready for quiz', l: 'content' },
+        { l: 'poll', t: 'Quick Check', text: 'What does EUDPR stand for?',
+          opts: ['EU Data Privacy Regulation', 'EU Data Protection Regulation', 'European Union Data Privacy Rules', 'European Data Processing Regulation'],
+          ok: 1, xp: 50, timer: 30, notes: 'Warm-up question to test devices' },
         { t: 'Key Principle', c: 'Not every security incident is a data breach,\nbut every data breach is a security incident.', l: 'quote' },
+        { l: 'poll', t: 'Experience Check', text: 'Have you handled a data breach before?',
+          opts: ['Yes, multiple times', 'Yes, once', 'No, but trained', 'No experience'],
+          ok: -1, xp: 0, timer: 20, notes: 'Opinion poll — helps gauge audience experience' },
       ]},
     ]},
 
@@ -59,6 +69,9 @@ export const DEFAULT_COURSE = {
       { id: 'i9', type: 'slides', title: 'Breach Essentials', slides: [
         { t: 'Breach Essentials', c: 'EDPS Perspective\nRisk Assessment\nNotification', l: 'title' },
         { t: '3-Tier Framework', c: 'Unlikely Risk = Record only\n\nRisk = Notify EDPS (72h)\n\nHigh Risk = Notify EDPS + Data subjects', l: 'content' },
+        { l: 'poll', t: 'Knowledge Check', text: 'When does the 72-hour notification clock start?',
+          opts: ['When the breach occurs', 'When the DPO is informed', 'At reasonable certainty', 'When IT reports it'],
+          ok: 2, xp: 100, timer: 30, notes: 'Key concept — discuss after reveal' },
         { t: '72-Hour Rule', c: 'Notify without undue delay,\nwhere feasible within 72 hours.\n\nClock starts at reasonable certainty.', l: 'quote' },
       ]},
     ]},

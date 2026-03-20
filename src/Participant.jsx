@@ -1,19 +1,32 @@
 import { useState, useEffect } from 'react';
 import { useApp } from './context.js';
 import { C, phaseColor, phaseLabel, itemIcon, ANS, card, btn, btnOutline, btnSm, input } from './theme';
-import { Header, ProgressBar, Slide, SurveyQuestion } from './components.jsx';
+import { Header, ProgressBar, Slide, SurveyQuestion, PresentationMode } from './components.jsx';
 
 /* ================================================================
    KAHOOT-STYLE LIVE QUESTION OVERLAY
    ================================================================ */
 function LiveQuestionOverlay({ activeQ, course, onAnswer, myAnswers }) {
-  const allItems = course.modules.flatMap((m) => m.items.filter((i) => i.type === 'quiz'));
-  const activeItem = allItems.find((i) => i.id === activeQ.itemId);
-  const q = activeItem?.qs?.[activeQ.qIndex];
+  // Support both quiz questions and presentation polls
+  const isFromPresentation = activeQ.fromPresentation;
+
+  let q = null;
+  let responseKey = '';
+
+  if (isFromPresentation) {
+    // Poll data comes directly from the activeQ payload
+    q = { text: activeQ.text, opts: activeQ.opts, ok: activeQ.ok, xp: activeQ.xp };
+    responseKey = `${activeQ.itemId}-slide-${activeQ.slideIdx}`;
+  } else {
+    const allItems = course.modules.flatMap((m) => m.items.filter((i) => i.type === 'quiz'));
+    const activeItem = allItems.find((i) => i.id === activeQ.itemId);
+    q = activeItem?.qs?.[activeQ.qIndex];
+    responseKey = `${activeQ.itemId}-${activeQ.qIndex}`;
+  }
 
   if (!q) return null;
 
-  const myAnswer = myAnswers?.[`${activeQ.itemId}-${activeQ.qIndex}`];
+  const myAnswer = myAnswers?.[responseKey];
   const answered = myAnswer !== undefined;
 
   return (
@@ -36,25 +49,53 @@ function LiveQuestionOverlay({ activeQ, course, onAnswer, myAnswers }) {
 
       {/* Answers */}
       {!answered ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, maxWidth: 600, width: '100%' }}>
-          {(q.opts || []).map((opt, i) => (
-            <button
-              key={i}
-              onClick={() => onAnswer(activeQ.itemId, activeQ.qIndex, i, q.xp)}
-              style={{
-                background: ANS[i % 4]?.bg || C.primary,
-                color: '#fff', border: 'none', borderRadius: 12,
-                padding: '20px 16px', fontSize: 16, fontWeight: 700,
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
-                boxShadow: '0 4px 12px rgba(0,0,0,.2)',
-                transition: 'transform .1s, box-shadow .1s',
-              }}
-            >
-              <span style={{ fontSize: 20 }}>{ANS[i % 4]?.shape}</span>
-              <span style={{ flex: 1, textAlign: 'left' }}>{opt}</span>
-            </button>
-          ))}
-        </div>
+        activeQ.pollType === 'rating' ? (
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', maxWidth: 600, width: '100%' }}>
+            {[1,2,3,4,5].map((n) => (
+              <button
+                key={n}
+                onClick={() => {
+                  const qIdx = isFromPresentation ? `slide-${activeQ.slideIdx}` : activeQ.qIndex;
+                  onAnswer(activeQ.itemId, qIdx, n - 1, q.xp);
+                }}
+                style={{
+                  background: 'rgba(255,255,255,.1)', border: '2px solid rgba(255,255,255,.3)',
+                  borderRadius: 16, padding: '16px 12px', cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                  transition: 'transform .15s, background .15s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,215,0,.3)'; e.currentTarget.style.transform = 'scale(1.1)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,.1)'; e.currentTarget.style.transform = 'scale(1)'; }}
+              >
+                <span style={{ fontSize: 36, color: '#FFD700' }}>★</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{n}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, maxWidth: 600, width: '100%' }}>
+            {(q.opts || []).map((opt, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  const qIdx = isFromPresentation ? `slide-${activeQ.slideIdx}` : activeQ.qIndex;
+                  onAnswer(activeQ.itemId, qIdx, i, q.xp);
+                }}
+                style={{
+                  background: ANS[i % 4]?.bg || C.primary,
+                  color: '#fff', border: 'none', borderRadius: 12,
+                  padding: '20px 16px', fontSize: 16, fontWeight: 700,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+                  boxShadow: '0 4px 12px rgba(0,0,0,.2)',
+                  transition: 'transform .1s, box-shadow .1s',
+                }}
+              >
+                <span style={{ fontSize: 20 }}>{ANS[i % 4]?.shape}</span>
+                <span style={{ flex: 1, textAlign: 'left' }}>{opt}</span>
+              </button>
+            ))}
+          </div>
+        )
       ) : (
         <div style={{
           background: '#fff', borderRadius: 16, padding: '24px 28px',
@@ -92,7 +133,7 @@ function DocViewer({ item, onRead, isRead, onBack }) {
   return (
     <div style={{ padding: 20 }}>
       <button onClick={onBack}
-        style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 13, marginBottom: 16 }}>
+        style={{ background: C.light, border: `1px solid ${C.primary}33`, color: C.primary, cursor: 'pointer', fontSize: 13, fontWeight: 600, marginBottom: 16, padding: '8px 14px', borderRadius: 8 }}>
         ← Back
       </button>
       <div style={card}>
@@ -137,17 +178,44 @@ function DocViewer({ item, onRead, isRead, onBack }) {
    ================================================================ */
 function SlideViewer({ item, onComplete, isComplete, onBack }) {
   const [idx, setIdx] = useState(0);
+  const [presenting, setPresenting] = useState(false);
   const slides = item.slides || [];
   const total = slides.length;
 
+  // Keyboard navigation
+  useEffect(() => {
+    if (presenting) return; // PresentationMode handles its own keys
+    const handleKey = (e) => {
+      if (e.key === 'ArrowRight') setIdx((i) => Math.min(total - 1, i + 1));
+      else if (e.key === 'ArrowLeft') setIdx((i) => Math.max(0, i - 1));
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [total, presenting]);
+
+  if (presenting && total > 0) {
+    return <PresentationMode slides={slides} startIdx={idx} onClose={() => setPresenting(false)} />;
+  }
+
   return (
     <div style={{ padding: 20 }}>
-      <button onClick={onBack}
-        style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 13, marginBottom: 16 }}>
-        ← Back
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <button onClick={onBack}
+          style={{ background: C.light, border: `1px solid ${C.primary}33`, color: C.primary, cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8 }}>
+          ← Back
+        </button>
+        {total > 0 && (
+          <button onClick={() => setPresenting(true)}
+            style={{ ...btn(C.dark), display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13 }}>
+            📺 Present Fullscreen
+          </button>
+        )}
+      </div>
       <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 4 }}>{item.title}</h2>
-      <p style={{ color: C.muted, fontSize: 13, marginBottom: 16 }}>Slide {idx + 1} of {total}</p>
+      {item.desc && <p style={{ color: C.muted, fontSize: 13, marginBottom: 4 }}>{item.desc}</p>}
+      <p style={{ color: C.dim, fontSize: 13, marginBottom: 16 }}>
+        Slide {idx + 1} of {total} · Use arrow keys to navigate
+      </p>
 
       {total === 0 ? (
         <div style={{ ...card, textAlign: 'center', color: C.dim, padding: 40 }}>No slides available.</div>
@@ -166,8 +234,9 @@ function SlideViewer({ item, onComplete, isComplete, onBack }) {
                   key={i}
                   onClick={() => setIdx(i)}
                   style={{
-                    width: 8, height: 8, borderRadius: '50%', border: 'none', cursor: 'pointer',
+                    width: 10, height: 10, borderRadius: '50%', border: 'none', cursor: 'pointer',
                     background: i === idx ? C.primary : C.border,
+                    transition: 'background .2s',
                   }}
                 />
               ))}
@@ -206,7 +275,7 @@ function SurveyViewer({ item, onSubmit, isSubmitted, savedAnswers, onBack }) {
   return (
     <div style={{ padding: 20 }}>
       <button onClick={onBack}
-        style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 13, marginBottom: 16 }}>
+        style={{ background: C.light, border: `1px solid ${C.primary}33`, color: C.primary, cursor: 'pointer', fontSize: 13, fontWeight: 600, marginBottom: 16, padding: '8px 14px', borderRadius: 8 }}>
         ← Back
       </button>
       <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 4 }}>{item.title}</h2>
@@ -244,7 +313,7 @@ function QuizInfo({ item, onBack }) {
   return (
     <div style={{ padding: 20 }}>
       <button onClick={onBack}
-        style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 13, marginBottom: 16 }}>
+        style={{ background: C.light, border: `1px solid ${C.primary}33`, color: C.primary, cursor: 'pointer', fontSize: 13, fontWeight: 600, marginBottom: 16, padding: '8px 14px', borderRadius: 8 }}>
         ← Back
       </button>
       <div style={{ ...card, textAlign: 'center', padding: 40 }}>
@@ -272,7 +341,7 @@ function ModuleView({ module: m, progress, onItemSelect, onBack }) {
   return (
     <div style={{ padding: 20 }}>
       <button onClick={onBack}
-        style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 13, marginBottom: 16 }}>
+        style={{ background: C.light, border: `1px solid ${C.primary}33`, color: C.primary, cursor: 'pointer', fontSize: 13, fontWeight: 600, marginBottom: 16, padding: '8px 14px', borderRadius: 8 }}>
         ← Back to Course
       </button>
       <div style={{ marginBottom: 20 }}>
@@ -398,10 +467,13 @@ function CourseOverview({ course, progress, xp, onModuleSelect }) {
 /* ================================================================
    PARTICIPANT MAIN
    ================================================================ */
+export { LiveQuestionOverlay, DocViewer, SlideViewer, SurveyViewer, QuizInfo };
+
 export default function Participant({ participantId, onExit }) {
   const {
     course, participants, activeQ, broadcast,
     recordAnswer, recordSurvey, markComplete,
+    presentationActive,
   } = useApp();
 
   // Find participant
@@ -486,6 +558,42 @@ export default function Participant({ participantId, onExit }) {
           onAnswer={handleAnswer}
           myAnswers={myAnswers}
         />
+      )}
+
+      {/* Session in progress holding screen (during presentations, no active poll) */}
+      {presentationActive && !activeQ && (
+        <div style={{
+          position: 'fixed', inset: 0, background: `linear-gradient(135deg, ${C.primary}, ${C.dark})`,
+          zIndex: 400, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', padding: 24,
+        }}>
+          <div style={{ fontSize: 64, marginBottom: 20 }}>📺</div>
+          <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 700, margin: '0 0 8px', textAlign: 'center' }}>
+            Session in Progress
+          </h2>
+          <p style={{ color: 'rgba(255,255,255,.7)', fontSize: 15, margin: '0 0 32px', textAlign: 'center' }}>
+            Follow along on the projector
+          </p>
+          <div style={{
+            background: 'rgba(255,255,255,.12)', borderRadius: 16, padding: 24,
+            textAlign: 'center', minWidth: 200,
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.5)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>
+              Your XP
+            </div>
+            <div style={{ fontSize: 40, fontWeight: 800, color: C.accent, lineHeight: 1 }}>
+              {participant.xp || 0} ⭐
+            </div>
+          </div>
+          {participants.length > 1 && (
+            <div style={{
+              marginTop: 16, background: 'rgba(255,255,255,.08)', borderRadius: 12, padding: '12px 20px',
+              color: 'rgba(255,255,255,.6)', fontSize: 13, textAlign: 'center',
+            }}>
+              Position: {[...participants].sort((a, b) => b.xp - a.xp).findIndex(p => p.id === participantId) + 1} of {participants.length}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Main content */}

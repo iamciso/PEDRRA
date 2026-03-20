@@ -1,18 +1,34 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useApp } from './context.js';
 import {
-  C, phaseColor, phaseLabel, itemIcon, ANS,
+  C, itemIcon, ANS,
   card, btn, btnSm, btnOutline, input, label, formGroup,
   sidebarItem, statCard,
 } from './theme';
-import { Modal, ConfirmDialog, Toast } from './components.jsx';
+import { Modal, ConfirmDialog, Toast, PresenterView, Slide, useDragDrop } from './components.jsx';
 import { DEFAULT_COURSE } from './courseData.js';
+import { useI18n, LanguageSelector } from './i18n.jsx';
 
 /* ================================================================
    UTILITIES
    ================================================================ */
 const genId = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+
+const downloadFile = (data, filename, type = 'application/json') => {
+  const content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+const csvEscape = (val) => {
+  const s = String(val ?? '');
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+};
 const PHASE_OPTIONS = [
   { value: 'before', label: 'Before Training' },
   { value: 'live', label: 'Training Day' },
@@ -36,20 +52,18 @@ const ROLE_PERMISSIONS = {
   viewer:      { users: false, modules: false, live: false, participants: true, results: true, settings: false },
 };
 
-function Sidebar({ activeTab, setTab, session, onLogout, courseName, currentUser }) {
+function Sidebar({ activeTab, setTab, session, onLogout, onBackToCourse, courseName, currentUser, className }) {
   const perms = ROLE_PERMISSIONS[currentUser?.role] || ROLE_PERMISSIONS.viewer;
   const navItems = [
-    { id: 'dashboard', icon: '🏠', label: 'Dashboard', show: true },
-    { id: 'users', icon: '🔑', label: 'Users & Roles', show: perms.users },
-    { id: 'modules', icon: '📚', label: 'Modules', show: true },
     { id: 'live', icon: session ? '🔴' : '📡', label: 'Live Session', show: perms.live },
     { id: 'participants', icon: '👥', label: 'Participants', show: perms.participants },
     { id: 'results', icon: '📊', label: 'Results & Analytics', show: perms.results },
+    { id: 'users', icon: '🔑', label: 'Users & Roles', show: perms.users },
     { id: 'settings', icon: '⚙️', label: 'Settings', show: perms.settings },
   ].filter((i) => i.show);
 
   return (
-    <div className="admin-sidebar">
+    <div className={className || 'admin-sidebar'}>
       {/* Logo */}
       <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(255,255,255,.1)' }}>
         <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: 1 }}>PEDRRA</div>
@@ -94,6 +108,12 @@ function Sidebar({ activeTab, setTab, session, onLogout, courseName, currentUser
           </div>
         )}
         <button
+          onClick={onBackToCourse}
+          style={{ background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.2)', color: '#fff', borderRadius: 6, padding: '7px 12px', fontSize: 12, cursor: 'pointer', width: '100%', marginBottom: 6, fontWeight: 600 }}
+        >
+          ← Back to Course
+        </button>
+        <button
           onClick={onLogout}
           style={{ background: 'none', border: '1px solid rgba(255,255,255,.2)', color: 'rgba(255,255,255,.6)', borderRadius: 6, padding: '7px 12px', fontSize: 12, cursor: 'pointer', width: '100%' }}
         >
@@ -120,110 +140,11 @@ function TopBar({ title, children }) {
   );
 }
 
-/* ================================================================
-   DASHBOARD TAB
-   ================================================================ */
-function DashboardTab({ onTabChange }) {
-  const { course, setCourse, session, launchSession, participants, setView } = useApp();
-  const [editTitle, setEditTitle] = useState(false);
-  const [editDesc, setEditDesc] = useState(false);
-  const [titleVal, setTitleVal] = useState(course.title);
-  const [descVal, setDescVal] = useState(course.desc);
-
-  const totalItems = course.modules.reduce((s, m) => s + m.items.length, 0);
-  const totalQs = course.modules.reduce((s, m) =>
-    s + m.items.reduce((si, it) => si + (it.qs ? it.qs.length : 0), 0), 0
-  );
-
-  const exportData = () => {
-    const data = { course, participants, exportedAt: new Date().toISOString() };
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-    a.download = `pedrra-export-${Date.now()}.json`;
-    a.click();
-  };
-
-  const stats = [
-    { label: 'Modules', value: course.modules.length, icon: '📚', color: C.primary },
-    { label: 'Items', value: totalItems, icon: '📄', color: C.purple },
-    { label: 'Questions', value: totalQs, icon: '❓', color: C.warning },
-    { label: 'Participants', value: participants.length, icon: '👥', color: C.success },
-  ];
-
-  return (
-    <div style={{ padding: 28 }}>
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, marginBottom: 28 }}>
-        {stats.map((s) => (
-          <div key={s.label} style={statCard}>
-            <div style={{ fontSize: 24 }}>{s.icon}</div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
-            <div style={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Course Info */}
-      <div style={{ ...card, marginBottom: 20 }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 16 }}>Course Information</h3>
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ ...label, marginBottom: 6 }}>Course Title</div>
-          {editTitle ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input style={input} value={titleVal} onChange={(e) => setTitleVal(e.target.value)} autoFocus />
-              <button onClick={() => { setCourse({ ...course, title: titleVal }); setEditTitle(false); }} style={btn(C.success)}>Save</button>
-              <button onClick={() => { setTitleVal(course.title); setEditTitle(false); }} style={btnOutline()}>Cancel</button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{course.title}</span>
-              <button onClick={() => setEditTitle(true)} style={{ ...btnSm(C.light, C.primary), fontSize: 11 }}>Edit</button>
-            </div>
-          )}
-        </div>
-        <div>
-          <div style={{ ...label, marginBottom: 6 }}>Description</div>
-          {editDesc ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input style={input} value={descVal} onChange={(e) => setDescVal(e.target.value)} autoFocus />
-              <button onClick={() => { setCourse({ ...course, desc: descVal }); setEditDesc(false); }} style={btn(C.success)}>Save</button>
-              <button onClick={() => { setDescVal(course.desc); setEditDesc(false); }} style={btnOutline()}>Cancel</button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 14, color: C.muted }}>{course.desc}</span>
-              <button onClick={() => setEditDesc(true)} style={{ ...btnSm(C.light, C.primary), fontSize: 11 }}>Edit</button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div style={{ ...card }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 16 }}>Quick Actions</h3>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {!session ? (
-            <button onClick={() => { launchSession(); onTabChange('live'); }} style={btn(C.success)}>
-              🎓 Launch Live Session
-            </button>
-          ) : (
-            <button onClick={() => onTabChange('live')} style={btn(C.error)}>
-              🔴 View Live Session
-            </button>
-          )}
-          <button onClick={() => setView('projector')} style={btn(C.purple)}>📺 Open Projector</button>
-          <button onClick={() => onTabChange('modules')} style={btn(C.primary)}>📚 Manage Modules</button>
-          <button onClick={exportData} style={btnOutline()}>📥 Export Data</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ================================================================
    ITEM MODAL - handles doc/slides/quiz/survey creation & editing
    ================================================================ */
-function ItemModal({ open, onClose, onSave, initial, moduleId }) {
+export function ItemModal({ open, onClose, onSave, initial, moduleId }) {
   const blank = {
     id: genId(), type: 'doc', title: '', desc: '', url: '',
     slides: [], qs: [],
@@ -231,6 +152,9 @@ function ItemModal({ open, onClose, onSave, initial, moduleId }) {
   const [item, setItem] = useState(initial || blank);
   const [activeSlide, setActiveSlide] = useState(0);
   const [activeQ, setActiveQ] = useState(0);
+  const [showPreview, setShowPreview] = useState(true);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const contentRef = useRef(null);
 
   // Reset when modal opens
   const prevOpen = useRef(false);
@@ -258,6 +182,19 @@ function ItemModal({ open, onClose, onSave, initial, moduleId }) {
     const slides = [...(item.slides || [])];
     slides[i] = { ...slides[i], [k]: v };
     set('slides', slides);
+  };
+  const duplicateSlide = (i) => {
+    const slides = [...(item.slides || [])];
+    slides.splice(i + 1, 0, { ...slides[i] });
+    set('slides', slides);
+    setActiveSlide(i + 1);
+  };
+  const moveSlide = (from, to) => {
+    if (to < 0 || to >= (item.slides || []).length) return;
+    const slides = [...(item.slides || [])];
+    [slides[from], slides[to]] = [slides[to], slides[from]];
+    set('slides', slides);
+    setActiveSlide(to);
   };
 
   // Question helpers
@@ -298,6 +235,65 @@ function ItemModal({ open, onClose, onSave, initial, moduleId }) {
     set('qs', qs);
   };
 
+  // Slide templates
+  const SLIDE_TEMPLATES = [
+    { name: '🎯 Title Slide', data: { t: 'Presentation Title', c: 'Subtitle or author', l: 'title', notes: '' } },
+    { name: '📋 Bullet Points', data: { t: 'Key Points', c: 'First point\nSecond point\nThird point', l: 'bullets', notes: '' } },
+    { name: '📑 Two Columns', data: { t: 'Comparison', c: 'Left column', c2: 'Right column', l: 'twocol', notes: '' } },
+    { name: '🖼️ Image + Caption', data: { t: 'Visual', c: 'Image description', l: 'image', img: '', notes: '' } },
+    { name: '💬 Quote', data: { t: 'Author Name', c: 'The quote text goes here...', l: 'quote', notes: '' } },
+    { name: '📊 Poll (4 options)', data: { t: 'Quick Check', text: 'Your question here?', l: 'poll', opts: ['Option A', 'Option B', 'Option C', 'Option D'], ok: -1, xp: 50, timer: 30, notes: '' } },
+    { name: '✅ Yes / No Poll', data: { t: 'Quick Vote', text: 'Do you agree?', l: 'poll', opts: ['Yes', 'No'], ok: -1, xp: 0, timer: 20, notes: '' } },
+  ];
+  const addFromTemplate = (tpl) => {
+    const slides = [...(item.slides || []), { ...tpl.data }];
+    set('slides', slides);
+    setActiveSlide(slides.length - 1);
+    setShowTemplates(false);
+  };
+
+  // Formatting toolbar helper
+  const wrapSelection = (prefix, suffix = prefix) => {
+    const ta = contentRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const text = ta.value;
+    const selected = text.substring(start, end);
+    const newText = text.substring(0, start) + prefix + selected + suffix + text.substring(end);
+    updateSlide(activeSlide, 'c', newText);
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(start + prefix.length, end + prefix.length);
+    });
+  };
+  const prefixLines = (prefix) => {
+    const ta = contentRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const text = ta.value;
+    const before = text.substring(0, start);
+    const lineStart = before.lastIndexOf('\n') + 1;
+    const selected = text.substring(lineStart, end);
+    const prefixed = selected.split('\n').map((l) => prefix + l).join('\n');
+    const newText = text.substring(0, lineStart) + prefixed + text.substring(end);
+    updateSlide(activeSlide, 'c', newText);
+  };
+
+  // Slide type icons
+  const SLIDE_ICONS = { title: '🎯', content: '📝', quote: '💬', twocol: '📑', bullets: '📋', image: '🖼️', poll: '📊', rating: '⭐' };
+
+  // Reorder helpers for drag & drop
+  const reorderSlides = useCallback((newSlides) => {
+    set('slides', newSlides);
+    setActiveSlide(0);
+  }, []);
+  const reorderQs = useCallback((newQs) => {
+    set('qs', newQs);
+    setActiveQ(0);
+  }, []);
+
   const handleSave = () => {
     if (!item.title.trim()) return;
     onSave({ ...item, id: item.id || genId() });
@@ -306,6 +302,9 @@ function ItemModal({ open, onClose, onSave, initial, moduleId }) {
 
   const currentSlide = (item.slides || [])[activeSlide];
   const currentQ = (item.qs || [])[activeQ];
+
+  const { dragHandlers: slideDrag, overIdx: slideOver } = useDragDrop(item.slides || [], reorderSlides);
+  const { dragHandlers: qDrag, overIdx: qOver } = useDragDrop(item.qs || [], reorderQs);
 
   return (
     <Modal open={open} onClose={onClose} title={initial ? 'Edit Item' : 'Add Item'} maxWidth={680}>
@@ -350,7 +349,31 @@ function ItemModal({ open, onClose, onSave, initial, moduleId }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <span style={label}>Slides ({(item.slides || []).length})</span>
-            <button onClick={addSlide} style={btnSm(C.primary)}>+ Add Slide</button>
+            <div style={{ display: 'flex', gap: 6, position: 'relative' }}>
+              <button onClick={addSlide} style={btnSm(C.primary)}>+ Slide</button>
+              <button onClick={() => {
+                const slides = [...(item.slides || []), { t: '', text: '', l: 'poll', opts: ['', ''], ok: -1, xp: 50, timer: 30, notes: '' }];
+                set('slides', slides);
+                setActiveSlide(slides.length - 1);
+              }} style={btnSm('#D89E00')}>+ Poll</button>
+              <button onClick={() => setShowTemplates(!showTemplates)} style={btnSm('#805AD5')}>📄 Template</button>
+              {showTemplates && (
+                <div style={{
+                  position: 'absolute', top: '100%', right: 0, marginTop: 4, background: '#fff',
+                  border: `1px solid ${C.border}`, borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,.15)',
+                  zIndex: 20, width: 220, padding: 4,
+                }}>
+                  {SLIDE_TEMPLATES.map((tpl, i) => (
+                    <div key={i} onClick={() => addFromTemplate(tpl)}
+                      style={{ padding: '8px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 500, color: C.text }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = C.light}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                      {tpl.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           {(item.slides || []).length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: C.dim, background: C.bg, borderRadius: 8 }}>
@@ -364,16 +387,30 @@ function ItemModal({ open, onClose, onSave, initial, moduleId }) {
                   <div
                     key={i}
                     onClick={() => setActiveSlide(i)}
+                    className={slideOver === i ? 'drag-over' : ''}
                     style={{
                       padding: '8px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
                       marginBottom: 4, background: activeSlide === i ? C.light : C.bg,
                       border: activeSlide === i ? `1px solid ${C.primary}` : `1px solid ${C.border}`,
+                      borderLeft: s.l === 'poll' ? '3px solid #D89E00' : undefined,
                       color: activeSlide === i ? C.primary : C.text, fontWeight: activeSlide === i ? 700 : 400,
+                      display: 'flex', alignItems: 'center', gap: 4,
                     }}
                   >
-                    <div style={{ fontSize: 10, color: C.dim, marginBottom: 2 }}>Slide {i + 1}</div>
-                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {s.t || '(untitled)'}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, flexShrink: 0 }}>
+                      <span className="drag-handle" {...slideDrag(i)} onClick={(e) => e.stopPropagation()} style={{ fontSize: 11, cursor: 'grab', color: C.dim, lineHeight: 1 }}>⠿</span>
+                      <button onClick={(e) => { e.stopPropagation(); moveSlide(i, i - 1); }} disabled={i === 0}
+                        style={{ background: 'none', border: 'none', cursor: i > 0 ? 'pointer' : 'default', fontSize: 8, padding: 0, color: i > 0 ? C.muted : 'transparent', lineHeight: 1 }}>▲</button>
+                      <button onClick={(e) => { e.stopPropagation(); moveSlide(i, i + 1); }} disabled={i === (item.slides || []).length - 1}
+                        style={{ background: 'none', border: 'none', cursor: i < (item.slides || []).length - 1 ? 'pointer' : 'default', fontSize: 8, padding: 0, color: i < (item.slides || []).length - 1 ? C.muted : 'transparent', lineHeight: 1 }}>▼</button>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10, color: s.l === 'poll' || s.l === 'rating' ? '#D89E00' : C.dim, marginBottom: 2 }}>
+                        {SLIDE_ICONS[s.l] || '📝'} {i + 1}
+                      </div>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {s.t || s.text || '(untitled)'}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -382,8 +419,11 @@ function ItemModal({ open, onClose, onSave, initial, moduleId }) {
               {currentSlide && (
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: C.muted }}>Editing Slide {activeSlide + 1}</span>
-                    <button onClick={() => removeSlide(activeSlide)} style={{ ...btnSm(C.error), fontSize: 11 }}>Remove</button>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: C.muted }}>{SLIDE_ICONS[currentSlide.l] || '📝'} Editing Slide {activeSlide + 1}</span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => duplicateSlide(activeSlide)} style={{ ...btnSm('#805AD5'), fontSize: 11 }}>Duplicate</button>
+                      <button onClick={() => removeSlide(activeSlide)} style={{ ...btnSm(C.error), fontSize: 11 }}>Remove</button>
+                    </div>
                   </div>
                   <div style={formGroup}>
                     <label style={label}>Title</label>
@@ -391,9 +431,29 @@ function ItemModal({ open, onClose, onSave, initial, moduleId }) {
                   </div>
                   <div style={formGroup}>
                     <label style={label}>Content</label>
-                    <textarea style={{ ...input, minHeight: 80, resize: 'vertical' }}
+                    <div style={{ display: 'flex', gap: 2, marginBottom: 4, background: C.bg, borderRadius: 6, padding: 3 }}>
+                      {[
+                        { label: 'B', title: 'Bold', fn: () => wrapSelection('**') },
+                        { label: 'I', title: 'Italic', fn: () => wrapSelection('*') },
+                        { label: 'H', title: 'Heading', fn: () => prefixLines('## ') },
+                        { label: '•', title: 'Bullet list', fn: () => prefixLines('- ') },
+                      ].map((b) => (
+                        <button key={b.label} onClick={b.fn} title={b.title}
+                          style={{
+                            padding: '3px 8px', border: 'none', borderRadius: 4, cursor: 'pointer',
+                            fontSize: 12, fontWeight: b.label === 'B' ? 800 : b.label === 'I' ? 400 : 600,
+                            fontStyle: b.label === 'I' ? 'italic' : 'normal',
+                            background: 'transparent', color: C.text,
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = C.light}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                          {b.label}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea ref={contentRef} style={{ ...input, minHeight: 80, resize: 'vertical' }}
                       value={currentSlide.c} onChange={(e) => updateSlide(activeSlide, 'c', e.target.value)}
-                      placeholder="Slide content (newlines supported)" />
+                      placeholder="Slide content (use **bold**, *italic*, ## heading)" />
                   </div>
                   <div style={formGroup}>
                     <label style={label}>Layout</label>
@@ -402,8 +462,154 @@ function ItemModal({ open, onClose, onSave, initial, moduleId }) {
                       <option value="title">Title (full screen, blue gradient)</option>
                       <option value="content">Content (white, left aligned)</option>
                       <option value="quote">Quote (light blue, centered)</option>
+                      <option value="twocol">Two Columns (side by side)</option>
+                      <option value="bullets">Bullet List (one item per line)</option>
+                      <option value="image">Image + Caption</option>
+                      <option value="poll">Poll (interactive question)</option>
+                      <option value="rating">Rating Scale (1-5 stars)</option>
                     </select>
                   </div>
+                  {currentSlide.l === 'twocol' && (
+                    <div style={formGroup}>
+                      <label style={label}>Column 2 Content</label>
+                      <textarea style={{ ...input, minHeight: 60, resize: 'vertical' }}
+                        value={currentSlide.c2 || ''} onChange={(e) => updateSlide(activeSlide, 'c2', e.target.value)}
+                        placeholder="Right column content" />
+                    </div>
+                  )}
+                  {currentSlide.l === 'image' && (
+                    <div style={formGroup}>
+                      <label style={label}>Image URL</label>
+                      <input style={input} value={currentSlide.img || ''}
+                        onChange={(e) => updateSlide(activeSlide, 'img', e.target.value)}
+                        placeholder="https://example.com/image.png" />
+                    </div>
+                  )}
+                  {currentSlide.l === 'poll' && (
+                    <>
+                      <div style={formGroup}>
+                        <label style={label}>Question Text</label>
+                        <textarea style={{ ...input, minHeight: 60, resize: 'vertical' }}
+                          value={currentSlide.text || ''} onChange={(e) => updateSlide(activeSlide, 'text', e.target.value)}
+                          placeholder="What is the question?" />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
+                        <div>
+                          <label style={label}>XP</label>
+                          <input style={input} type="number" min="0" max="500"
+                            value={currentSlide.xp || 0} onChange={(e) => updateSlide(activeSlide, 'xp', parseInt(e.target.value) || 0)} />
+                        </div>
+                        <div>
+                          <label style={label}>Timer (s)</label>
+                          <input style={input} type="number" min="0" max="120"
+                            value={currentSlide.timer || 30} onChange={(e) => updateSlide(activeSlide, 'timer', parseInt(e.target.value) || 30)} />
+                        </div>
+                        <div>
+                          <label style={label}>Correct</label>
+                          <select style={{ ...input, background: C.white }}
+                            value={currentSlide.ok ?? -1} onChange={(e) => updateSlide(activeSlide, 'ok', parseInt(e.target.value))}>
+                            <option value={-1}>No correct (opinion)</option>
+                            {(currentSlide.opts || []).map((_, i) => (
+                              <option key={i} value={i}>{String.fromCharCode(65 + i)}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div style={formGroup}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <label style={label}>Answer Options</label>
+                          <button onClick={() => {
+                            const opts = [...(currentSlide.opts || []), ''];
+                            updateSlide(activeSlide, 'opts', opts);
+                          }} style={{ ...btnSm(C.primary), fontSize: 10 }}>+ Option</button>
+                        </div>
+                        {(currentSlide.opts || []).map((opt, oi) => (
+                          <div key={oi} style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+                            <div style={{
+                              width: 24, height: 24, borderRadius: 4, background: ANS[oi % 4]?.bg || C.border,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              color: '#fff', fontSize: 11, fontWeight: 700, flexShrink: 0,
+                            }}>{String.fromCharCode(65 + oi)}</div>
+                            <input style={{ ...input, flex: 1 }} value={opt}
+                              onChange={(e) => {
+                                const opts = [...(currentSlide.opts || [])];
+                                opts[oi] = e.target.value;
+                                updateSlide(activeSlide, 'opts', opts);
+                              }}
+                              placeholder={`Option ${String.fromCharCode(65 + oi)}`} />
+                            <button onClick={() => {
+                              const opts = (currentSlide.opts || []).filter((_, i) => i !== oi);
+                              updateSlide(activeSlide, 'opts', opts);
+                            }}
+                              style={{ background: 'none', border: 'none', color: C.error, cursor: 'pointer', fontSize: 16 }}>×</button>
+                          </div>
+                        ))}
+                      </div>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: C.text, cursor: 'pointer', marginTop: 4 }}>
+                        <input type="checkbox" checked={currentSlide.autoReveal || false}
+                          onChange={(e) => updateSlide(activeSlide, 'autoReveal', e.target.checked)} />
+                        Auto-reveal when all participants have voted
+                      </label>
+                    </>
+                  )}
+                  {currentSlide.l === 'rating' && (
+                    <>
+                      <div style={formGroup}>
+                        <label style={label}>Question Text</label>
+                        <textarea style={{ ...input, minHeight: 60, resize: 'vertical' }}
+                          value={currentSlide.text || ''} onChange={(e) => updateSlide(activeSlide, 'text', e.target.value)}
+                          placeholder="What do you want participants to rate?" />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                        <div>
+                          <label style={label}>XP</label>
+                          <input style={input} type="number" min="0" max="500"
+                            value={currentSlide.xp || 0} onChange={(e) => updateSlide(activeSlide, 'xp', parseInt(e.target.value) || 0)} />
+                        </div>
+                        <div>
+                          <label style={label}>Timer (s)</label>
+                          <input style={input} type="number" min="0" max="120"
+                            value={currentSlide.timer || 30} onChange={(e) => updateSlide(activeSlide, 'timer', parseInt(e.target.value) || 30)} />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, padding: 12, background: C.bg, borderRadius: 8, marginBottom: 8 }}>
+                        {[1,2,3,4,5].map((n) => (
+                          <span key={n} style={{ fontSize: 28, color: '#FFD700' }}>★</span>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 11, color: C.dim, textAlign: 'center' }}>Participants will rate from 1 to 5 stars</div>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: C.text, cursor: 'pointer', marginTop: 8 }}>
+                        <input type="checkbox" checked={currentSlide.autoReveal || false}
+                          onChange={(e) => updateSlide(activeSlide, 'autoReveal', e.target.checked)} />
+                        Auto-reveal when all participants have voted
+                      </label>
+                    </>
+                  )}
+                  <div style={formGroup}>
+                    <label style={label}>Presenter Notes (optional)</label>
+                    <textarea style={{ ...input, minHeight: 40, resize: 'vertical', fontSize: 12 }}
+                      value={currentSlide.notes || ''} onChange={(e) => updateSlide(activeSlide, 'notes', e.target.value)}
+                      placeholder="Notes visible only to presenter..." />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Live Preview */}
+          {currentSlide && (
+            <div style={{ marginTop: 16 }}>
+              <div
+                onClick={() => setShowPreview(!showPreview)}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 8 }}
+              >
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.primary }}>
+                  {showPreview ? '▼ Hide Preview' : '▶ Show Preview'}
+                </span>
+              </div>
+              {showPreview && (
+                <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden', background: '#1a1a2e' }}>
+                  <Slide s={currentSlide} />
                 </div>
               )}
             </div>
@@ -430,16 +636,21 @@ function ItemModal({ open, onClose, onSave, initial, moduleId }) {
                   <div
                     key={i}
                     onClick={() => setActiveQ(i)}
+                    className={qOver === i ? 'drag-over' : ''}
                     style={{
                       padding: '8px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
                       marginBottom: 4, background: activeQ === i ? C.light : C.bg,
                       border: activeQ === i ? `1px solid ${C.primary}` : `1px solid ${C.border}`,
                       color: activeQ === i ? C.primary : C.text, fontWeight: activeQ === i ? 700 : 400,
+                      display: 'flex', alignItems: 'center', gap: 4,
                     }}
                   >
-                    <div style={{ fontSize: 10, color: C.dim, marginBottom: 2 }}>Q{i + 1} · {q.type}</div>
-                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {q.text || '(empty)'}
+                    <span className="drag-handle" {...qDrag(i)} onClick={(e) => e.stopPropagation()} style={{ fontSize: 11, cursor: 'grab', color: C.dim }}>⠿</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10, color: C.dim, marginBottom: 2 }}>Q{i + 1} · {q.type}</div>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {q.text || '(empty)'}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -525,16 +736,21 @@ function ItemModal({ open, onClose, onSave, initial, moduleId }) {
                   <div
                     key={i}
                     onClick={() => setActiveQ(i)}
+                    className={qOver === i ? 'drag-over' : ''}
                     style={{
                       padding: '8px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
                       marginBottom: 4, background: activeQ === i ? C.light : C.bg,
                       border: activeQ === i ? `1px solid ${C.primary}` : `1px solid ${C.border}`,
                       color: activeQ === i ? C.primary : C.text,
+                      display: 'flex', alignItems: 'center', gap: 4,
                     }}
                   >
+                    <span className="drag-handle" {...qDrag(i)} onClick={(e) => e.stopPropagation()} style={{ fontSize: 11, cursor: 'grab', color: C.dim }}>⠿</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 10, color: C.dim, marginBottom: 2 }}>{q.type}</div>
                     <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {q.text || '(empty)'}
+                    </div>
                     </div>
                   </div>
                 ))}
@@ -601,7 +817,7 @@ function ItemModal({ open, onClose, onSave, initial, moduleId }) {
 /* ================================================================
    MODULE MODAL
    ================================================================ */
-function ModuleModal({ open, onClose, onSave, initial }) {
+export function ModuleModal({ open, onClose, onSave, initial }) {
   const blank = { id: genId(), title: '', desc: '', icon: '📦', phase: 'live', items: [] };
   const [mod, setMod] = useState(initial || blank);
 
@@ -648,209 +864,6 @@ function ModuleModal({ open, onClose, onSave, initial }) {
 }
 
 /* ================================================================
-   MODULES TAB
-   ================================================================ */
-function ModulesTab({ readOnly }) {
-  const { course, setCourse } = useApp();
-  const [expanded, setExpanded] = useState({});
-  const [addModOpen, setAddModOpen] = useState(false);
-  const [editMod, setEditMod] = useState(null);
-  const [deleteMod, setDeleteMod] = useState(null);
-  const [addItem, setAddItem] = useState(null); // moduleId
-  const [editItem, setEditItem] = useState(null); // { moduleId, item }
-  const [deleteItem, setDeleteItem] = useState(null); // { moduleId, itemId }
-  const [toast, setToast] = useState(null);
-
-  const showToast = (message, type = 'success') => setToast({ message, type });
-
-  const toggleExpand = (id) => setExpanded((p) => ({ ...p, [id]: !p[id] }));
-
-  const handleAddModule = (mod) => {
-    setCourse({ ...course, modules: [...course.modules, mod] });
-    showToast('Module added');
-  };
-
-  const handleEditModule = (mod) => {
-    const modules = course.modules.map((m) => m.id === mod.id ? { ...m, ...mod } : m);
-    setCourse({ ...course, modules });
-    showToast('Module updated');
-  };
-
-  const handleDeleteModule = (modId) => {
-    setCourse({ ...course, modules: course.modules.filter((m) => m.id !== modId) });
-    showToast('Module deleted');
-  };
-
-  const handleAddItem = (moduleId, item) => {
-    const modules = course.modules.map((m) =>
-      m.id === moduleId ? { ...m, items: [...m.items, item] } : m
-    );
-    setCourse({ ...course, modules });
-    showToast('Item added');
-  };
-
-  const handleEditItem = (moduleId, item) => {
-    const modules = course.modules.map((m) =>
-      m.id === moduleId
-        ? { ...m, items: m.items.map((it) => it.id === item.id ? item : it) }
-        : m
-    );
-    setCourse({ ...course, modules });
-    showToast('Item updated');
-  };
-
-  const handleDeleteItem = (moduleId, itemId) => {
-    const modules = course.modules.map((m) =>
-      m.id === moduleId ? { ...m, items: m.items.filter((it) => it.id !== itemId) } : m
-    );
-    setCourse({ ...course, modules });
-    showToast('Item deleted');
-  };
-
-  const phases = ['before', 'live', 'after'];
-
-  return (
-    <div style={{ padding: 28 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>
-            {course.modules.length} modules · {course.modules.reduce((s, m) => s + m.items.length, 0)} items
-          </p>
-        </div>
-        <button onClick={() => setAddModOpen(true)} style={btn(C.primary)}>+ Add Module</button>
-      </div>
-
-      {phases.map((phase) => {
-        const mods = course.modules.filter((m) => m.phase === phase);
-        if (!mods.length) return null;
-        return (
-          <div key={phase} style={{ marginBottom: 28 }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
-              paddingBottom: 8, borderBottom: `2px solid ${phaseColor[phase]}22`,
-            }}>
-              <span style={{
-                display: 'inline-block', padding: '3px 10px', borderRadius: 12,
-                background: phaseColor[phase] + '18', color: phaseColor[phase],
-                fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: .5,
-              }}>{phaseLabel[phase]}</span>
-              <span style={{ fontSize: 12, color: C.dim }}>{mods.length} module{mods.length !== 1 ? 's' : ''}</span>
-            </div>
-
-            {mods.map((m) => (
-              <div key={m.id} style={{
-                ...card, marginBottom: 8,
-                borderLeft: `4px solid ${phaseColor[m.phase] || C.primary}`,
-                padding: 0, overflow: 'hidden',
-              }}>
-                {/* Module header */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px' }}>
-                  <span style={{ fontSize: 22, flexShrink: 0 }}>{m.icon}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h4 style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: C.text }}>{m.title}</h4>
-                    <p style={{ margin: 0, fontSize: 12, color: C.muted }}>
-                      {m.desc} · {m.items.length} item{m.items.length !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button onClick={() => toggleExpand(m.id)}
-                      style={{ ...btnSm(C.bg, C.primary), border: `1px solid ${C.border}` }}>
-                      {expanded[m.id] ? '▲ Collapse' : '▼ Expand'}
-                    </button>
-                    <button onClick={() => setEditMod(m)} style={btnSm(C.light, C.primary)}>✏️ Edit</button>
-                    <button onClick={() => setDeleteMod(m)} style={btnSm(C.error)}>🗑</button>
-                  </div>
-                </div>
-
-                {/* Module items */}
-                {expanded[m.id] && (
-                  <div style={{ borderTop: `1px solid ${C.border}`, padding: '10px 18px 14px' }}>
-                    {m.items.length === 0 ? (
-                      <p style={{ fontSize: 13, color: C.dim, margin: '8px 0', textAlign: 'center' }}>
-                        No items yet. Add your first item below.
-                      </p>
-                    ) : (
-                      m.items.map((it) => (
-                        <div key={it.id} style={{
-                          display: 'flex', alignItems: 'center', gap: 8,
-                          padding: '10px 12px', marginBottom: 4, background: C.bg,
-                          borderRadius: 8, border: `1px solid ${C.border}`,
-                        }}>
-                          <span style={{ fontSize: 18, flexShrink: 0 }}>{itemIcon[it.type] || '📄'}</span>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{it.title}</div>
-                            <div style={{ fontSize: 11, color: C.muted }}>
-                              {it.type}
-                              {it.url && ' · has URL'}
-                              {it.slides && ` · ${it.slides.length} slides`}
-                              {it.qs && ` · ${it.qs.length} questions`}
-                              {it.desc && ` · ${it.desc}`}
-                            </div>
-                          </div>
-                          <button onClick={() => setEditItem({ moduleId: m.id, item: it })}
-                            style={btnSm(C.light, C.primary)}>✏️ Edit</button>
-                          <button onClick={() => setDeleteItem({ moduleId: m.id, itemId: it.id, title: it.title })}
-                            style={btnSm(C.error)}>🗑</button>
-                        </div>
-                      ))
-                    )}
-                    <button onClick={() => setAddItem(m.id)} style={{ ...btnOutline(), marginTop: 8, fontSize: 12 }}>
-                      + Add Item
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        );
-      })}
-
-      {/* Modals */}
-      <ModuleModal
-        open={addModOpen}
-        onClose={() => setAddModOpen(false)}
-        onSave={handleAddModule}
-      />
-      <ModuleModal
-        open={!!editMod}
-        onClose={() => setEditMod(null)}
-        onSave={handleEditModule}
-        initial={editMod}
-      />
-      <ConfirmDialog
-        open={!!deleteMod}
-        onClose={() => setDeleteMod(null)}
-        onConfirm={() => handleDeleteModule(deleteMod?.id)}
-        title="Delete Module"
-        message={`Are you sure you want to delete "${deleteMod?.title}"? All items in this module will be permanently removed.`}
-      />
-      <ItemModal
-        open={!!addItem}
-        onClose={() => setAddItem(null)}
-        onSave={(item) => handleAddItem(addItem, item)}
-        moduleId={addItem}
-      />
-      <ItemModal
-        open={!!editItem}
-        onClose={() => setEditItem(null)}
-        onSave={(item) => handleEditItem(editItem?.moduleId, item)}
-        initial={editItem?.item}
-        moduleId={editItem?.moduleId}
-      />
-      <ConfirmDialog
-        open={!!deleteItem}
-        onClose={() => setDeleteItem(null)}
-        onConfirm={() => handleDeleteItem(deleteItem?.moduleId, deleteItem?.itemId)}
-        title="Delete Item"
-        message={`Are you sure you want to delete "${deleteItem?.title}"?`}
-      />
-
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-    </div>
-  );
-}
-
-/* ================================================================
    LIVE SESSION TAB
    ================================================================ */
 function LiveSessionTab() {
@@ -858,7 +871,11 @@ function LiveSessionTab() {
     course, session, launchSession, setView,
     participants, activeQ, pushQuestion, revealAnswer,
     timer, getResponseCount, getResponseDist,
+    broadcast, presentationActive,
   } = useApp();
+
+  const [presenting, setPresenting] = useState(null); // { itemId, slides } when PresenterView is open
+  const [showQuizPush, setShowQuizPush] = useState(false);
 
   const allQuizItems = course.modules.flatMap((m) =>
     m.items.filter((i) => i.type === 'quiz').map((i) => ({ ...i, moduleName: m.title }))
@@ -867,10 +884,36 @@ function LiveSessionTab() {
     (item.qs || []).map((q, qi) => ({ q, qi, item }))
   );
 
+  // Presentation decks: slides items from live-phase modules
+  const presentationDecks = course.modules
+    .filter((m) => m.phase === 'live')
+    .flatMap((m) => m.items.filter((i) => i.type === 'slides' && (i.slides || []).length > 0).map((i) => ({
+      ...i, moduleName: m.title, moduleId: m.id,
+      pollCount: (i.slides || []).filter((s) => s.l === 'poll').length,
+    })));
+
   const activeItem = activeQ ? allQuizItems.find((i) => i.id === activeQ.itemId) : null;
   const activeQuestion = activeItem?.qs?.[activeQ?.qIndex];
   const dist = activeQuestion ? getResponseDist(activeQ.itemId, activeQ.qIndex) : [];
   const count = activeQuestion ? getResponseCount(activeQ.itemId, activeQ.qIndex) : 0;
+
+  // If PresenterView is open, render it
+  if (presenting) {
+    return (
+      <PresenterView
+        slides={presenting.slides}
+        itemId={presenting.itemId}
+        onClose={() => setPresenting(null)}
+        broadcast={broadcast}
+        activeQ={activeQ}
+        getResponseCount={getResponseCount}
+        getResponseDist={getResponseDist}
+        pushQuestion={pushQuestion}
+        revealAnswer={revealAnswer}
+        participantCount={participants.length}
+      />
+    );
+  }
 
   if (!session) {
     return (
@@ -930,6 +973,22 @@ function LiveSessionTab() {
           <p style={{ fontSize: 12, color: C.muted, marginTop: 10, textAlign: 'center' }}>
             Scan to join the session
           </p>
+          <button
+            onClick={async () => {
+              if (navigator.share) {
+                try { await navigator.share({ title: 'Join PEDRRA Session', text: `Join with code: ${session.code}`, url }); }
+                catch { /* user cancelled */ }
+              } else {
+                navigator.clipboard.writeText(url);
+                // Quick visual feedback
+                const el = document.getElementById('share-copied');
+                if (el) { el.textContent = 'Copied!'; setTimeout(() => { el.textContent = 'Share Link'; }, 1500); }
+              }
+            }}
+            style={{ ...btnSm(C.primary), marginTop: 10, width: '100%' }}
+          >
+            <span id="share-copied">Share Link</span>
+          </button>
         </div>
       </div>
 
@@ -977,39 +1036,82 @@ function LiveSessionTab() {
         </div>
       )}
 
-      {/* Push questions */}
-      <div style={card}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 14 }}>Push Question to Participants</h3>
-        {allQuestions.length === 0 ? (
-          <p style={{ color: C.dim, fontSize: 13 }}>No quiz questions found. Add quiz items in the Modules tab.</p>
+      {/* Presentation Decks */}
+      <div style={{ ...card, marginBottom: 20 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 14 }}>Presentation Decks</h3>
+        {presentationDecks.length === 0 ? (
+          <p style={{ color: C.dim, fontSize: 13 }}>No slide decks found in live-phase modules.</p>
         ) : (
           <div>
-            {allQuestions.map(({ q, qi, item }) => {
-              const isActive = activeQ?.itemId === item.id && activeQ?.qIndex === qi;
-              return (
-                <div key={`${item.id}-${qi}`} style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '10px 12px', marginBottom: 6,
-                  background: isActive ? C.light : C.bg,
-                  borderRadius: 8, border: isActive ? `1px solid ${C.primary}` : `1px solid ${C.border}`,
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, color: C.dim, marginBottom: 2 }}>
-                      {item.moduleName} › {item.title} · Q{qi + 1} · {q.type} · {q.xp} XP
-                    </div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {q.text}
-                    </div>
+            {presentationDecks.map((deck) => (
+              <div key={deck.id} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 14px', marginBottom: 8,
+                background: C.bg, borderRadius: 8, border: `1px solid ${C.border}`,
+              }}>
+                <span style={{ fontSize: 24 }}>📊</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{deck.title}</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>
+                    {deck.moduleName} · {deck.slides.length} slide{deck.slides.length !== 1 ? 's' : ''}
+                    {deck.pollCount > 0 && <span style={{ color: '#D89E00', fontWeight: 600 }}> · {deck.pollCount} poll{deck.pollCount !== 1 ? 's' : ''}</span>}
                   </div>
-                  <button
-                    onClick={() => pushQuestion(item.id, qi)}
-                    style={isActive ? btn(C.error) : btn(C.primary)}
-                  >
-                    {isActive ? '🔴 Live' : '▶ Push'}
-                  </button>
                 </div>
-              );
-            })}
+                <button
+                  onClick={() => setPresenting({ itemId: deck.id, slides: deck.slides })}
+                  style={btn(C.success)}
+                >
+                  Start Presenting
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Push questions (standalone) */}
+      <div style={card}>
+        <div
+          onClick={() => setShowQuizPush(!showQuizPush)}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+        >
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, margin: 0 }}>Push Standalone Question</h3>
+          <span style={{ fontSize: 14, color: C.dim, transition: 'transform .2s', transform: showQuizPush ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
+        </div>
+        {showQuizPush && (
+          <div style={{ marginTop: 14 }}>
+            {allQuestions.length === 0 ? (
+              <p style={{ color: C.dim, fontSize: 13 }}>No quiz questions found. Add quiz items in the Modules tab.</p>
+            ) : (
+              <div>
+                {allQuestions.map(({ q, qi, item }) => {
+                  const isActive = activeQ?.itemId === item.id && activeQ?.qIndex === qi;
+                  return (
+                    <div key={`${item.id}-${qi}`} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 12px', marginBottom: 6,
+                      background: isActive ? C.light : C.bg,
+                      borderRadius: 8, border: isActive ? `1px solid ${C.primary}` : `1px solid ${C.border}`,
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, color: C.dim, marginBottom: 2 }}>
+                          {item.moduleName} › {item.title} · Q{qi + 1} · {q.type} · {q.xp} XP
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {q.text}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => pushQuestion(item.id, qi)}
+                        style={isActive ? btn(C.error) : btn(C.primary)}
+                      >
+                        {isActive ? '🔴 Live' : '▶ Push'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1090,16 +1192,72 @@ function ResultsTab() {
     m.items.filter((i) => i.type === 'quiz').map((i) => ({ ...i, moduleName: m.title }))
   );
 
+  const allSurveyItems = course.modules.flatMap((m) =>
+    m.items.filter((i) => i.type === 'survey').map((i) => ({ ...i, moduleName: m.title }))
+  );
+
   const totalXP = participants.reduce((s, p) => s + (p.xp || 0), 0);
   const totalAnswers = participants.reduce((s, p) => s + (p.answers || 0), 0);
   const avgXP = participants.length > 0 ? Math.round(totalXP / participants.length) : 0;
 
   const exportData = () => {
     const data = { course, participants, responses, exportedAt: new Date().toISOString() };
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-    a.download = `pedrra-results-${Date.now()}.json`;
-    a.click();
+    downloadFile(data, `pedrra-results-${Date.now()}.json`);
+  };
+
+  const exportQuizCSV = () => {
+    let csv = 'Participant,Team,Module,Quiz,Question,Answer Given,Correct Answer,Is Correct,XP Earned\n';
+    allQuizItems.forEach((item) => {
+      (item.qs || []).forEach((q, qi) => {
+        const resp = responses[`${item.id}-${qi}`];
+        if (!resp?.answers) return;
+        resp.answers.forEach((ans) => {
+          const p = participants.find((pp) => pp.id === ans.participantId);
+          const givenOpt = q.opts?.[ans.answerIdx] || '';
+          const correctOpt = q.ok >= 0 ? (q.opts?.[q.ok] || '') : 'N/A (opinion)';
+          const isCorrect = q.ok < 0 ? 'N/A' : (ans.answerIdx === q.ok ? 'Yes' : 'No');
+          const xpEarned = q.ok < 0 ? 0 : (ans.answerIdx === q.ok ? (q.xp || 0) : 0);
+          csv += [csvEscape(p?.name || 'Unknown'), csvEscape(p?.team || ''), csvEscape(item.moduleName),
+            csvEscape(item.title), csvEscape(q.text), csvEscape(givenOpt), csvEscape(correctOpt),
+            isCorrect, xpEarned].join(',') + '\n';
+        });
+      });
+    });
+    downloadFile(csv, `pedrra-quiz-results-${Date.now()}.csv`, 'text/csv');
+  };
+
+  const exportSurveyCSV = () => {
+    allSurveyItems.forEach((item) => {
+      const questions = (item.qs || []).filter((q) => q.type !== 'header');
+      if (!questions.length) return;
+      let csv = 'Participant,Team,' + questions.map((q, i) => csvEscape(`Q${i + 1}: ${q.text}`)).join(',') + '\n';
+      participants.forEach((p) => {
+        const resp = responses[`survey-${item.id}-${p.id}`];
+        if (!resp) return;
+        csv += csvEscape(p.name) + ',' + csvEscape(p.team) + ',' +
+          questions.map((_, i) => csvEscape(resp.answers?.[i] ?? '')).join(',') + '\n';
+      });
+      downloadFile(csv, `pedrra-survey-${item.title.replace(/\s+/g, '-')}-${Date.now()}.csv`, 'text/csv');
+    });
+  };
+
+  const exportSummaryCSV = () => {
+    let csv = 'Module,Quiz,Question,Total Responses,% Correct,Most Common Answer,Response Distribution\n';
+    allQuizItems.forEach((item) => {
+      (item.qs || []).forEach((q, qi) => {
+        const dist = getResponseDist(item.id, qi);
+        const total = dist.reduce((s, d) => s + (d || 0), 0);
+        const correctCount = q.ok >= 0 ? (dist[q.ok] || 0) : 0;
+        const pctCorrect = q.ok >= 0 && total > 0 ? Math.round(correctCount / total * 100) : 'N/A';
+        const maxIdx = dist.indexOf(Math.max(...dist.map((d) => d || 0)));
+        const mostCommon = q.opts?.[maxIdx] || '';
+        const distStr = (q.opts || []).map((opt, i) => `${opt}: ${dist[i] || 0}`).join(' | ');
+        csv += [csvEscape(item.moduleName), csvEscape(item.title), csvEscape(q.text),
+          total, typeof pctCorrect === 'number' ? pctCorrect + '%' : pctCorrect,
+          csvEscape(mostCommon), csvEscape(distStr)].join(',') + '\n';
+      });
+    });
+    downloadFile(csv, `pedrra-summary-${Date.now()}.csv`, 'text/csv');
   };
 
   return (
@@ -1120,8 +1278,11 @@ function ResultsTab() {
         ))}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <button onClick={exportData} style={btnOutline()}>📥 Export JSON</button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+        <button onClick={exportData} style={btnOutline()}>📥 JSON</button>
+        <button onClick={exportQuizCSV} style={btnOutline()} disabled={!allQuizItems.length}>📥 Quiz CSV</button>
+        <button onClick={exportSurveyCSV} style={btnOutline()} disabled={!allSurveyItems.length}>📥 Survey CSV</button>
+        <button onClick={exportSummaryCSV} style={btnOutline()} disabled={!allQuizItems.length}>📥 Summary CSV</button>
       </div>
 
       {/* Per-question distributions */}
@@ -1479,11 +1640,13 @@ function UsersTab() {
    SETTINGS TAB
    ================================================================ */
 function SettingsTab({ onPasswordChange, onLogout }) {
-  const { course, setCourse } = useApp();
+  const { course, setCourse, courses, setCourses } = useApp();
   const [newPwd, setNewPwd] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
   const [pwdError, setPwdError] = useState('');
   const [resetOpen, setResetOpen] = useState(false);
+  const [restoreOpen, setRestoreOpen] = useState(false);
+  const [pendingRestore, setPendingRestore] = useState(null);
   const [toast, setToast] = useState(null);
   const showToast = (message, type = 'success') => setToast({ message, type });
 
@@ -1497,16 +1660,57 @@ function SettingsTab({ onPasswordChange, onLogout }) {
   };
 
   const handleReset = () => {
-    setCourse(DEFAULT_COURSE);
+    const fresh = { ...DEFAULT_COURSE, id: course.id, icon: course.icon, color: course.color, createdAt: course.createdAt };
+    setCourse(fresh);
     showToast('Course reset to defaults');
   };
 
   const handleExport = () => {
-    const data = JSON.stringify(course, null, 2);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
-    a.download = `pedrra-course-${Date.now()}.json`;
-    a.click();
+    downloadFile(course, `pedrra-${course.title.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.json`);
+  };
+
+  const handleExportAll = () => {
+    downloadFile(courses, `pedrra-all-courses-${Date.now()}.json`);
+  };
+
+  const handleFullBackup = () => {
+    const backup = { _pedrra_backup: true, version: '1.0.0', exportedAt: new Date().toISOString(), data: {} };
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('pedrra-')) {
+        try { backup.data[key] = JSON.parse(localStorage.getItem(key)); }
+        catch { backup.data[key] = localStorage.getItem(key); }
+      }
+    }
+    downloadFile(backup, `pedrra-full-backup-${Date.now()}.json`);
+    showToast('Full backup exported');
+  };
+
+  const handleRestoreFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const backup = JSON.parse(ev.target.result);
+        if (!backup._pedrra_backup || !backup.data) throw new Error('Not a PEDRRA backup');
+        setPendingRestore(backup);
+        setRestoreOpen(true);
+      } catch {
+        showToast('Invalid backup file', 'error');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleConfirmRestore = () => {
+    if (!pendingRestore?.data) return;
+    Object.entries(pendingRestore.data).forEach(([key, val]) => {
+      localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
+    });
+    showToast('Backup restored. Reloading...');
+    setTimeout(() => window.location.reload(), 800);
   };
 
   const handleImport = (e) => {
@@ -1516,9 +1720,18 @@ function SettingsTab({ onPasswordChange, onLogout }) {
     reader.onload = (ev) => {
       try {
         const data = JSON.parse(ev.target.result);
-        if (!data.title || !Array.isArray(data.modules)) throw new Error('Invalid format');
-        setCourse(data);
-        showToast('Course imported successfully');
+        if (Array.isArray(data)) {
+          // Importing multiple courses
+          if (!data.every((c) => c.title && Array.isArray(c.modules))) throw new Error('Invalid format');
+          setCourses(data);
+          showToast(`Imported ${data.length} course(s)`);
+        } else {
+          // Importing single course — replace current course
+          if (!data.title || !Array.isArray(data.modules)) throw new Error('Invalid format');
+          const updated = { ...data, id: data.id || course.id };
+          setCourse(updated);
+          showToast('Course imported successfully');
+        }
       } catch {
         showToast('Invalid course file', 'error');
       }
@@ -1527,14 +1740,25 @@ function SettingsTab({ onPasswordChange, onLogout }) {
     e.target.value = '';
   };
 
+  const { t } = useI18n();
+
   return (
     <div style={{ padding: 28 }}>
       <div style={{ maxWidth: 560 }}>
+        {/* Language */}
+        <div style={{ ...card, marginBottom: 20 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>{t('settings.language')}</h3>
+          <p style={{ fontSize: 13, color: C.muted, marginBottom: 16, lineHeight: 1.5 }}>
+            {t('settings.languageDesc')}
+          </p>
+          <LanguageSelector />
+        </div>
+
         {/* Password */}
         <div style={{ ...card, marginBottom: 20 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>Admin Password</h3>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>{t('settings.adminPwd')}</h3>
           <p style={{ fontSize: 13, color: C.muted, marginBottom: 16, lineHeight: 1.5 }}>
-            Set a password to protect the admin panel. Leave empty to remove password protection.
+            {t('settings.adminPwdDesc')}
           </p>
           <div style={formGroup}>
             <label style={label}>New Password</label>
@@ -1557,12 +1781,31 @@ function SettingsTab({ onPasswordChange, onLogout }) {
             Export or import the complete course structure as a JSON file.
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button onClick={handleExport} style={btn(C.primary)}>📤 Export Course JSON</button>
+            <button onClick={handleExport} style={btn(C.primary)}>📤 Export This Course</button>
+            <button onClick={handleExportAll} style={btn(C.secondary || '#6B7280')}>📤 Export All Courses</button>
             <label style={{ ...btn(C.purple), display: 'inline-block', cursor: 'pointer' }}>
-              📥 Import Course JSON
+              📥 Import JSON
               <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
             </label>
           </div>
+        </div>
+
+        {/* Full Backup */}
+        <div style={{ ...card, marginBottom: 20, borderColor: C.purple + '44' }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>Full Backup</h3>
+          <p style={{ fontSize: 13, color: C.muted, marginBottom: 16, lineHeight: 1.5 }}>
+            Export or restore a complete backup of all data: courses, users, session results, participants, and progress.
+          </p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button onClick={handleFullBackup} style={btn(C.success)}>📦 Export Full Backup</button>
+            <label style={{ ...btn(C.purple), display: 'inline-block', cursor: 'pointer' }}>
+              📥 Restore from Backup
+              <input type="file" accept=".json" onChange={handleRestoreFile} style={{ display: 'none' }} />
+            </label>
+          </div>
+          <p style={{ fontSize: 11, color: C.dim, marginTop: 10, lineHeight: 1.5 }}>
+            Warning: Restoring a backup will overwrite all current data. The page will reload after restoring.
+          </p>
         </div>
 
         {/* Reset */}
@@ -1577,7 +1820,7 @@ function SettingsTab({ onPasswordChange, onLogout }) {
         {/* Version */}
         <div style={{ marginTop: 20, textAlign: 'center' }}>
           <p style={{ fontSize: 12, color: C.dim }}>
-            PEDRRA LMS · European Data Protection Supervisor · v1.0.0
+            PEDRRA LMS · v1.1.0
           </p>
         </div>
       </div>
@@ -1591,65 +1834,16 @@ function SettingsTab({ onPasswordChange, onLogout }) {
         confirmLabel="Reset"
       />
 
+      <ConfirmDialog
+        open={restoreOpen}
+        onClose={() => { setRestoreOpen(false); setPendingRestore(null); }}
+        onConfirm={handleConfirmRestore}
+        title="Restore Full Backup"
+        message={`This will overwrite ALL current data with the backup from ${pendingRestore?.exportedAt ? new Date(pendingRestore.exportedAt).toLocaleString() : 'unknown date'}. The page will reload. This action cannot be undone.`}
+        confirmLabel="Restore"
+      />
+
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-    </div>
-  );
-}
-
-/* ================================================================
-   LOGIN GATE
-   ================================================================ */
-function LoginGate({ onLogin }) {
-  const { users } = useApp();
-  const [username, setUsername] = useState('');
-  const [pwd, setPwd] = useState('');
-  const [error, setError] = useState('');
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError('');
-    const user = users.find((u) => u.username.toLowerCase() === username.toLowerCase().trim());
-    if (!user) { setError('No account found with this username'); return; }
-    if (user.status === 'disabled') { setError('This account has been disabled'); return; }
-    if (user.password && user.password !== pwd) { setError('Incorrect password'); setPwd(''); return; }
-    onLogin(user);
-  };
-
-  return (
-    <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ ...card, maxWidth: 380, width: '100%', padding: 36 }}>
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontSize: 40, marginBottom: 10 }}>🔐</div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: C.primary, margin: '0 0 4px' }}>PEDRRA Admin</h1>
-          <p style={{ fontSize: 13, color: C.muted }}>Sign in to manage the platform</p>
-        </div>
-        <form onSubmit={handleSubmit}>
-          <div style={formGroup}>
-            <label style={label}>Username</label>
-            <input
-              style={input} type="text" value={username}
-              onChange={(e) => { setUsername(e.target.value); setError(''); }}
-              placeholder="admin" autoFocus
-            />
-          </div>
-          <div style={formGroup}>
-            <label style={label}>Password</label>
-            <input
-              style={input} type="password" value={pwd}
-              onChange={(e) => { setPwd(e.target.value); setError(''); }}
-              placeholder="Your password"
-            />
-          </div>
-          {error && <p style={{ color: C.error, fontSize: 13, marginBottom: 12 }}>{error}</p>}
-          <button type="submit" style={{ ...btn(C.primary), width: '100%', padding: '13px' }}>Sign In</button>
-        </form>
-        <div style={{ marginTop: 20, textAlign: 'center' }}>
-          <p style={{ fontSize: 11, color: C.dim, lineHeight: 1.5 }}>
-            Default admin: admin (no password)<br />
-            Contact your administrator if you need access.
-          </p>
-        </div>
-      </div>
     </div>
   );
 }
@@ -1657,18 +1851,16 @@ function LoginGate({ onLogin }) {
 /* ================================================================
    ADMIN MAIN
    ================================================================ */
-export default function Admin({ onExit }) {
-  const { course, session, users, setUsers } = useApp();
+export default function Admin({ onExit, currentUser: propUser }) {
+  const { course, session, users, setUsers, currentUser: ctxUser } = useApp();
+  const currentUser = propUser || ctxUser;
 
-  const [tab, setTab] = useState('dashboard');
-  const [currentUser, setCurrentUser] = useState(null);
-
-  const handleLogin = (user) => {
-    setCurrentUser(user);
-  };
+  const [tab, setTab] = useState('live');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = () => {
-    setCurrentUser(null);
+    // Navigate back; actual logout is handled by App.jsx
+    onExit();
   };
 
   const handlePasswordChange = (newPwd) => {
@@ -1677,49 +1869,45 @@ export default function Admin({ onExit }) {
     }
   };
 
-  if (!currentUser) {
-    return <LoginGate onLogin={handleLogin} />;
-  }
-
-  const perms = ROLE_PERMISSIONS[currentUser.role] || ROLE_PERMISSIONS.viewer;
+  const perms = ROLE_PERMISSIONS[currentUser?.role] || ROLE_PERMISSIONS.viewer;
 
   const tabTitles = {
-    dashboard: 'Dashboard',
-    users: 'Users & Roles',
-    modules: 'Modules',
     live: 'Live Session',
     participants: 'Participants',
     results: 'Results & Analytics',
+    users: 'Users & Roles',
     settings: 'Settings',
   };
 
   return (
     <div className="admin-layout">
+      <div className={`sidebar-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
       <Sidebar
         activeTab={tab}
-        setTab={setTab}
+        setTab={(t) => { setTab(t); setSidebarOpen(false); }}
         session={session}
         onLogout={handleLogout}
+        onBackToCourse={onExit}
         courseName={course.title}
         currentUser={currentUser}
+        className={sidebarOpen ? 'admin-sidebar open' : 'admin-sidebar'}
       />
       <div className="admin-content">
         <TopBar title={tabTitles[tab] || tab}>
+          <button className="hamburger-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>☰</button>
           <span style={{ fontSize: 12, color: C.dim }}>
-            Signed in as <strong style={{ color: C.text }}>{currentUser.name}</strong>
+            {currentUser?.name}
           </span>
           <button onClick={onExit}
             style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
-            ← Back to Home
+            ←
           </button>
         </TopBar>
 
-        {tab === 'dashboard' && <DashboardTab onTabChange={setTab} />}
-        {tab === 'users' && perms.users && <UsersTab />}
-        {tab === 'modules' && <ModulesTab readOnly={!perms.modules} />}
         {tab === 'live' && perms.live && <LiveSessionTab />}
         {tab === 'participants' && perms.participants && <ParticipantsTab />}
         {tab === 'results' && perms.results && <ResultsTab />}
+        {tab === 'users' && perms.users && <UsersTab />}
         {tab === 'settings' && perms.settings && <SettingsTab onPasswordChange={handlePasswordChange} onLogout={handleLogout} />}
 
         {/* Permission denied fallback */}
@@ -1729,7 +1917,7 @@ export default function Admin({ onExit }) {
           <div style={{ padding: 40, textAlign: 'center', color: C.dim }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
             <h3 style={{ color: C.text, marginBottom: 8 }}>Access Restricted</h3>
-            <p>Your role ({ROLES.find((r) => r.value === currentUser.role)?.label}) does not have permission to access this section.</p>
+            <p>Your role ({ROLES.find((r) => r.value === currentUser?.role)?.label}) does not have permission to access this section.</p>
           </div>
         )}
       </div>
