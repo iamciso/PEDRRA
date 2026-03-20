@@ -1,10 +1,10 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useApp } from './context.js';
 import {
-  C, CD, itemIcon, ANS,
+  C, CD, itemIcon, ANS, phaseColor,
   card, btn, btnSm, btnOutline, input, label, formGroup,
-  sidebarItem, statCard,
+  sidebarItem, statCard, editorTab,
 } from './theme';
 import { Modal, ConfirmDialog, Toast, PresenterView, Slide, SearchBar, useDragDrop } from './components.jsx';
 import { DEFAULT_COURSE } from './courseData.js';
@@ -56,6 +56,7 @@ function Sidebar({ activeTab, setTab, session, onLogout, onBackToCourse, courseN
   const perms = ROLE_PERMISSIONS[currentUser?.role] || ROLE_PERMISSIONS.viewer;
   const navItems = [
     { id: 'live', icon: session ? '🔴' : '📡', label: 'Live Session', show: perms.live },
+    { id: 'content', icon: '📝', label: 'Content', show: perms.modules },
     { id: 'participants', icon: '👥', label: 'Participants', show: perms.participants },
     { id: 'results', icon: '📊', label: 'Results & Analytics', show: perms.results },
     { id: 'users', icon: '🔑', label: 'Users & Roles', show: perms.users },
@@ -142,6 +143,512 @@ function TopBar({ title, children }) {
 
 
 /* ================================================================
+   FULLSCREEN SLIDE EDITOR - PowerPoint-like editor
+   ================================================================ */
+function FullscreenSlideEditor({ item, onSave, onClose }) {
+  const { t } = useI18n();
+  const [editItem, setEditItem] = useState(() => JSON.parse(JSON.stringify(item)));
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [rightTab, setRightTab] = useState('content');
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [hasUnsaved, setHasUnsaved] = useState(false);
+  const contentRef = useRef(null);
+
+  // Track unsaved changes
+  useEffect(() => {
+    setHasUnsaved(JSON.stringify(editItem) !== JSON.stringify(item));
+  }, [editItem, item]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+      if (e.key === 'Escape') {
+        if (hasUnsaved) {
+          if (confirm(t('editor.unsaved') + '?')) onClose();
+        } else {
+          onClose();
+        }
+      }
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setActiveSlide((prev) => Math.max(0, prev - 1));
+      }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        setActiveSlide((prev) => Math.min((editItem.slides || []).length - 1, prev + 1));
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [hasUnsaved, editItem.slides?.length]);
+
+  const set = (k, v) => setEditItem((p) => ({ ...p, [k]: v }));
+  const slides = editItem.slides || [];
+  const currentSlide = slides[activeSlide];
+
+  // Slide operations
+  const blankSlide = () => ({ t: '', c: '', l: 'content' });
+  const addSlide = () => {
+    const s = [...slides, blankSlide()];
+    set('slides', s);
+    setActiveSlide(s.length - 1);
+  };
+  const addPoll = () => {
+    const s = [...slides, { t: '', text: '', l: 'poll', opts: ['', ''], ok: -1, xp: 50, timer: 30, notes: '' }];
+    set('slides', s);
+    setActiveSlide(s.length - 1);
+  };
+  const removeSlide = (i) => {
+    const s = slides.filter((_, idx) => idx !== i);
+    set('slides', s);
+    setActiveSlide(Math.max(0, Math.min(activeSlide, s.length - 1)));
+  };
+  const updateSlide = (i, k, v) => {
+    const s = [...slides];
+    s[i] = { ...s[i], [k]: v };
+    set('slides', s);
+  };
+  const duplicateSlide = (i) => {
+    const s = [...slides];
+    s.splice(i + 1, 0, { ...s[i] });
+    set('slides', s);
+    setActiveSlide(i + 1);
+  };
+  const reorderSlides = useCallback((newSlides) => {
+    set('slides', newSlides);
+  }, []);
+  const { dragHandlers: slideDrag, overIdx: slideOver } = useDragDrop(slides, reorderSlides);
+
+  const handleSave = () => {
+    onSave({ ...editItem, id: editItem.id || genId() });
+  };
+
+  // Formatting helpers
+  const wrapSelection = (prefix, suffix = prefix) => {
+    const ta = contentRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    const text = ta.value;
+    const selected = text.substring(start, end);
+    const newText = text.substring(0, start) + prefix + selected + suffix + text.substring(end);
+    updateSlide(activeSlide, 'c', newText);
+    requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(start + prefix.length, end + prefix.length); });
+  };
+  const prefixLines = (prefix) => {
+    const ta = contentRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    const text = ta.value;
+    const before = text.substring(0, start);
+    const lineStart = before.lastIndexOf('\n') + 1;
+    const selected = text.substring(lineStart, end);
+    const prefixed = selected.split('\n').map((l) => prefix + l).join('\n');
+    updateSlide(activeSlide, 'c', text.substring(0, lineStart) + prefixed + text.substring(end));
+  };
+
+  // Templates
+  const SLIDE_TEMPLATES = [
+    { name: '🎯 Title', data: { t: 'Presentation Title', c: 'Subtitle', l: 'title', notes: '' } },
+    { name: '📋 Bullets', data: { t: 'Key Points', c: 'Point 1\nPoint 2\nPoint 3', l: 'bullets', notes: '' } },
+    { name: '📑 Two Columns', data: { t: 'Comparison', c: 'Left side', c2: 'Right side', l: 'twocol', notes: '' } },
+    { name: '🖼️ Image', data: { t: 'Visual', c: 'Caption', l: 'image', img: '', notes: '' } },
+    { name: '💬 Quote', data: { t: 'Author', c: 'Quote text...', l: 'quote', notes: '' } },
+    { name: '🎬 Video', data: { t: 'Video', c: '', l: 'video', videoUrl: '', notes: '' } },
+    { name: '📊 Poll', data: { t: 'Question', text: 'Your question?', l: 'poll', opts: ['A', 'B', 'C', 'D'], ok: -1, xp: 50, timer: 30, notes: '' } },
+    { name: '⭐ Rating', data: { t: 'Rate', text: 'How would you rate...?', l: 'rating', xp: 0, timer: 30, notes: '' } },
+  ];
+  const addFromTemplate = (tpl) => {
+    const s = [...slides, { ...tpl.data }];
+    set('slides', s);
+    setActiveSlide(s.length - 1);
+    setShowTemplates(false);
+  };
+
+  const SLIDE_ICONS = { title: '🎯', content: '📝', quote: '💬', twocol: '📑', bullets: '📋', image: '🖼️', poll: '📊', rating: '⭐', video: '🎬' };
+  const LAYOUT_OPTIONS = [
+    { value: 'title', label: 'Title (gradient)' },
+    { value: 'content', label: 'Content (white)' },
+    { value: 'quote', label: 'Quote (centered)' },
+    { value: 'twocol', label: 'Two Columns' },
+    { value: 'bullets', label: 'Bullet List' },
+    { value: 'image', label: 'Image + Caption' },
+    { value: 'video', label: 'Video' },
+    { value: 'poll', label: 'Poll' },
+    { value: 'rating', label: 'Rating' },
+  ];
+
+  // Image handlers
+  const handleImageDrop = (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      if (file.size > 512000) { alert('Image too large (max 500KB)'); return; }
+      const reader = new FileReader();
+      reader.onload = (ev) => updateSlide(activeSlide, 'img', ev.target.result);
+      reader.readAsDataURL(file);
+    }
+  };
+  const handleImagePaste = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const it of items) {
+      if (it.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = it.getAsFile();
+        if (file.size > 512000) { alert('Image too large (max 500KB)'); return; }
+        const reader = new FileReader();
+        reader.onload = (ev) => updateSlide(activeSlide, 'img', ev.target.result);
+        reader.readAsDataURL(file);
+        break;
+      }
+    }
+  };
+
+  // Render right panel content based on tab
+  const renderRightPanel = () => {
+    if (!currentSlide) return <div style={{ padding: 20, color: C.dim, textAlign: 'center' }}>Select a slide</div>;
+
+    if (rightTab === 'style') {
+      return (
+        <div>
+          <div style={formGroup}>
+            <label style={label}>Layout</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              {LAYOUT_OPTIONS.map((lo) => (
+                <button key={lo.value} onClick={() => updateSlide(activeSlide, 'l', lo.value)}
+                  style={{
+                    padding: '8px 6px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                    border: currentSlide.l === lo.value ? `2px solid ${C.primary}` : `1px solid ${C.border}`,
+                    background: currentSlide.l === lo.value ? C.light : C.white,
+                    color: currentSlide.l === lo.value ? C.primary : C.text,
+                    textAlign: 'center',
+                  }}>
+                  {SLIDE_ICONS[lo.value] || '📝'}<br/>{lo.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (rightTab === 'media') {
+      return (
+        <div>
+          {/* Image */}
+          <div style={formGroup}>
+            <label style={label}>🖼️ Image</label>
+            <input style={input} value={currentSlide.img || ''}
+              onChange={(e) => updateSlide(activeSlide, 'img', e.target.value)}
+              placeholder="Image URL or paste/drop below" />
+            <div onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = C.primary; }}
+              onDragLeave={(e) => e.currentTarget.style.borderColor = C.border}
+              onDrop={handleImageDrop} onPaste={handleImagePaste} tabIndex={0}
+              style={{ marginTop: 6, padding: 16, border: `2px dashed ${C.border}`, borderRadius: 8,
+                textAlign: 'center', fontSize: 11, color: C.dim, cursor: 'pointer', background: C.bg }}>
+              Drop image or paste (Ctrl+V) · Max 500KB
+            </div>
+            {currentSlide.img && currentSlide.img.startsWith('data:') && (
+              <p style={{ fontSize: 10, color: C.warning, marginTop: 4 }}>Embedded: {Math.round(currentSlide.img.length / 1024)}KB</p>
+            )}
+          </div>
+          {/* Video */}
+          <div style={formGroup}>
+            <label style={label}>🎬 {t('editor.tab.media')} - Video</label>
+            <input style={input} value={currentSlide.videoUrl || ''}
+              onChange={(e) => updateSlide(activeSlide, 'videoUrl', e.target.value)}
+              placeholder="YouTube URL or direct video URL" />
+            <p style={{ fontSize: 10, color: C.dim, marginTop: 3 }}>YouTube, .mp4, .webm</p>
+          </div>
+          {/* Audio */}
+          <div style={formGroup}>
+            <label style={label}>🔊 {t('editor.audioUrl')}</label>
+            <input style={input} value={currentSlide.audioUrl || ''}
+              onChange={(e) => updateSlide(activeSlide, 'audioUrl', e.target.value)}
+              placeholder="https://example.com/audio.mp3" />
+            <p style={{ fontSize: 10, color: C.dim, marginTop: 3 }}>{t('editor.audioHelp')}</p>
+            {currentSlide.audioUrl && (
+              <audio controls src={currentSlide.audioUrl} style={{ width: '100%', marginTop: 6, height: 32 }} />
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    if (rightTab === 'notes') {
+      return (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <label style={{ ...label, marginBottom: 8 }}>Presenter Notes</label>
+          <textarea style={{ ...input, flex: 1, minHeight: 200, resize: 'vertical' }}
+            value={currentSlide.notes || ''}
+            onChange={(e) => updateSlide(activeSlide, 'notes', e.target.value)}
+            placeholder="Notes visible only to presenter..." />
+        </div>
+      );
+    }
+
+    // Content tab (default)
+    return (
+      <div>
+        <div style={formGroup}>
+          <label style={label}>Title</label>
+          <input style={input} value={currentSlide.t || ''} onChange={(e) => updateSlide(activeSlide, 't', e.target.value)} placeholder="Slide title" />
+        </div>
+
+        {/* Content with formatting toolbar */}
+        {currentSlide.l !== 'poll' && currentSlide.l !== 'rating' && (
+          <div style={formGroup}>
+            <label style={label}>Content</label>
+            <div style={{ display: 'flex', gap: 2, marginBottom: 4, background: C.bg, borderRadius: 6, padding: 3 }}>
+              {[
+                { label: 'B', title: 'Bold', fn: () => wrapSelection('**') },
+                { label: 'I', title: 'Italic', fn: () => wrapSelection('*') },
+                { label: 'H', title: 'Heading', fn: () => prefixLines('## ') },
+                { label: '•', title: 'Bullet', fn: () => prefixLines('- ') },
+              ].map((b) => (
+                <button key={b.label} onClick={b.fn} title={b.title}
+                  style={{ padding: '3px 8px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12,
+                    fontWeight: b.label === 'B' ? 800 : b.label === 'I' ? 400 : 600,
+                    fontStyle: b.label === 'I' ? 'italic' : 'normal', background: 'transparent', color: C.text }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = C.light}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                  {b.label}
+                </button>
+              ))}
+            </div>
+            <textarea ref={contentRef} style={{ ...input, minHeight: 100, resize: 'vertical' }}
+              value={currentSlide.c || ''} onChange={(e) => updateSlide(activeSlide, 'c', e.target.value)}
+              placeholder="Content (**bold**, *italic*, ## heading)" />
+          </div>
+        )}
+
+        {/* Two-col */}
+        {currentSlide.l === 'twocol' && (
+          <div style={formGroup}>
+            <label style={label}>Column 2</label>
+            <textarea style={{ ...input, minHeight: 60, resize: 'vertical' }}
+              value={currentSlide.c2 || ''} onChange={(e) => updateSlide(activeSlide, 'c2', e.target.value)}
+              placeholder="Right column content" />
+          </div>
+        )}
+
+        {/* Poll fields */}
+        {currentSlide.l === 'poll' && (
+          <>
+            <div style={formGroup}>
+              <label style={label}>Question</label>
+              <textarea style={{ ...input, minHeight: 60, resize: 'vertical' }}
+                value={currentSlide.text || ''} onChange={(e) => updateSlide(activeSlide, 'text', e.target.value)}
+                placeholder="What is the question?" />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+              <div>
+                <label style={label}>XP</label>
+                <input style={input} type="number" min="0" max="500" value={currentSlide.xp || 0}
+                  onChange={(e) => updateSlide(activeSlide, 'xp', parseInt(e.target.value) || 0)} />
+              </div>
+              <div>
+                <label style={label}>Timer (s)</label>
+                <input style={input} type="number" min="0" max="120" value={currentSlide.timer || 30}
+                  onChange={(e) => updateSlide(activeSlide, 'timer', parseInt(e.target.value) || 30)} />
+              </div>
+              <div>
+                <label style={label}>Correct</label>
+                <select style={{ ...input, background: C.white }} value={currentSlide.ok ?? -1}
+                  onChange={(e) => updateSlide(activeSlide, 'ok', parseInt(e.target.value))}>
+                  <option value={-1}>None</option>
+                  {(currentSlide.opts || []).map((_, i) => <option key={i} value={i}>{String.fromCharCode(65 + i)}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={formGroup}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={label}>Options</label>
+                <button onClick={() => updateSlide(activeSlide, 'opts', [...(currentSlide.opts || []), ''])}
+                  style={{ ...btnSm(C.primary), fontSize: 10 }}>+ Option</button>
+              </div>
+              {(currentSlide.opts || []).map((opt, oi) => (
+                <div key={oi} style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 4, background: ANS[oi % 4]?.bg || C.border,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{String.fromCharCode(65 + oi)}</div>
+                  <input style={{ ...input, flex: 1, fontSize: 12 }} value={opt}
+                    onChange={(e) => { const opts = [...(currentSlide.opts || [])]; opts[oi] = e.target.value; updateSlide(activeSlide, 'opts', opts); }}
+                    placeholder={`Option ${String.fromCharCode(65 + oi)}`} />
+                  <button onClick={() => updateSlide(activeSlide, 'opts', (currentSlide.opts || []).filter((_, i) => i !== oi))}
+                    style={{ background: 'none', border: 'none', color: C.error, cursor: 'pointer', fontSize: 14 }}>×</button>
+                </div>
+              ))}
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: C.text, cursor: 'pointer' }}>
+              <input type="checkbox" checked={currentSlide.autoReveal || false}
+                onChange={(e) => updateSlide(activeSlide, 'autoReveal', e.target.checked)} />
+              Auto-reveal when all vote
+            </label>
+          </>
+        )}
+
+        {/* Rating fields */}
+        {currentSlide.l === 'rating' && (
+          <>
+            <div style={formGroup}>
+              <label style={label}>Question</label>
+              <textarea style={{ ...input, minHeight: 60, resize: 'vertical' }}
+                value={currentSlide.text || ''} onChange={(e) => updateSlide(activeSlide, 'text', e.target.value)}
+                placeholder="What should participants rate?" />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+              <div>
+                <label style={label}>XP</label>
+                <input style={input} type="number" min="0" max="500" value={currentSlide.xp || 0}
+                  onChange={(e) => updateSlide(activeSlide, 'xp', parseInt(e.target.value) || 0)} />
+              </div>
+              <div>
+                <label style={label}>Timer (s)</label>
+                <input style={input} type="number" min="0" max="120" value={currentSlide.timer || 30}
+                  onChange={(e) => updateSlide(activeSlide, 'timer', parseInt(e.target.value) || 30)} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 6, padding: 10, background: C.bg, borderRadius: 8, marginBottom: 8 }}>
+              {[1,2,3,4,5].map((n) => <span key={n} style={{ fontSize: 24, color: '#FFD700' }}>★</span>)}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="fullscreen-editor">
+      {/* Top Bar */}
+      <div className="editor-toolbar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+          <button onClick={() => { if (hasUnsaved) { if (confirm(t('editor.unsaved') + '?')) onClose(); } else onClose(); }}
+            style={{ ...btnSm(C.muted), fontSize: 16, padding: '4px 10px' }}>←</button>
+          <input className="editor-title-input" value={editItem.title}
+            onChange={(e) => set('title', e.target.value)} placeholder="Presentation title" />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <span style={{ fontSize: 12, color: C.dim }}>
+            {slides.length > 0 ? `${activeSlide + 1} / ${slides.length}` : '0 slides'}
+          </span>
+          {hasUnsaved && <span style={{ fontSize: 11, color: C.warning, fontWeight: 600 }}>{t('editor.unsaved')}</span>}
+          <button onClick={handleSave} style={btn(C.success)}>💾 Save</button>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="editor-body">
+        {/* Left: Thumbnails */}
+        <div className="slide-thumbnails-sidebar">
+          {slides.map((s, i) => (
+            <div key={i} onClick={() => setActiveSlide(i)}
+              className={`slide-thumbnail${activeSlide === i ? ' active' : ''}${slideOver === i ? ' drag-over' : ''}`}
+              style={{ position: 'relative' }}>
+              <div {...slideDrag(i)} style={{ position: 'absolute', top: 2, left: 2, cursor: 'grab', fontSize: 10, color: C.dim, zIndex: 2 }}
+                onClick={(e) => e.stopPropagation()}>⠿</div>
+              <div style={{ position: 'absolute', top: 2, right: 2, fontSize: 9, color: C.dim, zIndex: 2 }}>
+                {SLIDE_ICONS[s.l] || '📝'}
+              </div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: activeSlide === i ? C.primary : C.text,
+                marginTop: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {i + 1}. {s.t || s.text || '(untitled)'}
+              </div>
+              {/* Mini preview: show layout type */}
+              <div style={{ fontSize: 8, color: C.dim, marginTop: 2 }}>{s.l}</div>
+              {/* Actions on hover */}
+              <div style={{ display: 'flex', gap: 2, marginTop: 4, justifyContent: 'flex-end' }}>
+                <button onClick={(e) => { e.stopPropagation(); duplicateSlide(i); }}
+                  style={{ background: 'none', border: 'none', fontSize: 10, color: C.primary, cursor: 'pointer', padding: '1px 3px' }}
+                  title="Duplicate">📋</button>
+                <button onClick={(e) => { e.stopPropagation(); if (slides.length > 1) removeSlide(i); }}
+                  style={{ background: 'none', border: 'none', fontSize: 10, color: C.error, cursor: 'pointer', padding: '1px 3px' }}
+                  title="Delete">🗑</button>
+              </div>
+            </div>
+          ))}
+          {slides.length === 0 && (
+            <div style={{ padding: 16, textAlign: 'center', color: C.dim, fontSize: 12 }}>
+              No slides yet
+            </div>
+          )}
+        </div>
+
+        {/* Center: Live Preview */}
+        <div className="editor-center">
+          {currentSlide ? (
+            <div className="slide-canvas" style={{ width: 640, height: 360, transform: 'scale(0.85)', transformOrigin: 'center center' }}>
+              <div style={{ width: 640, height: 360, overflow: 'hidden' }}>
+                <Slide s={currentSlide} />
+              </div>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', color: C.dim }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>🎨</div>
+              <p style={{ fontSize: 14 }}>Add a slide to get started</p>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Property Editor */}
+        <div className="editor-right-panel">
+          <div className="editor-tab-bar">
+            {['content', 'style', 'media', 'notes'].map((tab) => (
+              <button key={tab} className={rightTab === tab ? 'active' : ''}
+                onClick={() => setRightTab(tab)}>
+                {tab === 'content' ? '📝' : tab === 'style' ? '🎨' : tab === 'media' ? '📎' : '📋'}
+                {' '}{t(`editor.tab.${tab}`)}
+              </button>
+            ))}
+          </div>
+          <div className="editor-tab-content">
+            {renderRightPanel()}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Bar */}
+      <div className="editor-bottom-bar">
+        <div style={{ display: 'flex', gap: 6, position: 'relative' }}>
+          <button onClick={addSlide} style={btnSm(C.primary)}>+ Slide</button>
+          <button onClick={addPoll} style={btnSm('#D89E00')}>+ Poll</button>
+          <button onClick={() => setShowTemplates(!showTemplates)} style={btnSm('#805AD5')}>📄 Template</button>
+          {showTemplates && (
+            <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: 4, background: '#fff',
+              border: `1px solid ${C.border}`, borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,.15)',
+              zIndex: 20, width: 200, padding: 4 }}>
+              {SLIDE_TEMPLATES.map((tpl, i) => (
+                <div key={i} onClick={() => addFromTemplate(tpl)}
+                  style={{ padding: '7px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500, color: C.text }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = C.light}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                  {tpl.name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          {slides.map((_, i) => (
+            <div key={i} onClick={() => setActiveSlide(i)}
+              style={{ width: activeSlide === i ? 10 : 6, height: 6, borderRadius: 3, cursor: 'pointer',
+                background: activeSlide === i ? C.primary : C.border, transition: 'all .15s' }} />
+          ))}
+        </div>
+        <span style={{ fontSize: 12, color: C.dim }}>{slides.length} slide{slides.length !== 1 ? 's' : ''}</span>
+      </div>
+    </div>
+  );
+}
+
+
+/* ================================================================
    ITEM MODAL - handles doc/slides/quiz/survey creation & editing
    ================================================================ */
 export function ItemModal({ open, onClose, onSave, initial, moduleId }) {
@@ -156,13 +663,26 @@ export function ItemModal({ open, onClose, onSave, initial, moduleId }) {
   const [showTemplates, setShowTemplates] = useState(false);
   const contentRef = useRef(null);
 
-  // Reset when modal opens
+  // Reset when modal opens with new initial data
   const prevOpen = useRef(false);
+  const prevInitialId = useRef(null);
   if (open && !prevOpen.current) {
     prevOpen.current = true;
   } else if (!open && prevOpen.current) {
     prevOpen.current = false;
   }
+  useEffect(() => {
+    if (open && initial && initial.id !== prevInitialId.current) {
+      setItem(initial);
+      setActiveSlide(0);
+      setActiveQ(0);
+      prevInitialId.current = initial.id;
+    }
+    if (open && !initial) {
+      setItem({ id: genId(), type: 'doc', title: '', desc: '', url: '', slides: [], qs: [] });
+      prevInitialId.current = null;
+    }
+  }, [open, initial]);
 
   const set = (k, v) => setItem((p) => ({ ...p, [k]: v }));
 
@@ -305,6 +825,17 @@ export function ItemModal({ open, onClose, onSave, initial, moduleId }) {
 
   const { dragHandlers: slideDrag, overIdx: slideOver } = useDragDrop(item.slides || [], reorderSlides);
   const { dragHandlers: qDrag, overIdx: qOver } = useDragDrop(item.qs || [], reorderQs);
+
+  // Fullscreen editor for slides
+  if (open && item.type === 'slides') {
+    return (
+      <FullscreenSlideEditor
+        item={item}
+        onSave={(updated) => { onSave(updated); onClose(); }}
+        onClose={onClose}
+      />
+    );
+  }
 
   return (
     <Modal open={open} onClose={onClose} title={initial ? 'Edit Item' : 'Add Item'} maxWidth={680}>
@@ -1955,6 +2486,217 @@ function SettingsTab({ onPasswordChange, onLogout }) {
 }
 
 /* ================================================================
+   CONTENT TAB - Overview of all items across modules
+   ================================================================ */
+function ContentTab() {
+  const { course, setCourse } = useApp();
+  const { t } = useI18n();
+  const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [filterModule, setFilterModule] = useState('all');
+  const [editItem, setEditItem] = useState(null);
+  const [editModuleId, setEditModuleId] = useState(null);
+  const [addItemModuleId, setAddItemModuleId] = useState(null);
+  const [deleteItem, setDeleteItem] = useState(null);
+  const [toast, setToast] = useState(null);
+  const showToast = (msg, type = 'success') => setToast({ message: msg, type });
+
+  const handleSaveItem = (moduleId, item) => {
+    setCourse({
+      ...course,
+      modules: course.modules.map((m) =>
+        m.id === moduleId
+          ? { ...m, items: m.items.some((it) => it.id === item.id)
+              ? m.items.map((it) => it.id === item.id ? item : it)
+              : [...m.items, item] }
+          : m
+      ),
+    });
+    showToast(editItem ? 'Item updated' : 'Item added');
+    setEditItem(null);
+    setEditModuleId(null);
+    setAddItemModuleId(null);
+  };
+
+  const handleDuplicate = (moduleId, item) => {
+    const cloned = JSON.parse(JSON.stringify(item));
+    cloned.id = genId();
+    cloned.title = item.title + ' (copy)';
+    if (cloned.slides) cloned.slides = cloned.slides.map((s) => ({ ...s }));
+    if (cloned.qs) cloned.qs = cloned.qs.map((q) => ({ ...q, id: genId() }));
+    setCourse({
+      ...course,
+      modules: course.modules.map((m) =>
+        m.id === moduleId ? { ...m, items: [...m.items, cloned] } : m
+      ),
+    });
+    showToast(`Duplicated "${item.title}"`);
+  };
+
+  const handleDelete = (moduleId, itemId) => {
+    setCourse({
+      ...course,
+      modules: course.modules.map((m) =>
+        m.id === moduleId ? { ...m, items: m.items.filter((it) => it.id !== itemId) } : m
+      ),
+    });
+    showToast('Item deleted');
+  };
+
+  // Flatten all items with module info
+  const allItems = course.modules.flatMap((m) =>
+    m.items.map((it) => ({ ...it, moduleId: m.id, moduleName: m.title, moduleIcon: m.icon, phase: m.phase }))
+  );
+
+  // Filter
+  const filtered = allItems.filter((it) => {
+    if (filterType !== 'all' && it.type !== filterType) return false;
+    if (filterModule !== 'all' && it.moduleId !== filterModule) return false;
+    if (search) {
+      const s = search.toLowerCase();
+      if (!it.title.toLowerCase().includes(s) && !(it.desc || '').toLowerCase().includes(s)) return false;
+    }
+    return true;
+  });
+
+  // Group by module
+  const groupedByModule = course.modules
+    .filter((m) => filterModule === 'all' || m.id === filterModule)
+    .map((m) => ({
+      ...m,
+      filteredItems: filtered.filter((it) => it.moduleId === m.id),
+    }))
+    .filter((m) => m.filteredItems.length > 0 || filterType === 'all');
+
+  const typeCounts = { all: allItems.length };
+  allItems.forEach((it) => { typeCounts[it.type] = (typeCounts[it.type] || 0) + 1; });
+
+  const itemDetail = (it) => {
+    if (it.type === 'slides') {
+      const polls = (it.slides || []).filter((s) => s.l === 'poll' || s.l === 'rating').length;
+      return `${(it.slides || []).length} slides${polls > 0 ? `, ${polls} polls` : ''}`;
+    }
+    if (it.type === 'quiz' || it.type === 'survey') return `${(it.qs || []).length} questions`;
+    if (it.type === 'doc') return it.url ? 'Has URL' : 'No URL';
+    return '';
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Filter bar */}
+      <div className="content-filter-bar">
+        <input style={{ ...input, flex: 1, maxWidth: 280, padding: '8px 12px', fontSize: 13 }}
+          placeholder={t('content.search')} value={search}
+          onChange={(e) => setSearch(e.target.value)} />
+        <div className="content-type-filter">
+          {[
+            { value: 'all', label: t('content.allTypes'), icon: '📋' },
+            { value: 'slides', label: 'Slides', icon: '🎬' },
+            { value: 'quiz', label: 'Quiz', icon: '❓' },
+            { value: 'survey', label: 'Survey', icon: '📋' },
+            { value: 'doc', label: 'Doc', icon: '📄' },
+          ].map((f) => (
+            <button key={f.value} className={filterType === f.value ? 'active' : ''}
+              onClick={() => setFilterType(f.value)}>
+              {f.icon} {f.label} {typeCounts[f.value] ? `(${typeCounts[f.value]})` : ''}
+            </button>
+          ))}
+        </div>
+        <select style={{ ...input, maxWidth: 180, padding: '8px 12px', fontSize: 13, background: C.white }}
+          value={filterModule} onChange={(e) => setFilterModule(e.target.value)}>
+          <option value="all">{t('content.allModules')}</option>
+          {course.modules.map((m) => <option key={m.id} value={m.id}>{m.icon} {m.title}</option>)}
+        </select>
+      </div>
+
+      {/* Content list */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 20px' }}>
+        {groupedByModule.length === 0 ? (
+          <div style={{ padding: 48, textAlign: 'center', color: C.dim }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
+            <p style={{ fontSize: 14 }}>{t('content.noItems')}</p>
+          </div>
+        ) : (
+          groupedByModule.map((m) => (
+            <div key={m.id}>
+              {/* Module header */}
+              <div className="content-module-header">
+                <span style={{ fontSize: 20 }}>{m.icon}</span>
+                <span style={{ flex: 1, color: C.text }}>{m.title}</span>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                  background: (phaseColor[m.phase] || C.dim) + '18',
+                  color: phaseColor[m.phase] || C.dim, textTransform: 'uppercase',
+                }}>{m.phase}</span>
+                <span style={{ fontSize: 12, color: C.dim }}>{m.items.length} items</span>
+                <button onClick={() => setAddItemModuleId(m.id)} style={btnSm(C.primary)}>+ {t('content.addItem')}</button>
+              </div>
+
+              {/* Items */}
+              {m.filteredItems.length === 0 ? (
+                <div style={{ padding: '12px 16px', color: C.dim, fontSize: 13, fontStyle: 'italic', borderBottom: `1px solid ${C.border}` }}>
+                  No matching items in this module
+                </div>
+              ) : (
+                m.filteredItems.map((it) => (
+                  <div key={it.id} className="content-item-row">
+                    <span style={{ fontSize: 20, flexShrink: 0 }}>{itemIcon[it.type] || '📄'}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {it.title || '(untitled)'}
+                      </div>
+                      <div style={{ fontSize: 11, color: C.muted }}>
+                        {it.type} · {itemDetail(it)}
+                      </div>
+                    </div>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6,
+                      background: it.type === 'slides' ? '#6366f118' : it.type === 'quiz' ? '#E53E3E18' : it.type === 'survey' ? '#ED893618' : '#38A16918',
+                      color: it.type === 'slides' ? '#6366f1' : it.type === 'quiz' ? '#E53E3E' : it.type === 'survey' ? '#ED8936' : '#38A169',
+                    }}>{it.type}</span>
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      <button onClick={() => { setEditItem(it); setEditModuleId(it.moduleId); }}
+                        style={btnSm(C.primary)} title={t('content.edit')}>✏️</button>
+                      <button onClick={() => handleDuplicate(it.moduleId, it)}
+                        style={btnSm('#805AD5')} title={t('content.duplicate')}>📋</button>
+                      <button onClick={() => setDeleteItem({ moduleId: it.moduleId, itemId: it.id, title: it.title })}
+                        style={btnSm(C.error)} title={t('content.delete')}>🗑</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Modals */}
+      <ItemModal
+        open={!!editItem}
+        onClose={() => { setEditItem(null); setEditModuleId(null); }}
+        onSave={(item) => handleSaveItem(editModuleId, item)}
+        initial={editItem}
+        moduleId={editModuleId}
+      />
+      <ItemModal
+        open={!!addItemModuleId}
+        onClose={() => setAddItemModuleId(null)}
+        onSave={(item) => handleSaveItem(addItemModuleId, item)}
+        moduleId={addItemModuleId}
+      />
+      <ConfirmDialog
+        open={!!deleteItem}
+        onClose={() => setDeleteItem(null)}
+        onConfirm={() => { handleDelete(deleteItem.moduleId, deleteItem.itemId); setDeleteItem(null); }}
+        title={t('content.delete')}
+        message={`Delete "${deleteItem?.title}"?`}
+      />
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+    </div>
+  );
+}
+
+/* ================================================================
    ADMIN MAIN
    ================================================================ */
 export default function Admin({ onExit, currentUser: propUser }) {
@@ -1979,6 +2721,7 @@ export default function Admin({ onExit, currentUser: propUser }) {
 
   const tabTitles = {
     live: 'Live Session',
+    content: 'Content Overview',
     participants: 'Participants',
     results: 'Results & Analytics',
     users: 'Users & Roles',
@@ -2011,6 +2754,7 @@ export default function Admin({ onExit, currentUser: propUser }) {
         </TopBar>
 
         {tab === 'live' && perms.live && <LiveSessionTab />}
+        {tab === 'content' && perms.modules && <ContentTab />}
         {tab === 'participants' && perms.participants && <ParticipantsTab />}
         {tab === 'results' && perms.results && <ResultsTab />}
         {tab === 'users' && perms.users && <UsersTab />}

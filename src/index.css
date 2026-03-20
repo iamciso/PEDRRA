@@ -354,10 +354,31 @@ input:focus, select:focus, textarea:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
+  padding: 10px 20px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
+  gap: 12px;
+  height: 48px;
+  box-sizing: border-box;
+}
+
+.fullscreen-editor .editor-toolbar .editor-title-input {
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  outline: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.fullscreen-editor .editor-toolbar .editor-title-input:focus {
+  background: var(--bg-primary);
+  box-shadow: 0 0 0 2px rgba(12,77,162,.2);
 }
 
 .fullscreen-editor .editor-body {
@@ -370,6 +391,166 @@ input:focus, select:focus, textarea:focus {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+}
+
+.editor-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e8edf2;
+  overflow: auto;
+  padding: 24px;
+}
+
+[data-theme="dark"] .editor-center {
+  background: #111827;
+}
+
+.slide-canvas {
+  box-shadow: 0 4px 24px rgba(0,0,0,.15);
+  border-radius: 4px;
+  overflow: hidden;
+  background: #1a1a2e;
+}
+
+.editor-right-panel {
+  width: 320px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.editor-tab-bar button {
+  flex: 1;
+  padding: 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  transition: color .15s, border-color .15s;
+}
+
+.editor-tab-bar button:hover {
+  color: var(--text-primary);
+}
+
+.editor-tab-bar button.active {
+  color: var(--border-focus);
+  border-bottom-color: var(--border-focus);
+}
+
+.editor-tab-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.editor-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+/* ===== Content tab ===== */
+.content-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 28px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+
+.content-type-filter {
+  display: flex;
+  gap: 4px;
+}
+
+.content-type-filter button {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.content-type-filter button:hover {
+  border-color: var(--border-focus);
+  color: var(--text-primary);
+}
+
+.content-type-filter button.active {
+  background: var(--border-focus);
+  color: #fff;
+  border-color: var(--border-focus);
+}
+
+.content-item-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-color);
+  transition: background .1s;
+}
+
+.content-item-row:hover {
+  background: var(--table-hover);
+}
+
+.content-module-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--bg-primary);
+  font-weight: 700;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+@media (max-width: 768px) {
+  .editor-right-panel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    max-height: 50vh;
+  }
+  .editor-center {
+    padding: 12px;
+  }
+  .fullscreen-editor .editor-body {
+    flex-direction: column;
+  }
+  .content-filter-bar {
+    padding: 12px 16px;
+  }
 }
 
 /* ===== Slide thumbnails ===== */
@@ -397,7 +578,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .slide-thumbnails-sidebar {
-  width: 160px;
+  width: 180px;
   flex-shrink: 0;
   border-right: 1px solid var(--border-color);
   background: var(--bg-surface);

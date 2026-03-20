@@ -433,6 +433,11 @@ export function Slide({ s, big, showNotes }) {
       <h2 style={{ fontSize: l.title, fontWeight: 700, margin: '0 0 12px', lineHeight: 1.3 }}>{s.t}</h2>
       <div style={{ fontSize: l.body, lineHeight: 1.7, opacity: 0.9 }}>{renderFormattedText(s.c)}</div>
       {showNotes && s.notes && <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFF9DB', borderRadius: 6, fontSize: 12, color: '#744210', borderLeft: '3px solid #ECC94B' }}>📝 {s.notes}</div>}
+      {s.audioUrl && (
+        <div style={{ padding: '8px 16px', background: 'rgba(0,0,0,.15)', borderTop: '1px solid rgba(255,255,255,.1)' }}>
+          <audio controls src={s.audioUrl} style={{ width: '100%', height: 32 }} />
+        </div>
+      )}
     </div>
   );
 }

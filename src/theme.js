@@ -99,6 +99,13 @@ export const tab = (active) => ({
   color: active ? C.primary : C.dim,
 });
 
+export const editorTab = (active) => ({
+  flex: 1, padding: '10px 4px', fontSize: 11, fontWeight: 600,
+  border: 'none', background: 'transparent', cursor: 'pointer',
+  borderBottom: active ? `2px solid ${C.primary}` : '2px solid transparent',
+  color: active ? C.primary : C.dim,
+});
+
 /* Admin layout helpers */
 export const adminLayout = {
   display: 'flex', minHeight: '100vh', fontFamily: "'Segoe UI', system-ui, sans-serif",
