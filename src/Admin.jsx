@@ -326,14 +326,15 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
 
   // Templates
   const SLIDE_TEMPLATES = [
-    { name: '🎯 Title', data: { t: 'Presentation Title', c: 'Subtitle', l: 'title', notes: '' } },
-    { name: '📋 Bullets', data: { t: 'Key Points', c: 'Point 1\nPoint 2\nPoint 3', l: 'bullets', notes: '' } },
+    { name: '🏛️ EDPS Title', data: { t: 'Presentation Title', c: 'European Data Protection Supervisor', l: 'title', notes: '' } },
+    { name: '📋 Key Points', data: { t: 'Key Points', c: '- Point 1\n- Point 2\n- Point 3', l: 'bullets', notes: '' } },
     { name: '📑 Two Columns', data: { t: 'Comparison', c: 'Left side', c2: 'Right side', l: 'twocol', notes: '' } },
     { name: '🖼️ Image', data: { t: 'Visual', c: 'Caption', l: 'image', img: '', notes: '' } },
-    { name: '💬 Quote', data: { t: 'Author', c: 'Quote text...', l: 'quote', notes: '' } },
+    { name: '💬 Quote', data: { t: 'Author', c: '"Quote text..."', l: 'quote', notes: '' } },
     { name: '🎬 Video', data: { t: 'Video', c: '', l: 'video', videoUrl: '', notes: '' } },
-    { name: '📊 Poll', data: { t: 'Question', text: 'Your question?', l: 'poll', opts: ['A', 'B', 'C', 'D'], ok: -1, xp: 50, timer: 30, notes: '' } },
+    { name: '📊 Poll', data: { t: 'Question', text: 'Your question?', l: 'poll', opts: ['Option A', 'Option B', 'Option C', 'Option D'], ok: -1, xp: 50, timer: 30, notes: '' } },
     { name: '⭐ Rating', data: { t: 'Rate', text: 'How would you rate...?', l: 'rating', xp: 0, timer: 30, notes: '' } },
+    { name: '📄 Content', data: { t: 'Section Title', c: 'Body text here...', l: 'content', notes: '' } },
   ];
   const addFromTemplate = (tpl) => {
     const s = [...slides, { ...tpl.data }];
@@ -389,13 +390,13 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
     if (rightTab === 'style') {
       const COLOR_PRESETS = [
         { label: 'Default', bg: '', text: '' },
-        { label: 'Dark', bg: '#1a1a2e', text: '#ffffff' },
-        { label: 'Navy', bg: '#0C4DA2', text: '#ffffff' },
-        { label: 'Forest', bg: '#1a472a', text: '#ffffff' },
-        { label: 'Sunset', bg: '#ff6b35', text: '#ffffff' },
-        { label: 'Wine', bg: '#722f37', text: '#ffffff' },
-        { label: 'Sky', bg: '#e3f2fd', text: '#1a237e' },
-        { label: 'Cream', bg: '#fef9e7', text: '#5d4037' },
+        { label: 'EDPS Blue', bg: '#003399', text: '#ffffff' },
+        { label: 'EDPS Dark', bg: '#001a4d', text: '#ffffff' },
+        { label: 'EDPS Light', bg: '#e6ecf5', text: '#003399' },
+        { label: 'EU Gold', bg: '#FFCC00', text: '#001a4d' },
+        { label: 'White', bg: '#ffffff', text: '#1a1a2e' },
+        { label: 'Grey', bg: '#f4f6fa', text: '#1a1a2e' },
+        { label: 'Midnight', bg: '#0a0f1e', text: '#e0e4eb' },
       ];
       return (
         <div>

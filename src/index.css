@@ -1,34 +1,37 @@
 /* ===== CSS Custom Properties ===== */
+/* EDPS brand: EU blue #003399, gold #FFCC00 */
 :root {
-  --bg-primary: #F7FAFC;
+  --bg-primary: #f4f6fa;
   --bg-surface: #FFFFFF;
-  --bg-sidebar: #082F66;
-  --text-primary: #2D3748;
-  --text-muted: #718096;
-  --text-dim: #A0AEC0;
-  --border-color: #E2E8F0;
-  --border-focus: #0C4DA2;
-  --scrollbar-thumb: #CBD5E0;
-  --scrollbar-hover: #A0AEC0;
-  --table-hover: #F7FAFC;
+  --bg-sidebar: #001a4d;
+  --text-primary: #1a1a2e;
+  --text-muted: #5a6577;
+  --text-dim: #8e99a9;
+  --border-color: #d4dbe6;
+  --border-focus: #003399;
+  --scrollbar-thumb: #b0bec5;
+  --scrollbar-hover: #8e99a9;
+  --table-hover: #f4f6fa;
   --shadow-card: rgba(0,0,0,.06);
   --shadow-toast: rgba(0,0,0,.2);
+  --edps-gold: #FFCC00;
 }
 
 [data-theme="dark"] {
-  --bg-primary: #1A202C;
-  --bg-surface: #2D3748;
-  --bg-sidebar: #0D1B2A;
-  --text-primary: #E2E8F0;
-  --text-muted: #A0AEC0;
-  --text-dim: #718096;
-  --border-color: #4A5568;
-  --border-focus: #63B3ED;
-  --scrollbar-thumb: #4A5568;
-  --scrollbar-hover: #718096;
-  --table-hover: #2D3748;
+  --bg-primary: #111827;
+  --bg-surface: #1e2433;
+  --bg-sidebar: #0a0f1e;
+  --text-primary: #e0e4eb;
+  --text-muted: #99a5b5;
+  --text-dim: #6b7a8d;
+  --border-color: #3a4556;
+  --border-focus: #6699cc;
+  --scrollbar-thumb: #3a4556;
+  --scrollbar-hover: #6b7a8d;
+  --table-hover: #1e2433;
   --shadow-card: rgba(0,0,0,.3);
   --shadow-toast: rgba(0,0,0,.5);
+  --edps-gold: #FFCC00;
 }
 
 /* ===== Reset ===== */

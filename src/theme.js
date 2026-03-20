@@ -1,48 +1,52 @@
+/* EDPS brand palette — EU blue #003399, EDPS gold #FFCC00 */
 export const C = {
-  primary: '#0C4DA2',
-  dark: '#082F66',
-  light: '#E8EFF8',
-  text: '#2D3748',
-  muted: '#718096',
-  dim: '#A0AEC0',
-  border: '#E2E8F0',
-  bg: '#F7FAFC',
+  primary: '#003399',
+  dark: '#001a4d',
+  light: '#e6ecf5',
+  text: '#1a1a2e',
+  muted: '#5a6577',
+  dim: '#8e99a9',
+  border: '#d4dbe6',
+  bg: '#f4f6fa',
   white: '#FFFFFF',
-  success: '#38A169',
-  error: '#E53E3E',
-  warning: '#ED8936',
-  accent: '#FFF200',
+  success: '#2e7d32',
+  error: '#c62828',
+  warning: '#e65100',
+  accent: '#FFCC00',
   purple: '#6366f1',
+  gold: '#FFCC00',
 };
 
-/* Dark mode color palette */
+/* Dark mode color palette — EDPS dark variant */
 export const CD = {
-  primary: '#63B3ED',
-  dark: '#0D1B2A',
-  light: '#2A4365',
-  text: '#E2E8F0',
-  muted: '#A0AEC0',
-  dim: '#718096',
-  border: '#4A5568',
-  bg: '#1A202C',
-  white: '#2D3748',
-  surface: '#2D3748',
-  success: '#68D391',
-  error: '#FC8181',
-  warning: '#F6AD55',
-  accent: '#FFF200',
+  primary: '#6699cc',
+  dark: '#0a0f1e',
+  light: '#1e2d4a',
+  text: '#e0e4eb',
+  muted: '#99a5b5',
+  dim: '#6b7a8d',
+  border: '#3a4556',
+  bg: '#111827',
+  white: '#1e2433',
+  surface: '#1e2433',
+  success: '#66bb6a',
+  error: '#ef5350',
+  warning: '#ffa726',
+  accent: '#FFCC00',
   purple: '#A5B4FC',
+  gold: '#FFCC00',
 };
 
 export const phaseColor = { before: '#6366f1', live: C.primary, after: C.success };
 export const phaseLabel = { before: 'Before Training', live: 'Training Day', after: 'After Training' };
 export const itemIcon = { doc: '\u{1F4C4}', slides: '\u{1F4CA}', quiz: '\u2753', survey: '\u{1F4CB}' };
 
+/* EDPS-style poll answer colors */
 export const ANS = [
-  { bg: '#E21B3C', shape: '\u25B2', label: 'A' },
-  { bg: '#1368CE', shape: '\u25C6', label: 'B' },
-  { bg: '#D89E00', shape: '\u25CF', label: 'C' },
-  { bg: '#26890C', shape: '\u25A0', label: 'D' },
+  { bg: '#003399', shape: '\u25B2', label: 'A' },
+  { bg: '#0055a4', shape: '\u25C6', label: 'B' },
+  { bg: '#FFCC00', shape: '\u25CF', label: 'C' },
+  { bg: '#2e7d32', shape: '\u25A0', label: 'D' },
 ];
 
 /* Badge definitions */

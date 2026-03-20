@@ -292,14 +292,15 @@ export function Slide({ s, big, showNotes, transition }) {
   const f = big ? 1 : 0.55;
   // Font size multiplier from slide setting
   const fsm = s.fontSize === 'small' ? 0.8 : s.fontSize === 'large' ? 1.25 : s.fontSize === 'xlarge' ? 1.5 : 1;
+  // EDPS-style layouts with institutional blue and gold accents
   const layouts = {
-    title:   { bg: `linear-gradient(135deg, ${C.primary}, ${C.dark})`, c: '#fff', align: 'center', title: 42 * f * fsm, body: 20 * f * fsm, pad: 50 * f },
-    content: { bg: C.white, c: C.text, align: 'left', title: 28 * f * fsm, body: 16 * f * fsm, pad: 36 * f },
-    quote:   { bg: C.light, c: C.primary, align: 'center', title: 22 * f * fsm, body: 20 * f * fsm, pad: 50 * f },
-    twocol:  { bg: C.white, c: C.text, align: 'left', title: 28 * f * fsm, body: 15 * f * fsm, pad: 36 * f },
-    bullets: { bg: C.white, c: C.text, align: 'left', title: 28 * f * fsm, body: 15 * f * fsm, pad: 36 * f },
-    image:   { bg: C.bg, c: C.text, align: 'center', title: 26 * f * fsm, body: 14 * f * fsm, pad: 30 * f },
-    video:   { bg: C.bg, c: C.text, align: 'center', title: 26 * f * fsm, body: 14 * f * fsm, pad: 30 * f },
+    title:   { bg: `linear-gradient(135deg, #003399 0%, #001a4d 100%)`, c: '#fff', align: 'center', title: 40 * f * fsm, body: 18 * f * fsm, pad: 50 * f, accent: '#FFCC00' },
+    content: { bg: '#ffffff', c: '#1a1a2e', align: 'left', title: 26 * f * fsm, body: 15 * f * fsm, pad: 36 * f, accent: '#003399' },
+    quote:   { bg: '#e6ecf5', c: '#003399', align: 'center', title: 22 * f * fsm, body: 19 * f * fsm, pad: 50 * f, accent: '#FFCC00' },
+    twocol:  { bg: '#ffffff', c: '#1a1a2e', align: 'left', title: 26 * f * fsm, body: 14 * f * fsm, pad: 36 * f, accent: '#003399' },
+    bullets: { bg: '#ffffff', c: '#1a1a2e', align: 'left', title: 26 * f * fsm, body: 14 * f * fsm, pad: 36 * f, accent: '#003399' },
+    image:   { bg: '#f4f6fa', c: '#1a1a2e', align: 'center', title: 24 * f * fsm, body: 13 * f * fsm, pad: 30 * f, accent: '#003399' },
+    video:   { bg: '#f4f6fa', c: '#1a1a2e', align: 'center', title: 24 * f * fsm, body: 13 * f * fsm, pad: 30 * f, accent: '#003399' },
   };
   const l = layouts[s.l] || layouts.content;
   // Apply custom colors if set
@@ -307,10 +308,16 @@ export function Slide({ s, big, showNotes, transition }) {
     ? { backgroundImage: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${s.bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }
     : s.bgColor ? { background: s.bgColor } : { background: l.bg };
   const textColor = s.textColor || (s.bgImage ? '#fff' : l.c);
+  // EDPS-style: gold accent bar at top for title slides, blue bar for content
+  const accentBar = (s.l === 'title' || s.l === 'quote')
+    ? { borderTop: `4px solid ${l.accent}` }
+    : { borderLeft: `4px solid ${l.accent}` };
   const base = {
-    ...bgStyle, color: textColor, borderRadius: 12, padding: l.pad,
+    ...bgStyle, color: textColor, borderRadius: 4, padding: l.pad,
     minHeight: big ? 360 : 160, display: 'flex', flexDirection: 'column',
-    justifyContent: 'center', textAlign: l.align, border: `1px solid ${C.border}`,
+    justifyContent: 'center', textAlign: l.align,
+    fontFamily: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+    ...accentBar,
     ...(transition ? { animation: `slide-${transition} 0.4s ease-out` } : {}),
   };
 
@@ -338,7 +345,7 @@ export function Slide({ s, big, showNotes, transition }) {
         <ul style={{ margin: 0, paddingLeft: 24, listStyle: 'none' }}>
           {items.map((item, i) => (
             <li key={i} style={{ fontSize: l.body, lineHeight: 1.8, display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 6 }}>
-              <span style={{ color: C.primary, fontWeight: 700, fontSize: l.body * 1.1, flexShrink: 0 }}>▸</span>
+              <span style={{ color: '#003399', fontWeight: 700, fontSize: l.body * 1.1, flexShrink: 0 }}>▸</span>
               <span>{renderFormattedText(item)}</span>
             </li>
           ))}
@@ -388,10 +395,10 @@ export function Slide({ s, big, showNotes, transition }) {
     );
   }
 
-  // Rating layout (1-5 stars)
+  // Rating layout (1-5 stars) — EDPS dark blue
   if (s.l === 'rating') {
     return (
-      <div style={{ ...base, background: `linear-gradient(135deg, ${C.dark}, #1a1a2e)`, color: '#fff', textAlign: 'center' }}>
+      <div style={{ ...base, background: s.bgColor || 'linear-gradient(135deg, #003399, #001a4d)', color: s.textColor || '#fff', textAlign: 'center', borderTop: '4px solid #FFCC00' }}>
         <div style={{ fontSize: 11 * f, fontWeight: 700, color: 'rgba(255,255,255,.5)', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 * f }}>
           {s.xp > 0 ? `RATING · ${s.xp} XP` : 'RATING'}
         </div>
@@ -407,11 +414,11 @@ export function Slide({ s, big, showNotes, transition }) {
     );
   }
 
-  // Poll layout (Kahoot-style)
+  // Poll layout — EDPS styled
   if (s.l === 'poll') {
-    const POLL_COLORS = ['#E21B3C', '#1368CE', '#D89E00', '#26890C'];
+    const POLL_COLORS = ['#003399', '#0055a4', '#FFCC00', '#2e7d32'];
     return (
-      <div style={{ ...base, background: `linear-gradient(135deg, ${C.dark}, #1a1a2e)`, color: '#fff', textAlign: 'center' }}>
+      <div style={{ ...base, background: s.bgColor || 'linear-gradient(135deg, #003399, #001a4d)', color: s.textColor || '#fff', textAlign: 'center', borderTop: '4px solid #FFCC00' }}>
         <div style={{ fontSize: 11 * f, fontWeight: 700, color: 'rgba(255,255,255,.5)', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 * f }}>
           {s.xp > 0 ? `POLL · ${s.xp} XP` : 'POLL'}
         </div>
@@ -434,10 +441,13 @@ export function Slide({ s, big, showNotes, transition }) {
     );
   }
 
-  // Default layouts (title, content, quote)
+  // Default layouts (title, content, quote) — EDPS styled
+  const isTitle = s.l === 'title';
   return (
     <div style={base}>
-      <h2 style={{ fontSize: l.title, fontWeight: 700, margin: '0 0 12px', lineHeight: 1.3 }}>{s.t}</h2>
+      <h2 style={{ fontSize: l.title, fontWeight: 700, margin: '0 0 12px', lineHeight: 1.3,
+        ...(isTitle ? { fontFamily: "'Georgia', 'Trajan Pro', 'Times New Roman', serif", letterSpacing: 0.5 } : {}) }}>{s.t}</h2>
+      {isTitle && <div style={{ width: 60 * f, height: 3, background: '#FFCC00', margin: l.align === 'center' ? '0 auto 16px' : '0 0 16px', borderRadius: 2 }} />}
       <div style={{ fontSize: l.body, lineHeight: 1.7, opacity: 0.9 }}>{renderFormattedText(s.c)}</div>
       {showNotes && s.notes && <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFF9DB', borderRadius: 6, fontSize: 12, color: '#744210', borderLeft: '3px solid #ECC94B' }}>📝 {s.notes}</div>}
       {s.audioUrl && (
