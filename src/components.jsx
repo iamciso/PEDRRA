@@ -254,57 +254,64 @@ export function NotificationBell({ notifications, onClear }) {
 function renderFormattedText(text) {
   if (!text) return null;
   const lines = text.split('\n');
+  let olCounter = 0;
   return lines.map((line, li) => {
     const isHeading = line.startsWith('## ');
-    const content = isHeading ? line.slice(3) : line;
-    // Process inline formatting: **bold** and *italic*
+    const isBullet = line.startsWith('- ');
+    const isNumbered = /^\d+\.\s/.test(line);
+    let content = isHeading ? line.slice(3) : isBullet ? line.slice(2) : isNumbered ? line.replace(/^\d+\.\s/, '') : line;
+    if (isNumbered) olCounter++; else if (!isBullet) olCounter = 0;
+    // Process inline formatting: **bold**, *italic*, ~~strike~~, ==highlight==, [text](url)
     const parts = [];
-    let remaining = content;
-    const regex = /(\*\*(.+?)\*\*|\*(.+?)\*)/g;
+    const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|~~(.+?)~~|==(.+?)==|\[(.+?)\]\((.+?)\))/g;
     let lastIndex = 0;
     let match;
     while ((match = regex.exec(content)) !== null) {
-      if (match.index > lastIndex) {
-        parts.push(content.substring(lastIndex, match.index));
-      }
-      if (match[2]) {
-        parts.push(<strong key={`${li}-b-${match.index}`}>{match[2]}</strong>);
-      } else if (match[3]) {
-        parts.push(<em key={`${li}-i-${match.index}`}>{match[3]}</em>);
-      }
+      if (match.index > lastIndex) parts.push(content.substring(lastIndex, match.index));
+      if (match[2]) parts.push(<strong key={`${li}-b-${match.index}`}>{match[2]}</strong>);
+      else if (match[3]) parts.push(<em key={`${li}-i-${match.index}`}>{match[3]}</em>);
+      else if (match[4]) parts.push(<span key={`${li}-s-${match.index}`} style={{ textDecoration: 'line-through', opacity: 0.7 }}>{match[4]}</span>);
+      else if (match[5]) parts.push(<mark key={`${li}-h-${match.index}`} style={{ background: '#FFF176', padding: '1px 3px', borderRadius: 2 }}>{match[5]}</mark>);
+      else if (match[6]) parts.push(<a key={`${li}-a-${match.index}`} href={match[7]} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>{match[6]}</a>);
       lastIndex = regex.lastIndex;
     }
-    if (lastIndex < content.length) {
-      parts.push(content.substring(lastIndex));
-    }
+    if (lastIndex < content.length) parts.push(content.substring(lastIndex));
     if (parts.length === 0) parts.push(content);
-    const lineEl = isHeading
-      ? <span key={li} style={{ fontSize: '1.2em', fontWeight: 700, display: 'block', marginBottom: 4 }}>{parts}</span>
-      : <span key={li}>{parts}</span>;
-    return <span key={li}>{lineEl}{li < lines.length - 1 && <br />}</span>;
+    if (isHeading) return <span key={li} style={{ fontSize: '1.2em', fontWeight: 700, display: 'block', marginBottom: 4 }}>{parts}{li < lines.length - 1 && <br />}</span>;
+    if (isBullet) return <span key={li} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 2 }}><span style={{ fontWeight: 700, flexShrink: 0 }}>•</span><span>{parts}</span>{li < lines.length - 1 && <br />}</span>;
+    if (isNumbered) return <span key={li} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 2 }}><span style={{ fontWeight: 700, flexShrink: 0, minWidth: 16 }}>{olCounter}.</span><span>{parts}</span>{li < lines.length - 1 && <br />}</span>;
+    return <span key={li}>{parts}{li < lines.length - 1 && <br />}</span>;
   });
 }
 
 /* ================================================================
    SLIDE
    ================================================================ */
-export function Slide({ s, big, showNotes }) {
+export function Slide({ s, big, showNotes, transition }) {
   if (!s) return null;
   const f = big ? 1 : 0.55;
+  // Font size multiplier from slide setting
+  const fsm = s.fontSize === 'small' ? 0.8 : s.fontSize === 'large' ? 1.25 : s.fontSize === 'xlarge' ? 1.5 : 1;
   const layouts = {
-    title:   { bg: `linear-gradient(135deg, ${C.primary}, ${C.dark})`, c: '#fff', align: 'center', title: 42 * f, body: 20 * f, pad: 50 * f },
-    content: { bg: C.white, c: C.text, align: 'left', title: 28 * f, body: 16 * f, pad: 36 * f },
-    quote:   { bg: C.light, c: C.primary, align: 'center', title: 22 * f, body: 20 * f, pad: 50 * f },
-    twocol:  { bg: C.white, c: C.text, align: 'left', title: 28 * f, body: 15 * f, pad: 36 * f },
-    bullets: { bg: C.white, c: C.text, align: 'left', title: 28 * f, body: 15 * f, pad: 36 * f },
-    image:   { bg: C.bg, c: C.text, align: 'center', title: 26 * f, body: 14 * f, pad: 30 * f },
-    video:   { bg: C.bg, c: C.text, align: 'center', title: 26 * f, body: 14 * f, pad: 30 * f },
+    title:   { bg: `linear-gradient(135deg, ${C.primary}, ${C.dark})`, c: '#fff', align: 'center', title: 42 * f * fsm, body: 20 * f * fsm, pad: 50 * f },
+    content: { bg: C.white, c: C.text, align: 'left', title: 28 * f * fsm, body: 16 * f * fsm, pad: 36 * f },
+    quote:   { bg: C.light, c: C.primary, align: 'center', title: 22 * f * fsm, body: 20 * f * fsm, pad: 50 * f },
+    twocol:  { bg: C.white, c: C.text, align: 'left', title: 28 * f * fsm, body: 15 * f * fsm, pad: 36 * f },
+    bullets: { bg: C.white, c: C.text, align: 'left', title: 28 * f * fsm, body: 15 * f * fsm, pad: 36 * f },
+    image:   { bg: C.bg, c: C.text, align: 'center', title: 26 * f * fsm, body: 14 * f * fsm, pad: 30 * f },
+    video:   { bg: C.bg, c: C.text, align: 'center', title: 26 * f * fsm, body: 14 * f * fsm, pad: 30 * f },
   };
   const l = layouts[s.l] || layouts.content;
+  // Apply custom colors if set
+  const bgStyle = s.bgImage
+    ? { backgroundImage: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${s.bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : s.bgColor ? { background: s.bgColor } : { background: l.bg };
+  const textColor = s.textColor || (s.bgImage ? '#fff' : l.c);
   const base = {
-    background: l.bg, color: l.c, borderRadius: 12, padding: l.pad,
+    ...bgStyle, color: textColor, borderRadius: 12, padding: l.pad,
     minHeight: big ? 360 : 160, display: 'flex', flexDirection: 'column',
     justifyContent: 'center', textAlign: l.align, border: `1px solid ${C.border}`,
+    ...(transition ? { animation: `slide-${transition} 0.4s ease-out` } : {}),
   };
 
   // Two-column layout
@@ -447,10 +454,17 @@ export function Slide({ s, big, showNotes }) {
    ================================================================ */
 export function PresentationMode({ slides, startIdx, onClose }) {
   const [idx, setIdx] = useState(startIdx || 0);
+  const [slideTransition, setSlideTransition] = useState(null);
   const containerRef = useRef();
+  const prevIdx = useRef(startIdx || 0);
 
-  const goNext = useCallback(() => setIdx((i) => Math.min(slides.length - 1, i + 1)), [slides.length]);
-  const goPrev = useCallback(() => setIdx((i) => Math.max(0, i - 1)), []);
+  const doTransition = (newIdx) => {
+    setSlideTransition(newIdx > prevIdx.current ? 'in' : 'out');
+    prevIdx.current = newIdx;
+    setTimeout(() => setSlideTransition(null), 450);
+  };
+  const goNext = useCallback(() => setIdx((i) => { const n = Math.min(slides.length - 1, i + 1); doTransition(n); return n; }), [slides.length]);
+  const goPrev = useCallback(() => setIdx((i) => { const n = Math.max(0, i - 1); doTransition(n); return n; }), []);
 
   // Swipe support for slide navigation
   const swipeRef = useSwipe(goNext, goPrev);
@@ -486,7 +500,7 @@ export function PresentationMode({ slides, startIdx, onClose }) {
 
       {/* Slide */}
       <div style={{ width: '85vw', maxWidth: 960 }}>
-        <Slide s={slides[idx]} big />
+        <Slide s={slides[idx]} big transition={slideTransition} />
       </div>
 
       {/* Bottom bar */}
@@ -527,6 +541,7 @@ export function PresentationMode({ slides, startIdx, onClose }) {
 export function PresenterView({ slides, itemId, onClose, broadcast, activeQ, getResponseCount, getResponseDist, pushQuestion, revealAnswer, participantCount = 0 }) {
   const [idx, setIdx] = useState(0);
   const [pollLaunched, setPollLaunched] = useState(false);
+  const [slideTransition, setSlideTransition] = useState(null);
   const ref = useRef();
   const startTimeRef = useRef(Date.now());
   const [clock, setClock] = useState(new Date());
@@ -548,13 +563,25 @@ export function PresenterView({ slides, itemId, onClose, broadcast, activeQ, get
   const formatTime = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   const formatElapsed = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-  // Broadcast navigation
+  // Broadcast navigation with transition
   const navigate = (newIdx) => {
     const clamped = Math.max(0, Math.min(slides.length - 1, newIdx));
+    const dir = clamped > idx ? 'in' : 'out';
+    setSlideTransition(dir);
     setIdx(clamped);
     setPollLaunched(false);
     broadcast('SLIDE_NAV', { slideIdx: clamped, itemId });
+    setTimeout(() => setSlideTransition(null), 450);
   };
+
+  // Auto-advance timer
+  useEffect(() => {
+    const slide = slides[idx];
+    if (slide?.autoAdvance > 0 && idx < slides.length - 1) {
+      const timer = setTimeout(() => navigate(idx + 1), slide.autoAdvance * 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [idx, slides]);
 
   // Broadcast start on mount, end on close
   useEffect(() => {
@@ -631,7 +658,7 @@ export function PresenterView({ slides, itemId, onClose, broadcast, activeQ, get
         {/* Left panel: current slide */}
         <div style={{ flex: 65, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ width: '100%', maxWidth: 900 }}>
-            <Slide s={slide} big showNotes={false} />
+            <Slide s={slide} big showNotes={false} transition={slideTransition} />
           </div>
         </div>
 

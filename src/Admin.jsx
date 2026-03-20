@@ -152,7 +152,48 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
   const [rightTab, setRightTab] = useState('content');
   const [showTemplates, setShowTemplates] = useState(false);
   const [hasUnsaved, setHasUnsaved] = useState(false);
+  const [showOutline, setShowOutline] = useState(false);
   const contentRef = useRef(null);
+
+  // Undo/Redo system
+  const historyRef = useRef([JSON.stringify(JSON.parse(JSON.stringify(item)))]);
+  const historyIdxRef = useRef(0);
+  const lastPushRef = useRef(Date.now());
+  const pushHistory = useCallback((state) => {
+    const now = Date.now();
+    const json = JSON.stringify(state);
+    // Debounce: only push if >500ms since last push and different
+    if (now - lastPushRef.current > 500 && json !== historyRef.current[historyIdxRef.current]) {
+      const h = historyRef.current.slice(0, historyIdxRef.current + 1);
+      h.push(json);
+      if (h.length > 50) h.shift(); // limit history
+      historyRef.current = h;
+      historyIdxRef.current = h.length - 1;
+      lastPushRef.current = now;
+    }
+  }, []);
+  const undo = useCallback(() => {
+    if (historyIdxRef.current > 0) {
+      historyIdxRef.current--;
+      const restored = JSON.parse(historyRef.current[historyIdxRef.current]);
+      setEditItem(restored);
+      setActiveSlide((prev) => Math.min(prev, (restored.slides || []).length - 1));
+    }
+  }, []);
+  const redo = useCallback(() => {
+    if (historyIdxRef.current < historyRef.current.length - 1) {
+      historyIdxRef.current++;
+      const restored = JSON.parse(historyRef.current[historyIdxRef.current]);
+      setEditItem(restored);
+    }
+  }, []);
+  const canUndo = historyIdxRef.current > 0;
+  const canRedo = historyIdxRef.current < historyRef.current.length - 1;
+
+  // Push history on editItem changes (debounced)
+  useEffect(() => {
+    pushHistory(editItem);
+  }, [editItem, pushHistory]);
 
   // Track unsaved changes
   useEffect(() => {
@@ -165,6 +206,14 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         handleSave();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        redo();
       }
       if (e.key === 'Escape') {
         if (hasUnsaved) {
@@ -191,6 +240,29 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
   const set = (k, v) => setEditItem((p) => ({ ...p, [k]: v }));
   const slides = editItem.slides || [];
   const currentSlide = slides[activeSlide];
+
+  // Global clipboard paste for images
+  useEffect(() => {
+    const handlePaste = (e) => {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const it of items) {
+        if (it.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = it.getAsFile();
+          if (file.size > 512000) { alert('Image too large (max 500KB)'); return; }
+          const reader = new FileReader();
+          reader.onload = (ev) => updateSlide(activeSlide, 'img', ev.target.result);
+          reader.readAsDataURL(file);
+          break;
+        }
+      }
+    };
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [activeSlide]);
 
   // Slide operations
   const blankSlide = () => ({ t: '', c: '', l: 'content' });
@@ -315,6 +387,16 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
     if (!currentSlide) return <div style={{ padding: 20, color: C.dim, textAlign: 'center' }}>Select a slide</div>;
 
     if (rightTab === 'style') {
+      const COLOR_PRESETS = [
+        { label: 'Default', bg: '', text: '' },
+        { label: 'Dark', bg: '#1a1a2e', text: '#ffffff' },
+        { label: 'Navy', bg: '#0C4DA2', text: '#ffffff' },
+        { label: 'Forest', bg: '#1a472a', text: '#ffffff' },
+        { label: 'Sunset', bg: '#ff6b35', text: '#ffffff' },
+        { label: 'Wine', bg: '#722f37', text: '#ffffff' },
+        { label: 'Sky', bg: '#e3f2fd', text: '#1a237e' },
+        { label: 'Cream', bg: '#fef9e7', text: '#5d4037' },
+      ];
       return (
         <div>
           <div style={formGroup}>
@@ -332,6 +414,93 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
                   {SLIDE_ICONS[lo.value] || '📝'}<br/>{lo.label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Color scheme */}
+          <div style={formGroup}>
+            <label style={label}>{t('editor.colorScheme')}</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
+              {COLOR_PRESETS.map((cp) => (
+                <button key={cp.label} onClick={() => { updateSlide(activeSlide, 'bgColor', cp.bg); updateSlide(activeSlide, 'textColor', cp.text); }}
+                  style={{
+                    padding: '4px 2px', borderRadius: 6, fontSize: 9, fontWeight: 600, cursor: 'pointer',
+                    border: (currentSlide.bgColor || '') === cp.bg ? `2px solid ${C.primary}` : `1px solid ${C.border}`,
+                    background: cp.bg || C.white, color: cp.text || C.text, textAlign: 'center', minHeight: 32,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                  {cp.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom colors */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+            <div>
+              <label style={label}>{t('editor.bgColor')}</label>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                <input type="color" value={currentSlide.bgColor || '#ffffff'}
+                  onChange={(e) => updateSlide(activeSlide, 'bgColor', e.target.value)}
+                  style={{ width: 32, height: 28, border: 'none', cursor: 'pointer', borderRadius: 4 }} />
+                <input style={{ ...input, fontSize: 11, padding: '4px 6px' }} value={currentSlide.bgColor || ''}
+                  onChange={(e) => updateSlide(activeSlide, 'bgColor', e.target.value)}
+                  placeholder="auto" />
+              </div>
+            </div>
+            <div>
+              <label style={label}>{t('editor.textColor')}</label>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                <input type="color" value={currentSlide.textColor || '#2D3748'}
+                  onChange={(e) => updateSlide(activeSlide, 'textColor', e.target.value)}
+                  style={{ width: 32, height: 28, border: 'none', cursor: 'pointer', borderRadius: 4 }} />
+                <input style={{ ...input, fontSize: 11, padding: '4px 6px' }} value={currentSlide.textColor || ''}
+                  onChange={(e) => updateSlide(activeSlide, 'textColor', e.target.value)}
+                  placeholder="auto" />
+              </div>
+            </div>
+          </div>
+
+          {/* Background image */}
+          <div style={formGroup}>
+            <label style={label}>{t('editor.bgImage')}</label>
+            <input style={{ ...input, fontSize: 12 }} value={currentSlide.bgImage || ''}
+              onChange={(e) => updateSlide(activeSlide, 'bgImage', e.target.value)}
+              placeholder="URL for background image" />
+            {currentSlide.bgImage && (
+              <div style={{ marginTop: 4, display: 'flex', gap: 4, alignItems: 'center' }}>
+                <img src={currentSlide.bgImage} alt="" style={{ width: 48, height: 27, objectFit: 'cover', borderRadius: 4, border: `1px solid ${C.border}` }} />
+                <button onClick={() => updateSlide(activeSlide, 'bgImage', '')}
+                  style={{ background: 'none', border: 'none', color: C.error, cursor: 'pointer', fontSize: 12 }}>✕ Remove</button>
+              </div>
+            )}
+          </div>
+
+          {/* Font size */}
+          <div style={formGroup}>
+            <label style={label}>{t('editor.fontSize')}</label>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {[{ label: 'S', value: 'small' }, { label: 'M', value: '' }, { label: 'L', value: 'large' }, { label: 'XL', value: 'xlarge' }].map((fs) => (
+                <button key={fs.label} onClick={() => updateSlide(activeSlide, 'fontSize', fs.value)}
+                  style={{
+                    flex: 1, padding: '6px 4px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                    border: (currentSlide.fontSize || '') === fs.value ? `2px solid ${C.primary}` : `1px solid ${C.border}`,
+                    background: (currentSlide.fontSize || '') === fs.value ? C.light : C.white,
+                    color: (currentSlide.fontSize || '') === fs.value ? C.primary : C.text,
+                  }}>
+                  {fs.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Auto-advance timer */}
+          <div style={formGroup}>
+            <label style={label}>{t('editor.autoAdvance')}</label>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input style={{ ...input, width: 70 }} type="number" min="0" max="300" value={currentSlide.autoAdvance || 0}
+                onChange={(e) => updateSlide(activeSlide, 'autoAdvance', parseInt(e.target.value) || 0)} />
+              <span style={{ fontSize: 11, color: C.dim }}>{t('editor.autoAdvanceHelp')}</span>
             </div>
           </div>
         </div>
@@ -405,15 +574,19 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
         {currentSlide.l !== 'poll' && currentSlide.l !== 'rating' && (
           <div style={formGroup}>
             <label style={label}>Content</label>
-            <div style={{ display: 'flex', gap: 2, marginBottom: 4, background: C.bg, borderRadius: 6, padding: 3 }}>
+            <div style={{ display: 'flex', gap: 2, marginBottom: 4, background: C.bg, borderRadius: 6, padding: 3, flexWrap: 'wrap' }}>
               {[
-                { label: 'B', title: 'Bold', fn: () => wrapSelection('**') },
-                { label: 'I', title: 'Italic', fn: () => wrapSelection('*') },
-                { label: 'H', title: 'Heading', fn: () => prefixLines('## ') },
-                { label: '•', title: 'Bullet', fn: () => prefixLines('- ') },
+                { label: 'B', title: 'Bold (**text**)', fn: () => wrapSelection('**') },
+                { label: 'I', title: 'Italic (*text*)', fn: () => wrapSelection('*') },
+                { label: '~~', title: 'Strikethrough', fn: () => wrapSelection('~~') },
+                { label: '==', title: 'Highlight', fn: () => wrapSelection('==') },
+                { label: 'H', title: 'Heading (## )', fn: () => prefixLines('## ') },
+                { label: '•', title: 'Bullet list', fn: () => prefixLines('- ') },
+                { label: '1.', title: 'Numbered list', fn: () => prefixLines('1. ') },
+                { label: '🔗', title: 'Link [text](url)', fn: () => wrapSelection('[', '](url)') },
               ].map((b) => (
                 <button key={b.label} onClick={b.fn} title={b.title}
-                  style={{ padding: '3px 8px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12,
+                  style={{ padding: '3px 8px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11,
                     fontWeight: b.label === 'B' ? 800 : b.label === 'I' ? 400 : 600,
                     fontStyle: b.label === 'I' ? 'italic' : 'normal', background: 'transparent', color: C.text }}
                   onMouseEnter={(e) => e.currentTarget.style.background = C.light}
@@ -534,7 +707,14 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
           <input className="editor-title-input" value={editItem.title}
             onChange={(e) => set('title', e.target.value)} placeholder="Presentation title" />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <button onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)"
+            style={{ ...btnSm(canUndo ? C.muted : C.border), fontSize: 14, padding: '4px 8px', opacity: canUndo ? 1 : 0.4 }}>↩</button>
+          <button onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)"
+            style={{ ...btnSm(canRedo ? C.muted : C.border), fontSize: 14, padding: '4px 8px', opacity: canRedo ? 1 : 0.4 }}>↪</button>
+          <div style={{ width: 1, height: 20, background: C.border }} />
+          <button onClick={() => setShowOutline(!showOutline)} title={t('editor.outline')}
+            style={{ ...btnSm(showOutline ? C.primary : C.muted), fontSize: 12, padding: '4px 8px' }}>☰</button>
           <span style={{ fontSize: 12, color: C.dim }}>
             {slides.length > 0 ? `${activeSlide + 1} / ${slides.length}` : '0 slides'}
           </span>
@@ -545,31 +725,33 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
 
       {/* Body */}
       <div className="editor-body">
-        {/* Left: Thumbnails */}
+        {/* Left: Thumbnails with real Slide previews */}
         <div className="slide-thumbnails-sidebar">
           {slides.map((s, i) => (
             <div key={i} onClick={() => setActiveSlide(i)}
               className={`slide-thumbnail${activeSlide === i ? ' active' : ''}${slideOver === i ? ' drag-over' : ''}`}
-              style={{ position: 'relative' }}>
-              <div {...slideDrag(i)} style={{ position: 'absolute', top: 2, left: 2, cursor: 'grab', fontSize: 10, color: C.dim, zIndex: 2 }}
-                onClick={(e) => e.stopPropagation()}>⠿</div>
-              <div style={{ position: 'absolute', top: 2, right: 2, fontSize: 9, color: C.dim, zIndex: 2 }}>
-                {SLIDE_ICONS[s.l] || '📝'}
+              style={{ position: 'relative', padding: 0, overflow: 'hidden' }}>
+              {/* Mini Slide preview */}
+              <div className="slide-thumb-preview">
+                <div style={{ width: 640, height: 360, transform: 'scale(0.19)', transformOrigin: 'top left', pointerEvents: 'none' }}>
+                  <Slide s={s} />
+                </div>
               </div>
-              <div style={{ fontSize: 10, fontWeight: 600, color: activeSlide === i ? C.primary : C.text,
-                marginTop: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {i + 1}. {s.t || s.text || '(untitled)'}
-              </div>
-              {/* Mini preview: show layout type */}
-              <div style={{ fontSize: 8, color: C.dim, marginTop: 2 }}>{s.l}</div>
-              {/* Actions on hover */}
-              <div style={{ display: 'flex', gap: 2, marginTop: 4, justifyContent: 'flex-end' }}>
-                <button onClick={(e) => { e.stopPropagation(); duplicateSlide(i); }}
-                  style={{ background: 'none', border: 'none', fontSize: 10, color: C.primary, cursor: 'pointer', padding: '1px 3px' }}
-                  title="Duplicate">📋</button>
-                <button onClick={(e) => { e.stopPropagation(); if (slides.length > 1) removeSlide(i); }}
-                  style={{ background: 'none', border: 'none', fontSize: 10, color: C.error, cursor: 'pointer', padding: '1px 3px' }}
-                  title="Delete">🗑</button>
+              {/* Overlay with number and controls */}
+              <div className="slide-thumb-overlay">
+                <div {...slideDrag(i)} style={{ cursor: 'grab', fontSize: 10, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,.5)' }}
+                  onClick={(e) => e.stopPropagation()}>⠿</div>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,.5)' }}>
+                  {i + 1}
+                </span>
+                <div style={{ display: 'flex', gap: 1 }}>
+                  <button onClick={(e) => { e.stopPropagation(); duplicateSlide(i); }}
+                    style={{ background: 'rgba(0,0,0,.3)', border: 'none', fontSize: 9, color: '#fff', cursor: 'pointer', padding: '1px 3px', borderRadius: 3 }}
+                    title="Duplicate">📋</button>
+                  <button onClick={(e) => { e.stopPropagation(); if (slides.length > 1) removeSlide(i); }}
+                    style={{ background: 'rgba(0,0,0,.3)', border: 'none', fontSize: 9, color: '#fff', cursor: 'pointer', padding: '1px 3px', borderRadius: 3 }}
+                    title="Delete">🗑</button>
+                </div>
               </div>
             </div>
           ))}
@@ -579,6 +761,32 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
             </div>
           )}
         </div>
+
+        {/* Outline View (toggleable) */}
+        {showOutline && (
+          <div className="editor-outline-panel">
+            <div style={{ padding: '10px 12px', borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 12, color: C.text,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>☰ {t('editor.outline')}</span>
+              <button onClick={() => setShowOutline(false)} style={{ background: 'none', border: 'none', color: C.dim, cursor: 'pointer', fontSize: 14 }}>✕</button>
+            </div>
+            <div style={{ overflow: 'auto', flex: 1, padding: 8 }}>
+              {slides.map((s, i) => (
+                <div key={i} onClick={() => setActiveSlide(i)}
+                  style={{ padding: '8px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 2,
+                    background: activeSlide === i ? C.light : 'transparent',
+                    borderLeft: activeSlide === i ? `3px solid ${C.primary}` : '3px solid transparent' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: activeSlide === i ? C.primary : C.text, marginBottom: 2 }}>
+                    {i + 1}. {s.t || s.text || '(untitled)'}
+                  </div>
+                  {s.c && <div style={{ fontSize: 10, color: C.dim, overflow: 'hidden', textOverflow: 'ellipsis',
+                    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{s.c}</div>}
+                  {s.notes && <div style={{ fontSize: 9, color: C.warning, marginTop: 2 }}>📝 {s.notes.substring(0, 60)}{s.notes.length > 60 ? '...' : ''}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Center: Live Preview */}
         <div className="editor-center">

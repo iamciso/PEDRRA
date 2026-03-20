@@ -553,28 +553,58 @@ input:focus, select:focus, textarea:focus {
   }
 }
 
-/* ===== Slide thumbnails ===== */
+/* ===== Slide thumbnails with real previews ===== */
 .slide-thumbnail {
-  width: 120px;
-  min-height: 68px;
+  width: 140px;
+  height: 82px;
   border: 2px solid var(--border-color);
   border-radius: 6px;
-  padding: 6px;
   font-size: 9px;
   cursor: pointer;
   background: var(--bg-surface);
-  transition: border-color .15s, box-shadow .15s;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
   overflow: hidden;
-  text-overflow: ellipsis;
+  position: relative;
+  flex-shrink: 0;
 }
 
 .slide-thumbnail:hover {
   border-color: var(--border-focus);
+  transform: scale(1.03);
 }
 
 .slide-thumbnail.active {
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 2px rgba(12,77,162,.2);
+  box-shadow: 0 0 0 2px rgba(12,77,162,.3);
+}
+
+.slide-thumb-preview {
+  width: 140px;
+  height: 82px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.slide-thumb-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px;
+  background: linear-gradient(transparent, rgba(0,0,0,.55));
+  opacity: 0;
+  transition: opacity .15s;
+}
+
+.slide-thumbnail:hover .slide-thumb-overlay {
+  opacity: 1;
+}
+
+.slide-thumbnail.active .slide-thumb-overlay {
+  opacity: 1;
 }
 
 .slide-thumbnails-sidebar {
@@ -587,6 +617,28 @@ input:focus, select:focus, textarea:focus {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* ===== Editor outline panel ===== */
+.editor-outline-panel {
+  width: 260px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ===== Slide transition animations ===== */
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-out {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 /* ===== Poll timer countdown bar ===== */
@@ -902,8 +954,21 @@ input:focus, select:focus, textarea:focus {
 
   .slide-thumbnail {
     width: 100px;
-    min-height: 56px;
+    height: 58px;
     flex-shrink: 0;
+  }
+
+  .slide-thumb-preview {
+    width: 100px;
+    height: 58px;
+  }
+
+  .slide-thumb-preview > div {
+    transform: scale(0.135) !important;
+  }
+
+  .editor-outline-panel {
+    display: none;
   }
 }
 
