@@ -794,7 +794,7 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
           {currentSlide ? (
             <div className="slide-canvas" style={{ width: 640, height: 360, transform: 'scale(0.85)', transformOrigin: 'center center' }}>
               <div style={{ width: 640, height: 360, overflow: 'hidden' }}>
-                <Slide s={currentSlide} />
+                <Slide s={currentSlide} big />
               </div>
             </div>
           ) : (
