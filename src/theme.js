@@ -15,15 +15,46 @@ export const C = {
   purple: '#6366f1',
 };
 
+/* Dark mode color palette */
+export const CD = {
+  primary: '#63B3ED',
+  dark: '#0D1B2A',
+  light: '#2A4365',
+  text: '#E2E8F0',
+  muted: '#A0AEC0',
+  dim: '#718096',
+  border: '#4A5568',
+  bg: '#1A202C',
+  white: '#2D3748',
+  surface: '#2D3748',
+  success: '#68D391',
+  error: '#FC8181',
+  warning: '#F6AD55',
+  accent: '#FFF200',
+  purple: '#A5B4FC',
+};
+
 export const phaseColor = { before: '#6366f1', live: C.primary, after: C.success };
 export const phaseLabel = { before: 'Before Training', live: 'Training Day', after: 'After Training' };
-export const itemIcon = { doc: '📄', slides: '📊', quiz: '❓', survey: '📋' };
+export const itemIcon = { doc: '\u{1F4C4}', slides: '\u{1F4CA}', quiz: '\u2753', survey: '\u{1F4CB}' };
 
 export const ANS = [
-  { bg: '#E21B3C', shape: '▲', label: 'A' },
-  { bg: '#1368CE', shape: '◆', label: 'B' },
-  { bg: '#D89E00', shape: '●', label: 'C' },
-  { bg: '#26890C', shape: '■', label: 'D' },
+  { bg: '#E21B3C', shape: '\u25B2', label: 'A' },
+  { bg: '#1368CE', shape: '\u25C6', label: 'B' },
+  { bg: '#D89E00', shape: '\u25CF', label: 'C' },
+  { bg: '#26890C', shape: '\u25A0', label: 'D' },
+];
+
+/* Badge definitions */
+export const BADGE_DEFS = [
+  { id: 'first-steps', name: 'First Steps', icon: '\u{1F463}', desc: 'Complete your first activity', condition_desc: 'Complete any 1 activity' },
+  { id: 'speed-demon', name: 'Speed Demon', icon: '\u26A1', desc: 'Answer a quiz in record time', condition_desc: 'Answer a quiz question in under 3 seconds' },
+  { id: 'perfect-score', name: 'Perfect Score', icon: '\u{1F3AF}', desc: 'Get 100% on a quiz', condition_desc: 'Score 100% on any quiz' },
+  { id: 'bookworm', name: 'Bookworm', icon: '\u{1F4DA}', desc: 'Read all training documents', condition_desc: 'Open every document in a training' },
+  { id: 'social-butterfly', name: 'Social Butterfly', icon: '\u{1F98B}', desc: 'Participate in chat discussions', condition_desc: 'Send 10 or more chat messages' },
+  { id: 'team-player', name: 'Team Player', icon: '\u{1F91D}', desc: 'Respond to all polls', condition_desc: 'Vote in every poll during a live session' },
+  { id: 'completionist', name: 'Completionist', icon: '\u{1F3C6}', desc: 'Complete all activities in a training', condition_desc: 'Finish every activity across all phases' },
+  { id: 'early-bird', name: 'Early Bird', icon: '\u{1F426}', desc: 'Complete pre-training tasks ahead of time', condition_desc: 'Finish all before-training activities early' },
 ];
 
 /* Reusable style helpers */
@@ -118,4 +149,21 @@ export const statCard = {
   background: C.white, borderRadius: 12, padding: '20px 24px',
   boxShadow: '0 2px 12px rgba(0,0,0,.06)', border: `1px solid ${C.border}`,
   display: 'flex', flexDirection: 'column', gap: 4,
+};
+
+/* Video layout for slide presentations */
+export const videoLayout = {
+  container: {
+    position: 'relative', width: '100%', paddingBottom: '56.25%',
+    background: '#000', borderRadius: 8, overflow: 'hidden',
+  },
+  inner: {
+    position: 'absolute', inset: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  controls: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    padding: '8px 12px', background: 'linear-gradient(transparent, rgba(0,0,0,.7))',
+    display: 'flex', alignItems: 'center', gap: 8,
+  },
 };

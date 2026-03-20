@@ -12,6 +12,8 @@ export default function Projector({ onExit }) {
   } = useApp();
 
   const [tick, setTick] = useState(0);
+  const [leaderboardMode, setLeaderboardMode] = useState('individual'); // 'individual' | 'team'
+
   useEffect(() => {
     const t = setInterval(() => setTick((x) => x + 1), 1000);
     return () => clearInterval(t);
@@ -46,7 +48,7 @@ export default function Projector({ onExit }) {
   if (activeQ) {
     if (isFromPresentation) {
       // Poll data comes from the PUSH_Q payload
-      activeQuestion = { text: activeQ.text, opts: activeQ.opts, ok: activeQ.ok, xp: activeQ.xp };
+      activeQuestion = { text: activeQ.text, opts: activeQ.opts, ok: activeQ.ok, xp: activeQ.xp, explanation: activeQ.explanation };
       activeItemTitle = 'Presentation Poll';
       const qKey = `${activeQ.itemId}-slide-${activeQ.slideIdx}`;
       dist = getResponseDist(activeQ.itemId, `slide-${activeQ.slideIdx}`);
@@ -68,6 +70,24 @@ export default function Projector({ onExit }) {
 
   // Current presentation slide
   const currentPresentationSlide = presentationSlides?.[presentationSlideIdx] || null;
+
+  // Explanation text: from activeQuestion or from activeQ payload
+  const explanationText = activeQuestion?.explanation || activeQ?.explanation || '';
+
+  // Build team leaderboard data
+  const teamLeaderboardData = (() => {
+    if (!participants.length) return [];
+    const teamMap = {};
+    participants.forEach((p) => {
+      const teamName = p.team || 'No Team';
+      if (!teamMap[teamName]) {
+        teamMap[teamName] = { name: teamName, xp: 0, members: 0 };
+      }
+      teamMap[teamName].xp += (p.xp || 0);
+      teamMap[teamName].members += 1;
+    });
+    return Object.values(teamMap).sort((a, b) => b.xp - a.xp);
+  })();
 
   return (
     <div style={{
@@ -280,6 +300,28 @@ export default function Projector({ onExit }) {
             </div>
           )}
 
+          {/* Explanation after reveal */}
+          {activeQ.revealed && explanationText && (
+            <div style={{
+              background: 'rgba(255,255,255,.08)', borderRadius: 12,
+              padding: '16px 24px', marginBottom: 16,
+              border: '1px solid rgba(255,255,255,.15)',
+              borderLeft: `4px solid ${C.accent}`,
+            }}>
+              <div style={{
+                fontSize: 11, fontWeight: 700, color: C.accent,
+                letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8,
+              }}>
+                Explanation
+              </div>
+              <div style={{
+                color: 'rgba(255,255,255,.85)', fontSize: 15, lineHeight: 1.6,
+              }}>
+                {explanationText}
+              </div>
+            </div>
+          )}
+
           {/* Response counter + voting progress */}
           <div style={{ textAlign: 'center', marginTop: 4 }}>
             {activeQ.revealed ? (
@@ -309,10 +351,85 @@ export default function Projector({ onExit }) {
           {/* Leaderboard after reveal */}
           {activeQ.revealed && participants.length > 0 && (
             <div style={{ marginTop: 24, background: 'rgba(255,255,255,.06)', borderRadius: 12, padding: '12px 0', border: '1px solid rgba(255,255,255,.1)' }}>
-              <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: C.accent, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>
-                Leaderboard
+              {/* Leaderboard toggle: Individual vs Team */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 4 }}>
+                <div style={{
+                  display: 'inline-flex', background: 'rgba(255,255,255,.08)', borderRadius: 8, overflow: 'hidden',
+                  border: '1px solid rgba(255,255,255,.1)',
+                }}>
+                  {['individual', 'team'].map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setLeaderboardMode(mode)}
+                      style={{
+                        background: leaderboardMode === mode ? C.accent : 'transparent',
+                        color: leaderboardMode === mode ? C.dark : 'rgba(255,255,255,.6)',
+                        border: 'none', padding: '5px 16px', fontSize: 12, fontWeight: 700,
+                        cursor: 'pointer', textTransform: 'uppercase', letterSpacing: 0.8,
+                        transition: 'all .2s',
+                      }}
+                    >
+                      {mode === 'individual' ? 'Individual' : 'Team'}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <Leaderboard participants={participants} variant="projector" />
+
+              {leaderboardMode === 'individual' ? (
+                <>
+                  <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: C.accent, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>
+                    Leaderboard
+                  </div>
+                  <Leaderboard participants={participants} variant="projector" />
+                </>
+              ) : (
+                <>
+                  <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: C.accent, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
+                    Team Leaderboard
+                  </div>
+                  <div style={{ padding: '0 16px' }}>
+                    {teamLeaderboardData.slice(0, 5).map((team, idx) => {
+                      const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
+                      const maxXp = teamLeaderboardData[0]?.xp || 1;
+                      const barPct = Math.round((team.xp / maxXp) * 100);
+                      return (
+                        <div key={team.name} style={{
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          padding: '8px 12px', borderRadius: 8,
+                          background: idx === 0 ? 'rgba(255,215,0,.1)' : 'transparent',
+                          marginBottom: 4,
+                        }}>
+                          <span style={{ width: 28, textAlign: 'center', fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,.5)' }}>
+                            {medal || `${idx + 1}.`}
+                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
+                              <span style={{ color: '#fff', fontSize: 15, fontWeight: 700 }}>{team.name}</span>
+                              <span style={{ color: 'rgba(255,255,255,.5)', fontSize: 12 }}>
+                                {team.members} member{team.members !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                            <div style={{ height: 4, background: 'rgba(255,255,255,.12)', borderRadius: 2, overflow: 'hidden', marginBottom: 2 }}>
+                              <div style={{
+                                height: '100%', borderRadius: 2, width: `${barPct}%`,
+                                background: idx === 0 ? '#FFD700' : idx === 1 ? '#C0C0C0' : idx === 2 ? '#CD7F32' : C.accent,
+                                transition: 'width .6s ease',
+                              }} />
+                            </div>
+                          </div>
+                          <span style={{
+                            fontWeight: 800, fontSize: 16,
+                            color: idx === 0 ? '#FFD700' : idx === 1 ? '#C0C0C0' : idx === 2 ? '#CD7F32' : C.accent,
+                            minWidth: 60, textAlign: 'right',
+                          }}>
+                            {team.xp} XP
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

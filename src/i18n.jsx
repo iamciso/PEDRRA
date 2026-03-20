@@ -350,6 +350,132 @@ const en = {
   'survey.agree': 'Agree',
   'survey.true': 'True',
   'survey.false': 'False',
+
+  // Accessibility
+  'a11y.close': 'Close',
+  'a11y.menu': 'Menu',
+  'a11y.skipToContent': 'Skip to content',
+  'a11y.navigation': 'Navigation',
+  'a11y.mainContent': 'Main content',
+
+  // Fullscreen Editor
+  'editor.fullscreen': 'Fullscreen Editor',
+  'editor.addSlide': 'Add Slide',
+  'editor.addPoll': 'Add Poll',
+  'editor.template': 'Template',
+  'editor.preview': 'Preview',
+  'editor.save': 'Save',
+  'editor.close': 'Close',
+  'editor.unsavedChanges': 'You have unsaved changes. Close anyway?',
+  'editor.editing': 'Editing Slide {n}',
+  'editor.duplicate': 'Duplicate',
+  'editor.remove': 'Remove',
+  'editor.videoUrl': 'Video URL',
+
+  // Poll Timer & Overlay
+  'poll.timeRemaining': 'Time remaining',
+  'poll.timeUp': "Time's up!",
+  'poll.waitingResults': 'Waiting for results...',
+  'poll.minimize': 'Minimize',
+  'poll.expand': 'Expand',
+  'poll.soundOn': 'Sound on',
+  'poll.soundOff': 'Sound off',
+  'poll.answerSubmitted': 'Answer submitted!',
+  'poll.resultsRevealed': 'Results revealed',
+  'poll.tapToAnswer': 'Tap to answer',
+
+  // Search
+  'search.placeholder': 'Search...',
+  'search.noResults': 'No results found',
+  'search.clear': 'Clear search',
+
+  // Duplicate
+  'duplicate.course': 'Duplicate Course',
+  'duplicate.item': 'Duplicate',
+  'duplicate.suffix': '(copy)',
+
+  // Progress & Quiz Review
+  'progress.export': 'Export Progress',
+  'progress.import': 'Import Progress',
+  'progress.backupReminder': "It's been a while since your last backup. Consider exporting your data.",
+  'quiz.review': 'Review Answers',
+  'quiz.yourAnswer': 'Your answer',
+  'quiz.correctAnswer': 'Correct answer',
+  'quiz.explanation': 'Explanation',
+  'quiz.score': 'Score: {n}/{total}',
+
+  // Swipe & Thumbnails
+  'swipe.hint': 'Swipe to navigate',
+  'thumbnails.show': 'Show all slides',
+  'thumbnails.hide': 'Hide thumbnails',
+
+  // Presenter
+  'presenter.elapsed': 'Elapsed',
+  'presenter.clock': 'Clock',
+
+  // Image Upload
+  'image.paste': 'Paste Image',
+  'image.drag': 'Drag & drop an image',
+  'image.remove': 'Remove Image',
+  'image.tooLarge': 'Image too large (max 500KB). Consider using an external URL.',
+
+  // Dark Mode
+  'darkMode.light': 'Light',
+  'darkMode.dark': 'Dark',
+  'darkMode.system': 'System',
+
+  // Video
+  'video.url': 'Video URL',
+  'video.youtube': 'YouTube video',
+
+  // Validation
+  'validation.required': 'This field is required',
+  'validation.minOneSlide': 'Add at least one slide',
+  'validation.minOneQuestion': 'Add at least one question',
+
+  // Teams
+  'teams.manage': 'Manage Teams',
+  'teams.add': 'Add Team',
+  'teams.rename': 'Rename',
+  'teams.leaderboard': 'Team Leaderboard',
+  'teams.individual': 'Individual',
+
+  // Chat/Q&A
+  'chat.title': 'Q&A',
+  'chat.askQuestion': 'Ask a question...',
+  'chat.send': 'Send',
+  'chat.upvote': 'Upvote',
+  'chat.answered': 'Answered',
+  'chat.noQuestions': 'No questions yet',
+
+  // Badges
+  'badges.title': 'Badges',
+  'badges.earned': 'Badge earned!',
+  'badges.firstSteps': 'First Steps',
+  'badges.speedDemon': 'Speed Demon',
+  'badges.perfectScore': 'Perfect Score',
+  'badges.bookworm': 'Bookworm',
+  'badges.socialButterfly': 'Social Butterfly',
+  'badges.teamPlayer': 'Team Player',
+  'badges.completionist': 'Completionist',
+  'badges.earlyBird': 'Early Bird',
+
+  // Notifications
+  'notifications.title': 'Notifications',
+  'notifications.clearAll': 'Clear all',
+  'notifications.none': 'No notifications',
+  'notifications.progress25': '25% complete! Keep going!',
+  'notifications.progress50': 'Halfway there! 50% complete',
+  'notifications.progress75': 'Almost there! 75% complete',
+  'notifications.progress100': 'Course completed! Congratulations!',
+
+  // Offline (new)
+  'offline.available': 'Available offline',
+  'offline.cached': 'Content cached for offline use',
+
+  // Layout (new)
+  'layout.video': 'Video',
+  'layout.rating': 'Rating Scale',
 };
 
 const es = {
@@ -648,6 +774,132 @@ const es = {
   'survey.agree': 'De acuerdo',
   'survey.true': 'Verdadero',
   'survey.false': 'Falso',
+
+  // Accessibility
+  'a11y.close': 'Cerrar',
+  'a11y.menu': 'Menú',
+  'a11y.skipToContent': 'Ir al contenido',
+  'a11y.navigation': 'Navegación',
+  'a11y.mainContent': 'Contenido principal',
+
+  // Fullscreen Editor
+  'editor.fullscreen': 'Editor Completo',
+  'editor.addSlide': 'Añadir Diapositiva',
+  'editor.addPoll': 'Añadir Encuesta',
+  'editor.template': 'Plantilla',
+  'editor.preview': 'Vista Previa',
+  'editor.save': 'Guardar',
+  'editor.close': 'Cerrar',
+  'editor.unsavedChanges': 'Tienes cambios sin guardar. ¿Cerrar?',
+  'editor.editing': 'Editando Diapositiva {n}',
+  'editor.duplicate': 'Duplicar',
+  'editor.remove': 'Eliminar',
+  'editor.videoUrl': 'URL del Vídeo',
+
+  // Poll Timer & Overlay
+  'poll.timeRemaining': 'Tiempo restante',
+  'poll.timeUp': '¡Tiempo agotado!',
+  'poll.waitingResults': 'Esperando resultados...',
+  'poll.minimize': 'Minimizar',
+  'poll.expand': 'Expandir',
+  'poll.soundOn': 'Sonido activado',
+  'poll.soundOff': 'Sonido desactivado',
+  'poll.answerSubmitted': '¡Respuesta enviada!',
+  'poll.resultsRevealed': 'Resultados revelados',
+  'poll.tapToAnswer': 'Toca para responder',
+
+  // Search
+  'search.placeholder': 'Buscar...',
+  'search.noResults': 'Sin resultados',
+  'search.clear': 'Limpiar búsqueda',
+
+  // Duplicate
+  'duplicate.course': 'Duplicar Curso',
+  'duplicate.item': 'Duplicar',
+  'duplicate.suffix': '(copia)',
+
+  // Progress & Quiz Review
+  'progress.export': 'Exportar Progreso',
+  'progress.import': 'Importar Progreso',
+  'progress.backupReminder': 'Ha pasado tiempo desde tu última copia. Considera exportar tus datos.',
+  'quiz.review': 'Revisar Respuestas',
+  'quiz.yourAnswer': 'Tu respuesta',
+  'quiz.correctAnswer': 'Respuesta correcta',
+  'quiz.explanation': 'Explicación',
+  'quiz.score': 'Puntuación: {n}/{total}',
+
+  // Swipe & Thumbnails
+  'swipe.hint': 'Desliza para navegar',
+  'thumbnails.show': 'Mostrar todas',
+  'thumbnails.hide': 'Ocultar miniaturas',
+
+  // Presenter
+  'presenter.elapsed': 'Transcurrido',
+  'presenter.clock': 'Reloj',
+
+  // Image Upload
+  'image.paste': 'Pegar Imagen',
+  'image.drag': 'Arrastra una imagen',
+  'image.remove': 'Eliminar Imagen',
+  'image.tooLarge': 'Imagen demasiado grande (máx 500KB). Usa una URL externa.',
+
+  // Dark Mode
+  'darkMode.light': 'Claro',
+  'darkMode.dark': 'Oscuro',
+  'darkMode.system': 'Sistema',
+
+  // Video
+  'video.url': 'URL del Vídeo',
+  'video.youtube': 'Vídeo de YouTube',
+
+  // Validation
+  'validation.required': 'Este campo es obligatorio',
+  'validation.minOneSlide': 'Añade al menos una diapositiva',
+  'validation.minOneQuestion': 'Añade al menos una pregunta',
+
+  // Teams
+  'teams.manage': 'Gestionar Equipos',
+  'teams.add': 'Añadir Equipo',
+  'teams.rename': 'Renombrar',
+  'teams.leaderboard': 'Clasificación por Equipos',
+  'teams.individual': 'Individual',
+
+  // Chat/Q&A
+  'chat.title': 'Preguntas',
+  'chat.askQuestion': 'Haz una pregunta...',
+  'chat.send': 'Enviar',
+  'chat.upvote': 'Votar',
+  'chat.answered': 'Respondida',
+  'chat.noQuestions': 'Sin preguntas aún',
+
+  // Badges
+  'badges.title': 'Insignias',
+  'badges.earned': '¡Insignia obtenida!',
+  'badges.firstSteps': 'Primeros Pasos',
+  'badges.speedDemon': 'Velocista',
+  'badges.perfectScore': 'Puntuación Perfecta',
+  'badges.bookworm': 'Ratón de Biblioteca',
+  'badges.socialButterfly': 'Mariposa Social',
+  'badges.teamPlayer': 'Jugador de Equipo',
+  'badges.completionist': 'Completista',
+  'badges.earlyBird': 'Madrugador',
+
+  // Notifications
+  'notifications.title': 'Notificaciones',
+  'notifications.clearAll': 'Limpiar todo',
+  'notifications.none': 'Sin notificaciones',
+  'notifications.progress25': '¡25% completado! ¡Sigue así!',
+  'notifications.progress50': '¡A mitad de camino! 50% completado',
+  'notifications.progress75': '¡Casi terminas! 75% completado',
+  'notifications.progress100': '¡Curso completado! ¡Felicidades!',
+
+  // Offline (new)
+  'offline.available': 'Disponible sin conexión',
+  'offline.cached': 'Contenido guardado para uso sin conexión',
+
+  // Layout (new)
+  'layout.video': 'Vídeo',
+  'layout.rating': 'Escala de Valoración',
 };
 
 const fr = {
@@ -785,6 +1037,132 @@ const fr = {
   'presentation.launchPoll': 'Lancer le Sondage',
   'presentation.endPresentation': 'Terminer',
   'access.restricted': 'Acc\u00e8s Restreint',
+
+  // Accessibility
+  'a11y.close': 'Fermer',
+  'a11y.menu': 'Menu',
+  'a11y.skipToContent': 'Aller au contenu',
+  'a11y.navigation': 'Navigation',
+  'a11y.mainContent': 'Contenu principal',
+
+  // Fullscreen Editor
+  'editor.fullscreen': '\u00c9diteur Plein \u00c9cran',
+  'editor.addSlide': 'Ajouter Diapositive',
+  'editor.addPoll': 'Ajouter Sondage',
+  'editor.template': 'Mod\u00e8le',
+  'editor.preview': 'Aper\u00e7u',
+  'editor.save': 'Enregistrer',
+  'editor.close': 'Fermer',
+  'editor.unsavedChanges': 'Vous avez des modifications non enregistr\u00e9es. Fermer quand m\u00eame ?',
+  'editor.editing': '\u00c9dition Diapositive {n}',
+  'editor.duplicate': 'Dupliquer',
+  'editor.remove': 'Supprimer',
+  'editor.videoUrl': 'URL de la Vid\u00e9o',
+
+  // Poll Timer & Overlay
+  'poll.timeRemaining': 'Temps restant',
+  'poll.timeUp': 'Temps \u00e9coul\u00e9 !',
+  'poll.waitingResults': 'En attente des r\u00e9sultats...',
+  'poll.minimize': 'R\u00e9duire',
+  'poll.expand': 'Agrandir',
+  'poll.soundOn': 'Son activ\u00e9',
+  'poll.soundOff': 'Son d\u00e9sactiv\u00e9',
+  'poll.answerSubmitted': 'R\u00e9ponse envoy\u00e9e !',
+  'poll.resultsRevealed': 'R\u00e9sultats r\u00e9v\u00e9l\u00e9s',
+  'poll.tapToAnswer': 'Appuyez pour r\u00e9pondre',
+
+  // Search
+  'search.placeholder': 'Rechercher...',
+  'search.noResults': 'Aucun r\u00e9sultat',
+  'search.clear': 'Effacer la recherche',
+
+  // Duplicate
+  'duplicate.course': 'Dupliquer le Cours',
+  'duplicate.item': 'Dupliquer',
+  'duplicate.suffix': '(copie)',
+
+  // Progress & Quiz Review
+  'progress.export': 'Exporter Progr\u00e8s',
+  'progress.import': 'Importer Progr\u00e8s',
+  'progress.backupReminder': 'Cela fait un moment depuis votre derni\u00e8re sauvegarde. Pensez \u00e0 exporter vos donn\u00e9es.',
+  'quiz.review': 'Revoir les R\u00e9ponses',
+  'quiz.yourAnswer': 'Votre r\u00e9ponse',
+  'quiz.correctAnswer': 'Bonne r\u00e9ponse',
+  'quiz.explanation': 'Explication',
+  'quiz.score': 'Score : {n}/{total}',
+
+  // Swipe & Thumbnails
+  'swipe.hint': 'Glissez pour naviguer',
+  'thumbnails.show': 'Afficher toutes',
+  'thumbnails.hide': 'Masquer miniatures',
+
+  // Presenter
+  'presenter.elapsed': '\u00c9coul\u00e9',
+  'presenter.clock': 'Horloge',
+
+  // Image Upload
+  'image.paste': 'Coller Image',
+  'image.drag': 'Glissez-d\u00e9posez une image',
+  'image.remove': 'Supprimer Image',
+  'image.tooLarge': 'Image trop volumineuse (max 500Ko). Utilisez une URL externe.',
+
+  // Dark Mode
+  'darkMode.light': 'Clair',
+  'darkMode.dark': 'Sombre',
+  'darkMode.system': 'Syst\u00e8me',
+
+  // Video
+  'video.url': 'URL de la Vid\u00e9o',
+  'video.youtube': 'Vid\u00e9o YouTube',
+
+  // Validation
+  'validation.required': 'Ce champ est obligatoire',
+  'validation.minOneSlide': 'Ajoutez au moins une diapositive',
+  'validation.minOneQuestion': 'Ajoutez au moins une question',
+
+  // Teams
+  'teams.manage': 'G\u00e9rer les \u00c9quipes',
+  'teams.add': 'Ajouter \u00c9quipe',
+  'teams.rename': 'Renommer',
+  'teams.leaderboard': 'Classement par \u00c9quipe',
+  'teams.individual': 'Individuel',
+
+  // Chat/Q&A
+  'chat.title': 'Q&R',
+  'chat.askQuestion': 'Posez une question...',
+  'chat.send': 'Envoyer',
+  'chat.upvote': 'Voter',
+  'chat.answered': 'R\u00e9pondue',
+  'chat.noQuestions': 'Pas encore de questions',
+
+  // Badges
+  'badges.title': 'Badges',
+  'badges.earned': 'Badge obtenu !',
+  'badges.firstSteps': 'Premiers Pas',
+  'badges.speedDemon': 'Rapide',
+  'badges.perfectScore': 'Score Parfait',
+  'badges.bookworm': 'Rat de Biblioth\u00e8que',
+  'badges.socialButterfly': 'Papillon Social',
+  'badges.teamPlayer': 'Joueur d\u0027\u00c9quipe',
+  'badges.completionist': 'Perfectionniste',
+  'badges.earlyBird': 'L\u00e8ve-T\u00f4t',
+
+  // Notifications
+  'notifications.title': 'Notifications',
+  'notifications.clearAll': 'Tout effacer',
+  'notifications.none': 'Aucune notification',
+  'notifications.progress25': '25% termin\u00e9 ! Continuez !',
+  'notifications.progress50': '\u00c0 mi-chemin ! 50% termin\u00e9',
+  'notifications.progress75': 'Presque fini ! 75% termin\u00e9',
+  'notifications.progress100': 'Cours termin\u00e9 ! F\u00e9licitations !',
+
+  // Offline (new)
+  'offline.available': 'Disponible hors ligne',
+  'offline.cached': 'Contenu mis en cache pour usage hors ligne',
+
+  // Layout (new)
+  'layout.video': 'Vid\u00e9o',
+  'layout.rating': '\u00c9chelle d\u0027\u00c9valuation',
 };
 
 const de = {
@@ -922,6 +1300,132 @@ const de = {
   'presentation.launchPoll': 'Umfrage Starten',
   'presentation.endPresentation': 'Beenden',
   'access.restricted': 'Zugang Eingeschr\u00e4nkt',
+
+  // Accessibility
+  'a11y.close': 'Schlie\u00dfen',
+  'a11y.menu': 'Men\u00fc',
+  'a11y.skipToContent': 'Zum Inhalt springen',
+  'a11y.navigation': 'Navigation',
+  'a11y.mainContent': 'Hauptinhalt',
+
+  // Fullscreen Editor
+  'editor.fullscreen': 'Vollbild-Editor',
+  'editor.addSlide': 'Folie Hinzuf\u00fcgen',
+  'editor.addPoll': 'Umfrage Hinzuf\u00fcgen',
+  'editor.template': 'Vorlage',
+  'editor.preview': 'Vorschau',
+  'editor.save': 'Speichern',
+  'editor.close': 'Schlie\u00dfen',
+  'editor.unsavedChanges': 'Sie haben ungespeicherte \u00c4nderungen. Trotzdem schlie\u00dfen?',
+  'editor.editing': 'Folie {n} Bearbeiten',
+  'editor.duplicate': 'Duplizieren',
+  'editor.remove': 'Entfernen',
+  'editor.videoUrl': 'Video-URL',
+
+  // Poll Timer & Overlay
+  'poll.timeRemaining': 'Verbleibende Zeit',
+  'poll.timeUp': 'Zeit abgelaufen!',
+  'poll.waitingResults': 'Warte auf Ergebnisse...',
+  'poll.minimize': 'Minimieren',
+  'poll.expand': 'Erweitern',
+  'poll.soundOn': 'Ton an',
+  'poll.soundOff': 'Ton aus',
+  'poll.answerSubmitted': 'Antwort gesendet!',
+  'poll.resultsRevealed': 'Ergebnisse aufgedeckt',
+  'poll.tapToAnswer': 'Tippen zum Antworten',
+
+  // Search
+  'search.placeholder': 'Suchen...',
+  'search.noResults': 'Keine Ergebnisse',
+  'search.clear': 'Suche l\u00f6schen',
+
+  // Duplicate
+  'duplicate.course': 'Kurs Duplizieren',
+  'duplicate.item': 'Duplizieren',
+  'duplicate.suffix': '(Kopie)',
+
+  // Progress & Quiz Review
+  'progress.export': 'Fortschritt Exportieren',
+  'progress.import': 'Fortschritt Importieren',
+  'progress.backupReminder': 'Es ist eine Weile seit Ihrem letzten Backup. Erw\u00e4gen Sie, Ihre Daten zu exportieren.',
+  'quiz.review': 'Antworten \u00dcberpr\u00fcfen',
+  'quiz.yourAnswer': 'Ihre Antwort',
+  'quiz.correctAnswer': 'Richtige Antwort',
+  'quiz.explanation': 'Erkl\u00e4rung',
+  'quiz.score': 'Ergebnis: {n}/{total}',
+
+  // Swipe & Thumbnails
+  'swipe.hint': 'Wischen zum Navigieren',
+  'thumbnails.show': 'Alle Folien zeigen',
+  'thumbnails.hide': 'Miniaturansichten ausblenden',
+
+  // Presenter
+  'presenter.elapsed': 'Vergangen',
+  'presenter.clock': 'Uhr',
+
+  // Image Upload
+  'image.paste': 'Bild Einf\u00fcgen',
+  'image.drag': 'Bild hierher ziehen',
+  'image.remove': 'Bild Entfernen',
+  'image.tooLarge': 'Bild zu gro\u00df (max 500KB). Verwenden Sie eine externe URL.',
+
+  // Dark Mode
+  'darkMode.light': 'Hell',
+  'darkMode.dark': 'Dunkel',
+  'darkMode.system': 'System',
+
+  // Video
+  'video.url': 'Video-URL',
+  'video.youtube': 'YouTube-Video',
+
+  // Validation
+  'validation.required': 'Dieses Feld ist erforderlich',
+  'validation.minOneSlide': 'F\u00fcgen Sie mindestens eine Folie hinzu',
+  'validation.minOneQuestion': 'F\u00fcgen Sie mindestens eine Frage hinzu',
+
+  // Teams
+  'teams.manage': 'Teams Verwalten',
+  'teams.add': 'Team Hinzuf\u00fcgen',
+  'teams.rename': 'Umbenennen',
+  'teams.leaderboard': 'Team-Rangliste',
+  'teams.individual': 'Einzeln',
+
+  // Chat/Q&A
+  'chat.title': 'Fragen',
+  'chat.askQuestion': 'Stellen Sie eine Frage...',
+  'chat.send': 'Senden',
+  'chat.upvote': 'Hochstimmen',
+  'chat.answered': 'Beantwortet',
+  'chat.noQuestions': 'Noch keine Fragen',
+
+  // Badges
+  'badges.title': 'Abzeichen',
+  'badges.earned': 'Abzeichen erhalten!',
+  'badges.firstSteps': 'Erste Schritte',
+  'badges.speedDemon': 'Geschwindigkeitsd\u00e4mon',
+  'badges.perfectScore': 'Perfekte Punktzahl',
+  'badges.bookworm': 'B\u00fccherwurm',
+  'badges.socialButterfly': 'Sozialer Schmetterling',
+  'badges.teamPlayer': 'Teamplayer',
+  'badges.completionist': 'Perfektionist',
+  'badges.earlyBird': 'Fr\u00fchaufsteher',
+
+  // Notifications
+  'notifications.title': 'Benachrichtigungen',
+  'notifications.clearAll': 'Alle l\u00f6schen',
+  'notifications.none': 'Keine Benachrichtigungen',
+  'notifications.progress25': '25% geschafft! Weiter so!',
+  'notifications.progress50': 'Halbzeit! 50% geschafft',
+  'notifications.progress75': 'Fast geschafft! 75%',
+  'notifications.progress100': 'Kurs abgeschlossen! Herzlichen Gl\u00fcckwunsch!',
+
+  // Offline (new)
+  'offline.available': 'Offline verf\u00fcgbar',
+  'offline.cached': 'Inhalt f\u00fcr Offline-Nutzung gespeichert',
+
+  // Layout (new)
+  'layout.video': 'Video',
+  'layout.rating': 'Bewertungsskala',
 };
 
 const translations = { en, es, fr, de };

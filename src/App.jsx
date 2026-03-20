@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { AppContext, useApp } from './context.js';
 import {
-  C, phaseColor, phaseLabel, itemIcon,
+  C, CD, phaseColor, phaseLabel, itemIcon,
   card, btn, btnOutline, input, label, formGroup,
 } from './theme';
 import { DEFAULT_COURSE } from './courseData.js';
-import { Header, ProgressBar, useDragDrop, Leaderboard, XPPopup } from './components.jsx';
+import { Header, ProgressBar, useDragDrop, Leaderboard, XPPopup, SearchBar } from './components.jsx';
 import { Modal, ConfirmDialog, Toast } from './components.jsx';
 import { DocViewer, SlideViewer, SurveyViewer, QuizInfo, LiveQuestionOverlay } from './Participant.jsx';
 import { ModuleModal, ItemModal } from './Admin.jsx';
@@ -234,9 +234,13 @@ function CourseCardModal({ open, onClose, onSave, initial }) {
 /* ================================================================
    COURSE LIST PAGE
    ================================================================ */
-function CourseListPage({ currentUser, courses, onCourseSelect, onAdminOpen, onLogout, onAddCourse, onEditCourse, onDeleteCourse }) {
+function CourseListPage({ currentUser, courses, onCourseSelect, onAdminOpen, onLogout, onAddCourse, onEditCourse, onDeleteCourse, onDuplicateCourse, darkMode, onToggleDark }) {
   const canEdit = ROLE_PERMISSIONS[currentUser.role]?.editContent;
   const canAdmin = ROLE_PERMISSIONS[currentUser.role]?.adminPanel;
+  const [searchTerm, setSearchTerm] = useState('');
+  const filteredCourses = searchTerm
+    ? courses.filter((c) => c.title.toLowerCase().includes(searchTerm.toLowerCase()) || (c.desc || '').toLowerCase().includes(searchTerm.toLowerCase()))
+    : courses;
 
   // Per-user progress
   const progressKey = `pedrra-progress-${currentUser.id}`;
@@ -253,6 +257,10 @@ function CourseListPage({ currentUser, courses, onCourseSelect, onAdminOpen, onL
         }
         right={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={onToggleDark} title={darkMode ? 'Light mode' : 'Dark mode'}
+              style={{ background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff', borderRadius: 6, padding: '6px 10px', fontSize: 14, cursor: 'pointer' }}>
+              {darkMode ? '☀️' : '🌙'}
+            </button>
             {canAdmin && (
               <button onClick={onAdminOpen}
                 style={{ background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff', borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
@@ -268,7 +276,7 @@ function CourseListPage({ currentUser, courses, onCourseSelect, onAdminOpen, onL
       />
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div>
             <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, margin: '0 0 4px' }}>My Trainings</h1>
             <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>{courses.length} training{courses.length !== 1 ? 's' : ''} available</p>
@@ -277,9 +285,19 @@ function CourseListPage({ currentUser, courses, onCourseSelect, onAdminOpen, onL
             <button onClick={onAddCourse} style={btn(C.primary)}>+ New Training</button>
           )}
         </div>
+        {courses.length > 2 && (
+          <div style={{ marginBottom: 16 }}>
+            <input
+              style={{ ...input, padding: '10px 14px', fontSize: 14 }}
+              placeholder="Search trainings..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 16 }}>
-          {courses.map((course) => {
+          {filteredCourses.map((course) => {
             const totalItems = course.modules.reduce((s, m) => s + m.items.length, 0);
             const doneItems = course.modules.reduce((s, m) => s + m.items.filter((it) => progress[`${course.id}-${m.id}-${it.id}`] || progress[`${m.id}-${it.id}`]).length, 0);
             const color = course.color || C.primary;
@@ -320,6 +338,9 @@ function CourseListPage({ currentUser, courses, onCourseSelect, onAdminOpen, onL
                 {canEdit && (
                   <div style={{ borderTop: `1px solid ${C.border}`, padding: '8px 16px', display: 'flex', gap: 8, justifyContent: 'flex-end' }}
                     onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => onDuplicateCourse(course)} style={{ background: 'none', border: 'none', fontSize: 12, color: '#805AD5', cursor: 'pointer', fontWeight: 600, padding: '4px 8px' }}>
+                      📋 Duplicate
+                    </button>
                     <button onClick={() => onEditCourse(course)} style={{ background: 'none', border: 'none', fontSize: 12, color: C.primary, cursor: 'pointer', fontWeight: 600, padding: '4px 8px' }}>
                       ✏️ Edit
                     </button>
@@ -434,7 +455,7 @@ function ItemList({ items, moduleId, canEdit, progress, onActivityOpen, onReorde
 /* ================================================================
    COURSE PAGE (single course view)
    ================================================================ */
-function CoursePage({ currentUser, onActivityOpen, onAdminOpen, onLogout, onBack }) {
+function CoursePage({ currentUser, onActivityOpen, onAdminOpen, onLogout, onBack, darkMode, onToggleDark }) {
   const {
     course, setCourse, session, activeQ,
     recordAnswer, recordSurvey, markComplete,
@@ -460,6 +481,7 @@ function CoursePage({ currentUser, onActivityOpen, onAdminOpen, onLogout, onBack
   const [deleteItem, setDeleteItem] = useState(null);
   const [toast, setToast] = useState(null);
   const showToast = (msg, type = 'success') => setToast({ message: msg, type });
+  const [searchItems, setSearchItems] = useState('');
 
   useEffect(() => {
     try { localStorage.setItem(progressKey, JSON.stringify(progress)); } catch { /* noop */ }
@@ -521,6 +543,10 @@ function CoursePage({ currentUser, onActivityOpen, onAdminOpen, onLogout, onBack
         }
         right={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={onToggleDark} title={darkMode ? 'Light mode' : 'Dark mode'}
+              style={{ background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff', borderRadius: 6, padding: '6px 10px', fontSize: 14, cursor: 'pointer' }}>
+              {darkMode ? '☀️' : '🌙'}
+            </button>
             {canAdmin && (
               <button onClick={onAdminOpen}
                 style={{ background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff', borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
@@ -566,14 +592,27 @@ function CoursePage({ currentUser, onActivityOpen, onAdminOpen, onLogout, onBack
           </div>
         </div>
 
-        {canEdit && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 10 }}>
+          {course.modules.length > 2 && (
+            <input
+              style={{ ...input, flex: 1, maxWidth: 300, padding: '8px 12px', fontSize: 13 }}
+              placeholder="Search modules & items..."
+              value={searchItems}
+              onChange={(e) => setSearchItems(e.target.value)}
+            />
+          )}
+          <div style={{ flex: 1 }} />
+          {canEdit && (
             <button onClick={() => setAddModOpen(true)} style={btn(C.primary)}>+ Add Module</button>
-          </div>
-        )}
+          )}
+        </div>
 
         {phases.map((phase) => {
-          const mods = course.modules.filter((m) => m.phase === phase);
+          let mods = course.modules.filter((m) => m.phase === phase);
+          if (searchItems) {
+            const s = searchItems.toLowerCase();
+            mods = mods.filter((m) => m.title.toLowerCase().includes(s) || m.items.some((it) => it.title.toLowerCase().includes(s)));
+          }
           if (!mods.length) return null;
           return (
             <div key={phase} style={{ marginBottom: 24 }}>
@@ -669,6 +708,17 @@ export default function App() {
   });
   const [timer, setTimer] = useState(0);
   const timerRef = useRef(null);
+
+  // Dark mode
+  const [darkMode, setDarkMode] = useState(() => {
+    const stored = localStorage.getItem('pedrra-dark-mode');
+    if (stored !== null) return stored === 'true';
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches || false;
+  });
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+    localStorage.setItem('pedrra-dark-mode', String(darkMode));
+  }, [darkMode]);
 
   // Presentation state
   const [presentationActive, setPresentationActive] = useState(false);
@@ -976,6 +1026,20 @@ export default function App() {
     if (activeCourseId === courseId) setActiveCourseId(null);
   };
 
+  const handleDuplicateCourse = (course) => {
+    const newId = 'course-' + genId();
+    const cloned = JSON.parse(JSON.stringify(course));
+    cloned.id = newId;
+    cloned.title = course.title + ' (copy)';
+    cloned.createdAt = Date.now();
+    // Give new IDs to all modules and items
+    cloned.modules = cloned.modules.map((m) => ({
+      ...m, id: genId(),
+      items: m.items.map((it) => ({ ...it, id: genId() })),
+    }));
+    setCourses((prev) => [...prev, cloned]);
+  };
+
   /* ─── Context value ─── */
   const startPresentation = useCallback((itemId, slides) => {
     setPresentationActive(true);
@@ -1041,6 +1105,9 @@ export default function App() {
                 onAddCourse={() => setAddCourseOpen(true)}
                 onEditCourse={(c) => setEditCourseData(c)}
                 onDeleteCourse={(c) => setDeleteCourseData(c)}
+                onDuplicateCourse={handleDuplicateCourse}
+                darkMode={darkMode}
+                onToggleDark={() => setDarkMode((d) => !d)}
               />
               <CourseCardModal open={addCourseOpen} onClose={() => setAddCourseOpen(false)} onSave={handleAddCourse} />
               <CourseCardModal open={!!editCourseData} onClose={() => setEditCourseData(null)} onSave={handleEditCourse} initial={editCourseData} />
@@ -1056,6 +1123,8 @@ export default function App() {
               onAdminOpen={() => setView('admin')}
               onLogout={handleLogout}
               onBack={() => setView('courseList')}
+              darkMode={darkMode}
+              onToggleDark={() => setDarkMode((d) => !d)}
             />
           )}
           {view === 'activity' && activityContext && (

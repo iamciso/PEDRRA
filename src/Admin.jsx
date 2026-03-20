@@ -2,11 +2,11 @@ import { useState, useRef, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useApp } from './context.js';
 import {
-  C, itemIcon, ANS,
+  C, CD, itemIcon, ANS,
   card, btn, btnSm, btnOutline, input, label, formGroup,
   sidebarItem, statCard,
 } from './theme';
-import { Modal, ConfirmDialog, Toast, PresenterView, Slide, useDragDrop } from './components.jsx';
+import { Modal, ConfirmDialog, Toast, PresenterView, Slide, SearchBar, useDragDrop } from './components.jsx';
 import { DEFAULT_COURSE } from './courseData.js';
 import { useI18n, LanguageSelector } from './i18n.jsx';
 
@@ -467,6 +467,7 @@ export function ItemModal({ open, onClose, onSave, initial, moduleId }) {
                       <option value="image">Image + Caption</option>
                       <option value="poll">Poll (interactive question)</option>
                       <option value="rating">Rating Scale (1-5 stars)</option>
+                      <option value="video">Video (embedded player)</option>
                     </select>
                   </div>
                   {currentSlide.l === 'twocol' && (
@@ -479,10 +480,53 @@ export function ItemModal({ open, onClose, onSave, initial, moduleId }) {
                   )}
                   {currentSlide.l === 'image' && (
                     <div style={formGroup}>
-                      <label style={label}>Image URL</label>
+                      <label style={label}>Image</label>
                       <input style={input} value={currentSlide.img || ''}
                         onChange={(e) => updateSlide(activeSlide, 'img', e.target.value)}
-                        placeholder="https://example.com/image.png" />
+                        placeholder="https://example.com/image.png or paste/drop image" />
+                      <div
+                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = C.primary; }}
+                        onDragLeave={(e) => { e.currentTarget.style.borderColor = C.border; }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.currentTarget.style.borderColor = C.border;
+                          const file = e.dataTransfer.files[0];
+                          if (file && file.type.startsWith('image/')) {
+                            if (file.size > 512000) { alert('Image too large (max 500KB). Consider using a URL instead.'); return; }
+                            const reader = new FileReader();
+                            reader.onload = (ev) => updateSlide(activeSlide, 'img', ev.target.result);
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        onPaste={(e) => {
+                          const items = e.clipboardData?.items;
+                          if (!items) return;
+                          for (const item of items) {
+                            if (item.type.startsWith('image/')) {
+                              e.preventDefault();
+                              const file = item.getAsFile();
+                              if (file.size > 512000) { alert('Image too large (max 500KB). Consider using a URL instead.'); return; }
+                              const reader = new FileReader();
+                              reader.onload = (ev) => updateSlide(activeSlide, 'img', ev.target.result);
+                              reader.readAsDataURL(file);
+                              break;
+                            }
+                          }
+                        }}
+                        tabIndex={0}
+                        style={{
+                          marginTop: 6, padding: 16, border: `2px dashed ${C.border}`, borderRadius: 8,
+                          textAlign: 'center', fontSize: 12, color: C.dim, cursor: 'pointer',
+                          background: C.bg, transition: 'border-color .2s',
+                        }}
+                      >
+                        Drop image here or click and paste (Ctrl+V) · Max 500KB
+                      </div>
+                      {currentSlide.img && currentSlide.img.startsWith('data:') && (
+                        <p style={{ fontSize: 11, color: C.warning, marginTop: 4 }}>
+                          Embedded image ({Math.round(currentSlide.img.length / 1024)}KB in data)
+                        </p>
+                      )}
                     </div>
                   )}
                   {currentSlide.l === 'poll' && (
@@ -584,6 +628,17 @@ export function ItemModal({ open, onClose, onSave, initial, moduleId }) {
                         Auto-reveal when all participants have voted
                       </label>
                     </>
+                  )}
+                  {currentSlide.l === 'video' && (
+                    <div style={formGroup}>
+                      <label style={label}>Video URL</label>
+                      <input style={input} value={currentSlide.videoUrl || ''}
+                        onChange={(e) => updateSlide(activeSlide, 'videoUrl', e.target.value)}
+                        placeholder="YouTube URL or direct video URL" />
+                      <p style={{ fontSize: 11, color: C.dim, marginTop: 3 }}>
+                        Supports YouTube links and direct video file URLs (.mp4, .webm)
+                      </p>
+                    </div>
                   )}
                   <div style={formGroup}>
                     <label style={label}>Presenter Notes (optional)</label>
@@ -709,6 +764,12 @@ export function ItemModal({ open, onClose, onSave, initial, moduleId }) {
                     <p style={{ fontSize: 11, color: C.dim, marginTop: 4 }}>
                       Select the radio button next to the correct answer. For polls, no selection is needed.
                     </p>
+                  </div>
+                  <div style={formGroup}>
+                    <label style={label}>Explanation (shown after reveal)</label>
+                    <textarea style={{ ...input, minHeight: 50, resize: 'vertical' }}
+                      value={currentQ.explanation || ''} onChange={(e) => updateQ(activeQ, 'explanation', e.target.value)}
+                      placeholder="Why is this the correct answer? (optional)" />
                   </div>
                 </div>
               )}
@@ -876,6 +937,7 @@ function LiveSessionTab() {
 
   const [presenting, setPresenting] = useState(null); // { itemId, slides } when PresenterView is open
   const [showQuizPush, setShowQuizPush] = useState(false);
+  const [searchQ, setSearchQ] = useState('');
 
   const allQuizItems = course.modules.flatMap((m) =>
     m.items.filter((i) => i.type === 'quiz').map((i) => ({ ...i, moduleName: m.title }))
@@ -1084,7 +1146,14 @@ function LiveSessionTab() {
               <p style={{ color: C.dim, fontSize: 13 }}>No quiz questions found. Add quiz items in the Modules tab.</p>
             ) : (
               <div>
-                {allQuestions.map(({ q, qi, item }) => {
+                {allQuestions.length > 3 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <input style={{ ...input, padding: '8px 12px', fontSize: 13 }}
+                      placeholder="Search questions..." value={searchQ}
+                      onChange={(e) => setSearchQ(e.target.value)} />
+                  </div>
+                )}
+                {allQuestions.filter(({ q, item }) => !searchQ || `${item.title} ${q.text}`.toLowerCase().includes(searchQ.toLowerCase())).map(({ q, qi, item }) => {
                   const isActive = activeQ?.itemId === item.id && activeQ?.qIndex === qi;
                   return (
                     <div key={`${item.id}-${qi}`} style={{
@@ -1787,6 +1856,43 @@ function SettingsTab({ onPasswordChange, onLogout }) {
               📥 Import JSON
               <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
             </label>
+          </div>
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+            <p style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>Student progress data (localStorage):</p>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button onClick={() => {
+                const progressData = {};
+                for (let i = 0; i < localStorage.length; i++) {
+                  const key = localStorage.key(i);
+                  if (key && key.startsWith('pedrra-progress-')) {
+                    try { progressData[key] = JSON.parse(localStorage.getItem(key)); } catch {}
+                  }
+                }
+                downloadFile(progressData, `pedrra-progress-${Date.now()}.json`);
+              }} style={btnSm(C.success)}>📤 Export Progress</button>
+              <label style={{ ...btnSm(C.purple), display: 'inline-block', cursor: 'pointer' }}>
+                📥 Import Progress
+                <input type="file" accept=".json" onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (ev) => {
+                    try {
+                      const data = JSON.parse(ev.target.result);
+                      Object.entries(data).forEach(([key, val]) => {
+                        if (key.startsWith('pedrra-progress-')) {
+                          const existing = JSON.parse(localStorage.getItem(key) || '{}');
+                          localStorage.setItem(key, JSON.stringify({ ...existing, ...val }));
+                        }
+                      });
+                      showToast('Progress imported');
+                    } catch { showToast('Invalid file', 'error'); }
+                  };
+                  reader.readAsText(file);
+                  e.target.value = '';
+                }} style={{ display: 'none' }} />
+              </label>
+            </div>
           </div>
         </div>
 

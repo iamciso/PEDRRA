@@ -15,6 +15,30 @@ export function useResponsive() {
 }
 
 /* ================================================================
+   SWIPE HOOK
+   ================================================================ */
+export function useSwipe(onSwipeLeft, onSwipeRight, threshold = 50) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let startX = 0, startY = 0;
+    const onStart = (e) => { startX = e.touches[0].clientX; startY = e.touches[0].clientY; };
+    const onEnd = (e) => {
+      const dx = e.changedTouches[0].clientX - startX;
+      const dy = e.changedTouches[0].clientY - startY;
+      if (Math.abs(dx) > threshold && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        if (dx > 0) onSwipeRight?.(); else onSwipeLeft?.();
+      }
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchend', onEnd, { passive: true });
+    return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchend', onEnd); };
+  }, [onSwipeLeft, onSwipeRight, threshold]);
+  return ref;
+}
+
+/* ================================================================
    DRAG & DROP HOOK
    ================================================================ */
 export function useDragDrop(list, onReorder) {
@@ -149,6 +173,82 @@ export function ProgressBar({ done, total, color = C.primary, height = 8 }) {
 }
 
 /* ================================================================
+   SEARCH BAR
+   ================================================================ */
+export function SearchBar({ value, onChange, placeholder = 'Search...' }) {
+  return (
+    <div style={{ position: 'relative', marginBottom: 12 }}>
+      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: C.dim }}>🔍</span>
+      <input
+        style={{ ...input, paddingLeft: 36, background: C.white }}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={placeholder}
+      />
+      {value && (
+        <button
+          onClick={() => onChange('')}
+          style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', fontSize: 16, color: C.dim, cursor: 'pointer' }}
+          aria-label="Clear search"
+        >×</button>
+      )}
+    </div>
+  );
+}
+
+/* ================================================================
+   BADGE POPUP
+   ================================================================ */
+export function BadgePopup({ badge, onDone }) {
+  useEffect(() => { const t = setTimeout(onDone, 3000); return () => clearTimeout(t); }, [onDone]);
+  return (
+    <div style={{
+      position: 'fixed', top: '30%', left: '50%', transform: 'translateX(-50%)',
+      background: '#fff', borderRadius: 16, padding: '24px 32px', textAlign: 'center',
+      boxShadow: '0 8px 40px rgba(0,0,0,.3)', zIndex: 9999, animation: 'badgeReveal .5s ease',
+    }}>
+      <div style={{ fontSize: 48, marginBottom: 8 }}>{badge.icon}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>{badge.name}</div>
+      <div style={{ fontSize: 13, color: C.muted }}>{badge.desc}</div>
+    </div>
+  );
+}
+
+/* ================================================================
+   NOTIFICATION BELL
+   ================================================================ */
+export function NotificationBell({ notifications, onClear }) {
+  const [open, setOpen] = useState(false);
+  const unread = notifications.filter(n => !n.read).length;
+  return (
+    <div style={{ position: 'relative' }}>
+      <button onClick={() => setOpen(!open)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#fff', position: 'relative', padding: 4 }}
+        aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`}>
+        🔔
+        {unread > 0 && <span style={{ position: 'absolute', top: -2, right: -4, background: C.error, color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unread}</span>}
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 8, background: '#fff', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,.2)', width: 280, maxHeight: 320, overflowY: 'auto', zIndex: 1000, border: `1px solid ${C.border}` }}>
+          <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Notifications</span>
+            {notifications.length > 0 && <button onClick={() => { onClear(); setOpen(false); }} style={{ background: 'none', border: 'none', fontSize: 11, color: C.primary, cursor: 'pointer' }}>Clear all</button>}
+          </div>
+          {notifications.length === 0 ? (
+            <div style={{ padding: 20, textAlign: 'center', color: C.dim, fontSize: 13 }}>No notifications</div>
+          ) : notifications.slice(0, 10).map((n, i) => (
+            <div key={i} style={{ padding: '10px 14px', borderBottom: `1px solid ${C.border}`, background: n.read ? 'transparent' : C.light }}>
+              <div style={{ fontSize: 13, color: C.text }}>{n.text}</div>
+              <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{new Date(n.time).toLocaleTimeString()}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ================================================================
    FORMATTED TEXT RENDERER (markdown-lite)
    ================================================================ */
 function renderFormattedText(text) {
@@ -198,6 +298,7 @@ export function Slide({ s, big, showNotes }) {
     twocol:  { bg: C.white, c: C.text, align: 'left', title: 28 * f, body: 15 * f, pad: 36 * f },
     bullets: { bg: C.white, c: C.text, align: 'left', title: 28 * f, body: 15 * f, pad: 36 * f },
     image:   { bg: C.bg, c: C.text, align: 'center', title: 26 * f, body: 14 * f, pad: 30 * f },
+    video:   { bg: C.bg, c: C.text, align: 'center', title: 26 * f, body: 14 * f, pad: 30 * f },
   };
   const l = layouts[s.l] || layouts.content;
   const base = {
@@ -251,6 +352,28 @@ export function Slide({ s, big, showNotes }) {
           <div style={{ width: '100%', height: big ? 200 : 100, background: C.border, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.dim, fontSize: 14, marginBottom: 12 }}>
             🖼️ Image placeholder
           </div>
+        )}
+        {s.c && <div style={{ fontSize: l.body, lineHeight: 1.7, opacity: 0.9 }}>{renderFormattedText(s.c)}</div>}
+        {showNotes && s.notes && <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFF9DB', borderRadius: 6, fontSize: 12, color: '#744210', borderLeft: '3px solid #ECC94B' }}>📝 {s.notes}</div>}
+      </div>
+    );
+  }
+
+  // Video layout
+  if (s.l === 'video') {
+    const isYT = s.videoUrl && (s.videoUrl.includes('youtube.com') || s.videoUrl.includes('youtu.be'));
+    const ytId = isYT ? s.videoUrl.match(/(?:youtu\.be\/|v=)([^&?#]+)/)?.[1] : null;
+    return (
+      <div style={base}>
+        <h2 style={{ fontSize: l.title, fontWeight: 700, margin: '0 0 12px', lineHeight: 1.3 }}>{s.t}</h2>
+        {ytId ? (
+          <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 8, marginBottom: 12 }}>
+            <iframe src={`https://www.youtube-nocookie.com/embed/${ytId}`} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title={s.t} />
+          </div>
+        ) : s.videoUrl ? (
+          <video src={s.videoUrl} controls style={{ width: '100%', maxHeight: big ? 400 : 200, borderRadius: 8, marginBottom: 12 }} />
+        ) : (
+          <div style={{ padding: 40, textAlign: 'center', color: C.dim, background: C.border, borderRadius: 8, marginBottom: 12 }}>🎬 Video placeholder</div>
         )}
         {s.c && <div style={{ fontSize: l.body, lineHeight: 1.7, opacity: 0.9 }}>{renderFormattedText(s.c)}</div>}
         {showNotes && s.notes && <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFF9DB', borderRadius: 6, fontSize: 12, color: '#744210', borderLeft: '3px solid #ECC94B' }}>📝 {s.notes}</div>}
@@ -319,27 +442,33 @@ export function Slide({ s, big, showNotes }) {
    ================================================================ */
 export function PresentationMode({ slides, startIdx, onClose }) {
   const [idx, setIdx] = useState(startIdx || 0);
-  const ref = useRef();
+  const containerRef = useRef();
+
+  const goNext = useCallback(() => setIdx((i) => Math.min(slides.length - 1, i + 1)), [slides.length]);
+  const goPrev = useCallback(() => setIdx((i) => Math.max(0, i - 1)), []);
+
+  // Swipe support for slide navigation
+  const swipeRef = useSwipe(goNext, goPrev);
 
   // Keyboard navigation
   useEffect(() => {
     const handleKey = (e) => {
-      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); setIdx((i) => Math.min(slides.length - 1, i + 1)); }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); setIdx((i) => Math.max(0, i - 1)); }
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goNext(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); }
       else if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [slides.length, onClose]);
+  }, [slides.length, onClose, goNext, goPrev]);
 
   // Try fullscreen
   useEffect(() => {
-    try { ref.current?.requestFullscreen?.(); } catch { /* noop */ }
+    try { containerRef.current?.requestFullscreen?.(); } catch { /* noop */ }
     return () => { try { document.exitFullscreen?.(); } catch { /* noop */ } };
   }, []);
 
   return (
-    <div ref={ref} style={{
+    <div ref={(el) => { containerRef.current = el; swipeRef.current = el; }} style={{
       position: 'fixed', inset: 0, zIndex: 2000, background: '#111',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
     }}>
@@ -361,14 +490,14 @@ export function PresentationMode({ slides, startIdx, onClose }) {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '12px 24px', background: 'rgba(0,0,0,.6)',
       }}>
-        <button onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
+        <button onClick={goPrev} disabled={idx === 0}
           style={{ background: 'rgba(255,255,255,.15)', border: 'none', color: idx === 0 ? '#555' : '#fff', borderRadius: 6, padding: '8px 16px', fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>
           ← Prev
         </button>
         <div style={{ color: 'rgba(255,255,255,.7)', fontSize: 14, fontWeight: 600 }}>
           {idx + 1} / {slides.length}
         </div>
-        <button onClick={() => setIdx((i) => Math.min(slides.length - 1, i + 1))} disabled={idx === slides.length - 1}
+        <button onClick={goNext} disabled={idx === slides.length - 1}
           style={{ background: 'rgba(255,255,255,.15)', border: 'none', color: idx === slides.length - 1 ? '#555' : '#fff', borderRadius: 6, padding: '8px 16px', fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>
           Next →
         </button>
@@ -394,10 +523,25 @@ export function PresenterView({ slides, itemId, onClose, broadcast, activeQ, get
   const [idx, setIdx] = useState(0);
   const [pollLaunched, setPollLaunched] = useState(false);
   const ref = useRef();
+  const startTimeRef = useRef(Date.now());
+  const [clock, setClock] = useState(new Date());
+  const [elapsed, setElapsed] = useState(0);
 
   const slide = slides[idx];
   const nextSlide = slides[idx + 1] || null;
   const isPoll = slide?.l === 'poll' || slide?.l === 'rating';
+
+  // Clock and elapsed timer
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setClock(new Date());
+      setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatTime = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const formatElapsed = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
   // Broadcast navigation
   const navigate = (newIdx) => {
@@ -463,10 +607,18 @@ export function PresenterView({ slides, itemId, onClose, broadcast, activeQ, get
         <span style={{ color: 'rgba(255,255,255,.7)', fontSize: 13, fontWeight: 600 }}>
           Presenter View — Slide {idx + 1} of {slides.length}
         </span>
-        <button onClick={onClose} style={{
-          background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff',
-          borderRadius: 6, padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 600,
-        }}>✕ End Presentation</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <span style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, fontFamily: 'monospace' }}>
+            🕐 {formatTime(clock)}
+          </span>
+          <span style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, fontFamily: 'monospace' }}>
+            ⏱ {formatElapsed(elapsed)}
+          </span>
+          <button onClick={onClose} style={{
+            background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff',
+            borderRadius: 6, padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 600,
+          }}>✕ End Presentation</button>
+        </div>
       </div>
 
       {/* Main content */}
@@ -688,6 +840,7 @@ export function SurveyQuestion({ q, answers, setAnswers, readonly }) {
    ================================================================ */
 export function Modal({ open, onClose, title, children, maxWidth = 580 }) {
   const ref = useRef();
+  const contentRef = useRef();
 
   useEffect(() => {
     if (!open) return;
@@ -696,6 +849,17 @@ export function Modal({ open, onClose, title, children, maxWidth = 580 }) {
     return () => document.removeEventListener('keydown', handleKey);
   }, [open, onClose]);
 
+  // Focus trap: focus the first focusable element when modal opens
+  useEffect(() => {
+    if (!open || !contentRef.current) return;
+    const focusable = contentRef.current.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusable.length > 0) {
+      focusable[0].focus();
+    }
+  }, [open]);
+
   if (!open) return null;
 
   return (
@@ -703,14 +867,17 @@ export function Modal({ open, onClose, title, children, maxWidth = 580 }) {
       style={modal}
       onMouseDown={(e) => { if (e.target === ref.current) onClose(); }}
       ref={ref}
+      role="dialog"
+      aria-modal="true"
     >
-      <div style={{ ...modalBox, maxWidth }}>
+      <div ref={contentRef} style={{ ...modalBox, maxWidth }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: 0 }}>{title}</h2>
           <button
             onClick={onClose}
             style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: C.dim, lineHeight: 1, padding: '4px 8px', borderRadius: 6 }}
             title="Close"
+            aria-label="Close dialog"
           >×</button>
         </div>
         {children}
