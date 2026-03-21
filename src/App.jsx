@@ -5,6 +5,8 @@ import {
   card, btn, btnOutline, input, label, formGroup,
 } from './theme';
 import { DEFAULT_COURSE } from './courseData.js';
+import * as Sync from './sync.js';
+import { firebaseEnabled } from './firebase.js';
 import { Header, ProgressBar, useDragDrop, Leaderboard, XPPopup, SearchBar } from './components.jsx';
 import { Modal, ConfirmDialog, Toast } from './components.jsx';
 import { DocViewer, SlideViewer, SurveyViewer, QuizInfo, LiveQuestionOverlay } from './Participant.jsx';
@@ -887,6 +889,45 @@ export default function App() {
     return () => clearInterval(poll);
   }, [session, participants, responses, activeQ]);
 
+  /* ─── Firebase real-time listeners (cross-device sync) ─── */
+  useEffect(() => {
+    const code = session?.code || currentUser?._sessionCode;
+    if (!code || !firebaseEnabled()) return;
+
+    const unsub = Sync.subscribeToSession(code, {
+      onPresentation: (data) => {
+        if (data.active) {
+          setPresentationActive(true);
+          if (data.slides) setPresentationSlides(data.slides);
+          setPresentationSlideIdx(data.slideIdx || 0);
+          setPresentationItemId(data.itemId);
+        } else {
+          setPresentationActive(false);
+          setPresentationSlides(null);
+          setPresentationSlideIdx(0);
+          setPresentationItemId(null);
+        }
+      },
+      onActiveQ: (data) => {
+        if (data) {
+          setActiveQ(data);
+          if (!data.revealed && data.timer) startTimer(data.timer);
+          if (data.revealed) stopTimer();
+        } else {
+          setActiveQ(null);
+        }
+      },
+      onParticipants: (list) => {
+        setParticipants(list);
+      },
+      onResponses: (data) => {
+        setResponses(data);
+      },
+    });
+
+    return unsub;
+  }, [session?.code, currentUser?._sessionCode]);
+
   /* ─── Online / Offline ─── */
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   useEffect(() => {
@@ -927,6 +968,7 @@ export default function App() {
     const s = { code: genCode(), courseId: activeCourseId, startedAt: Date.now() };
     setSession(s);
     broadcastMsg('SESSION', s);
+    Sync.createSession(s);
   }, [activeCourseId]);
 
   const pushQuestion = useCallback((itemId, qIndex, fromPresentation) => {
@@ -943,8 +985,9 @@ export default function App() {
   const revealAnswer = useCallback(() => {
     setActiveQ((prev) => prev ? { ...prev, revealed: true } : prev);
     broadcastMsg('REVEAL', {});
+    Sync.revealAnswer(session?.code);
     stopTimer();
-  }, []);
+  }, [session]);
 
   // Auto-reveal when all participants have voted
   useEffect(() => {
@@ -986,7 +1029,8 @@ export default function App() {
       setParticipants((prev) => prev.map((p) => p.id === participantId ? { ...p, answers: (p.answers || 0) + 1 } : p));
     }
     broadcastMsg('ANSWER', { participantId, itemId, qIndex, answerIdx, xp: isCorrect ? xp : 0 });
-  }, [course, activeQ]);
+    Sync.submitAnswer(session?.code, { participantId, itemId, qIndex, answerIdx, xp: isCorrect ? xp : 0 });
+  }, [course, activeQ, session]);
 
   const recordSurvey = useCallback((participantId, itemId, answers) => {
     setResponses((prev) => ({ ...prev, [`survey-${itemId}-${participantId}`]: { answers, submittedAt: Date.now() } }));
@@ -1011,15 +1055,16 @@ export default function App() {
     window.history.replaceState({}, '', window.location.pathname);
   };
 
-  const handleJoinSession = (code, name, team) => {
+  const handleJoinSession = async (code, name, team) => {
     const id = genId();
     const participant = { id, name, team, xp: 0, answers: 0, joinedAt: Date.now() };
     broadcastMsg('JOIN', { code, participant });
+    Sync.joinSession(code, participant);
     setParticipants((prev) => {
       if (prev.find((p) => p.id === participant.id)) return prev;
       return [...prev, participant];
     });
-    const tempUser = { id, username: `participant-${id}`, name, role: 'viewer', _isParticipant: true, _team: team };
+    const tempUser = { id, username: `participant-${id}`, name, role: 'viewer', _isParticipant: true, _team: team, _sessionCode: code };
     setCurrentUser(tempUser);
     save('pedrra-currentUser', tempUser);
     // If there's a session with a courseId, go directly to that course
@@ -1076,7 +1121,8 @@ export default function App() {
     setPresentationSlideIdx(0);
     setPresentationItemId(itemId);
     broadcastMsg('PRESENT_START', { itemId, slides });
-  }, []);
+    Sync.startPresentation(session?.code, itemId, slides);
+  }, [session]);
 
   const endPresentation = useCallback(() => {
     setPresentationActive(false);
@@ -1084,13 +1130,15 @@ export default function App() {
     setPresentationSlideIdx(0);
     setPresentationItemId(null);
     broadcastMsg('PRESENT_END', {});
+    Sync.endPresentation(session?.code);
     if (activeQ?.fromPresentation) setActiveQ(null);
-  }, [activeQ]);
+  }, [activeQ, session]);
 
   const navigateSlide = useCallback((slideIdx) => {
     setPresentationSlideIdx(slideIdx);
     broadcastMsg('SLIDE_NAV', { slideIdx, itemId: presentationItemId });
-  }, [presentationItemId]);
+    Sync.navigateSlide(session?.code, slideIdx);
+  }, [presentationItemId, session]);
 
   const ctx = {
     course, setCourse,
@@ -1102,7 +1150,15 @@ export default function App() {
     timer,
     getResponseCount, getResponseDist,
     recordAnswer, recordSurvey, markComplete,
-    broadcast: broadcastMsg,
+    broadcast: (type, payload) => {
+      broadcastMsg(type, payload);
+      // Also sync via Firebase for cross-device
+      if (session?.code) {
+        if (type === 'PUSH_Q') Sync.pushQuestion(session.code, payload);
+        else if (type === 'REVEAL') Sync.revealAnswer(session.code);
+        else if (type === 'SLIDE_NAV') Sync.navigateSlide(session.code, payload.slideIdx);
+      }
+    },
     setView,
     users, setUsers,
     currentUser,
