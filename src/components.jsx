@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { useApp } from './context.js';
 import { C, ANS, card, btn, btnOutline, input, header, label, modal, modalBox, formGroup } from './theme';
 
 /* ================================================================
@@ -516,39 +517,108 @@ export function Slide({ s, big, showNotes, transition, fullscreen }) {
 /* ================================================================
    PRESENTATION MODE (fullscreen slide viewer)
    ================================================================ */
-export function PresentationMode({ slides, startIdx, onClose }) {
+export function PresentationMode({ slides, startIdx, onClose, itemId, broadcast: broadcastProp }) {
   const [idx, setIdx] = useState(startIdx || 0);
   const [slideTransition, setSlideTransition] = useState(null);
+  const [pollLaunched, setPollLaunched] = useState(false);
   const containerRef = useRef();
   const prevIdx = useRef(startIdx || 0);
+
+  // Get context for auto-broadcast
+  const ctx = useApp();
+  const {
+    session, launchSession, activeQ, pushQuestion, revealAnswer,
+    activeSurvey, pushSurvey, clearSurvey,
+    getResponseCount, getResponseDist, participants,
+    startPresentation, endPresentation, navigateSlide,
+  } = ctx;
+  const broadcast = broadcastProp || ctx.broadcast;
+  const isTrainer = ctx.currentUser?.role === 'admin' || ctx.currentUser?.role === 'facilitator';
+
+  const slide = slides[idx];
+  const isPoll = slide?.l === 'poll' || slide?.l === 'rating';
 
   const doTransition = (newIdx) => {
     setSlideTransition(newIdx > prevIdx.current ? 'in' : 'out');
     prevIdx.current = newIdx;
     setTimeout(() => setSlideTransition(null), 450);
   };
-  const goNext = useCallback(() => setIdx((i) => { const n = Math.min(slides.length - 1, i + 1); doTransition(n); return n; }), [slides.length]);
-  const goPrev = useCallback(() => setIdx((i) => { const n = Math.max(0, i - 1); doTransition(n); return n; }), []);
+
+  const navigate = useCallback((newIdx) => {
+    const clamped = Math.max(0, Math.min(slides.length - 1, newIdx));
+    doTransition(clamped);
+    setIdx(clamped);
+    setPollLaunched(false);
+    // Broadcast slide navigation to participants
+    if (isTrainer && broadcast) {
+      broadcast('SLIDE_NAV', { slideIdx: clamped, itemId });
+    }
+  }, [slides.length, isTrainer, broadcast, itemId]);
+
+  const goNext = useCallback(() => navigate(prevIdx.current + 1), [navigate]);
+  const goPrev = useCallback(() => navigate(prevIdx.current - 1), [navigate]);
 
   // Swipe support for slide navigation
   const swipeRef = useSwipe(goNext, goPrev);
+
+  // Auto-launch poll when arriving at a poll/rating slide
+  useEffect(() => {
+    const s = slides[idx];
+    const isAutoLaunchPoll = s?.l === 'poll' || s?.l === 'rating';
+    if (isAutoLaunchPoll && !pollLaunched && isTrainer) {
+      const timer = setTimeout(() => {
+        setPollLaunched(true);
+        const opts = s.l === 'rating' ? ['1','2','3','4','5'] : s.opts;
+        if (broadcast) {
+          broadcast('PUSH_Q', {
+            itemId, slideIdx: idx, text: s.text || s.t, opts, ok: s.ok ?? -1,
+            xp: s.xp || 0, timer: s.timer || 30, fromPresentation: true,
+            autoReveal: s.autoReveal || false, pollType: s.l,
+          });
+        }
+        if (pushQuestion) pushQuestion(itemId, idx, true);
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [idx]);
 
   // Keyboard navigation
   useEffect(() => {
     const handleKey = (e) => {
       if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goNext(); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); }
+      else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (isPoll && pollLaunched && activeQ && !activeQ.revealed && revealAnswer) revealAnswer();
+      }
       else if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [slides.length, onClose, goNext, goPrev]);
+  }, [slides.length, onClose, goNext, goPrev, isPoll, pollLaunched, activeQ]);
+
+  // Auto-create session if trainer doesn't have one, then broadcast presentation start
+  useEffect(() => {
+    if (!isTrainer) return;
+    // Ensure session exists
+    if (!session && launchSession) launchSession();
+    // Broadcast presentation start
+    if (broadcast) broadcast('PRESENT_START', { itemId, slides });
+    return () => {
+      if (broadcast) broadcast('PRESENT_END', {});
+    };
+  }, []);
 
   // Try fullscreen
   useEffect(() => {
     try { containerRef.current?.requestFullscreen?.(); } catch { /* noop */ }
     return () => { try { document.exitFullscreen?.(); } catch { /* noop */ } };
   }, []);
+
+  // Poll response data
+  const respCount = isPoll && pollLaunched && getResponseCount ? getResponseCount(itemId, `slide-${idx}`) : 0;
+  const respDist = isPoll && pollLaunched && getResponseDist ? getResponseDist(itemId, `slide-${idx}`) : [];
+  const joinUrl = session ? `${window.location.origin}${window.location.pathname}?code=${session.code}` : '';
 
   return (
     <div ref={(el) => { containerRef.current = el; swipeRef.current = el; }} style={{
@@ -562,14 +632,57 @@ export function PresentationMode({ slides, startIdx, onClose }) {
         fontSize: 13, cursor: 'pointer', zIndex: 10, fontWeight: 600,
       }}>✕ Exit</button>
 
+      {/* Session code badge (top-left) for trainer */}
+      {isTrainer && session?.code && (
+        <div style={{
+          position: 'absolute', top: 16, left: 16, zIndex: 10,
+          background: 'rgba(0,0,0,.5)', borderRadius: 8, padding: '6px 12px',
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <span style={{ color: 'rgba(255,255,255,.5)', fontSize: 11, fontWeight: 600 }}>SESSION</span>
+          <span style={{ color: '#FFCC00', fontSize: 14, fontWeight: 800, fontFamily: 'monospace', letterSpacing: 2 }}>{session.code}</span>
+          <span style={{ color: 'rgba(255,255,255,.4)', fontSize: 11 }}>👥 {participants.length}</span>
+        </div>
+      )}
+
       {/* Slide — fill viewport maintaining 16:9 aspect ratio */}
       <div style={{
         width: 'min(92vw, calc((100vh - 120px) * 16 / 9))',
         height: 'min(calc(92vw * 9 / 16), calc(100vh - 120px))',
-        display: 'flex',
+        display: 'flex', position: 'relative',
       }}>
         <Slide s={slides[idx]} big transition={slideTransition} fullscreen />
+
+        {/* QR overlay when poll is active */}
+        {isPoll && pollLaunched && activeQ && !activeQ.revealed && session?.code && (
+          <div style={{
+            position: 'absolute', bottom: 16, right: 16,
+            background: 'rgba(255,255,255,.95)', borderRadius: 12, padding: 10,
+            boxShadow: '0 4px 20px rgba(0,0,0,.4)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+            zIndex: 10,
+          }}>
+            <QRCodeSVG value={joinUrl} size={90} bgColor="#fff" fgColor="#003399" level="L" />
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#003399', fontFamily: 'monospace', letterSpacing: 2 }}>{session.code}</div>
+            <div style={{ fontSize: 9, color: '#666', textTransform: 'uppercase' }}>Scan to vote</div>
+          </div>
+        )}
       </div>
+
+      {/* Poll status bar */}
+      {isPoll && pollLaunched && activeQ && !activeQ.revealed && (
+        <div style={{
+          position: 'absolute', top: 60, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(0,0,0,.7)', borderRadius: 10, padding: '8px 20px',
+          display: 'flex', alignItems: 'center', gap: 12, zIndex: 10,
+        }}>
+          <span style={{ color: '#FFCC00', fontSize: 13, fontWeight: 700 }}>🗳️ {respCount}{participants.length > 0 ? ` / ${participants.length}` : ''} voted</span>
+          <button onClick={() => { if (revealAnswer) revealAnswer(); }} style={{
+            background: '#22c55e', border: 'none', color: '#fff', borderRadius: 6,
+            padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+          }}>Reveal ↵</button>
+        </div>
+      )}
 
       {/* Bottom bar */}
       <div style={{
@@ -593,7 +706,7 @@ export function PresentationMode({ slides, startIdx, onClose }) {
       {/* Dot indicators */}
       <div style={{ position: 'absolute', bottom: 56, display: 'flex', gap: 6 }}>
         {slides.map((_, i) => (
-          <button key={i} onClick={() => setIdx(i)} style={{
+          <button key={i} onClick={() => navigate(i)} style={{
             width: 10, height: 10, borderRadius: '50%', border: 'none', cursor: 'pointer',
             background: i === idx ? '#fff' : 'rgba(255,255,255,.3)', transition: 'background .2s',
           }} />

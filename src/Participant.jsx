@@ -572,7 +572,7 @@ function SlideViewer({ item, onComplete, isComplete, onBack, currentUser, module
   };
 
   if (presenting && total > 0) {
-    return <PresentationMode slides={slides} startIdx={idx} onClose={() => setPresenting(false)} />;
+    return <PresentationMode slides={slides} startIdx={idx} onClose={() => setPresenting(false)} itemId={liveItem.id} />;
   }
 
   if (editing && canEdit) {

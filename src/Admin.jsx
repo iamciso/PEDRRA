@@ -57,7 +57,7 @@ function Sidebar({ activeTab, setTab, session, onLogout, onBackToCourse, courseN
   const perms = ROLE_PERMISSIONS[currentUser?.role] || ROLE_PERMISSIONS.viewer;
   const navItems = [
     { id: 'live', icon: session ? '🔴' : '📡', label: 'Live Session', show: perms.live },
-    { id: 'content', icon: '📝', label: 'Content', show: perms.modules },
+    // Content is now managed from the course view directly
     { id: 'participants', icon: '👥', label: 'Participants', show: perms.participants },
     { id: 'results', icon: '📊', label: 'Results & Analytics', show: perms.results },
     { id: 'users', icon: '🔑', label: 'Users & Roles', show: perms.users },
@@ -3353,7 +3353,7 @@ export default function Admin({ onExit, currentUser: propUser, adminTab: tab, se
 
   const tabTitles = {
     live: 'Live Session',
-    content: 'Content Overview',
+    // content tab removed
     participants: 'Participants',
     results: 'Results & Analytics',
     users: 'Users & Roles',
@@ -3386,7 +3386,7 @@ export default function Admin({ onExit, currentUser: propUser, adminTab: tab, se
         </TopBar>
 
         {tab === 'live' && perms.live && <LiveSessionTab />}
-        {tab === 'content' && perms.modules && <ContentTab adminEditing={adminEditing} setAdminEditing={setAdminEditing} closeAdminEditing={closeAdminEditing} />}
+        {/* Content tab removed — course is managed from the course view */}
         {tab === 'participants' && perms.participants && <ParticipantsTab />}
         {tab === 'results' && perms.results && <ResultsTab />}
         {tab === 'users' && perms.users && <UsersTab />}
