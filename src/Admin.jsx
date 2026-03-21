@@ -1984,16 +1984,22 @@ function LiveSessionTab() {
   const {
     course, session, launchSession, setView,
     participants, activeQ, pushQuestion, revealAnswer,
+    activeSurvey, pushSurvey, clearSurvey,
     timer, getResponseCount, getResponseDist,
-    broadcast, presentationActive,
+    broadcast, presentationActive, responses,
   } = useApp();
 
   const [presenting, setPresenting] = useState(null); // { itemId, slides } when PresenterView is open
   const [showQuizPush, setShowQuizPush] = useState(false);
+  const [showSurveyPush, setShowSurveyPush] = useState(false);
   const [searchQ, setSearchQ] = useState('');
 
   const allQuizItems = course.modules.flatMap((m) =>
     m.items.filter((i) => i.type === 'quiz').map((i) => ({ ...i, moduleName: m.title }))
+  );
+
+  const allSurveyItems = course.modules.flatMap((m) =>
+    m.items.filter((i) => i.type === 'survey').map((i) => ({ ...i, moduleName: m.title }))
   );
   const allQuestions = allQuizItems.flatMap((item) =>
     (item.qs || []).map((q, qi) => ({ q, qi, item }))
@@ -2233,6 +2239,90 @@ function LiveSessionTab() {
                       >
                         {isActive ? '🔴 Live' : '▶ Push'}
                       </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Push Survey */}
+      <div style={{ ...card, marginTop: 20 }}>
+        <div
+          onClick={() => setShowSurveyPush(!showSurveyPush)}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+        >
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, margin: 0 }}>📋 Push Survey to Participants</h3>
+          <span style={{ fontSize: 14, color: C.dim, transition: 'transform .2s', transform: showSurveyPush ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
+        </div>
+        {showSurveyPush && (
+          <div style={{ marginTop: 14 }}>
+            {/* Active survey indicator */}
+            {activeSurvey && (
+              <div style={{
+                ...card, marginBottom: 14, borderLeft: `4px solid ${C.success}`,
+                background: C.success + '10',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.success, marginBottom: 4 }}>
+                      📋 Survey Active: {activeSurvey.title}
+                    </div>
+                    <div style={{ fontSize: 12, color: C.muted }}>
+                      {(() => {
+                        const surveyResponses = Object.keys(responses).filter(k => k.startsWith(`survey-${activeSurvey.itemId}-`)).length;
+                        return `${surveyResponses} / ${participants.length} responded`;
+                      })()}
+                    </div>
+                  </div>
+                  <button onClick={clearSurvey} style={btn(C.error)}>
+                    ✕ Close Survey
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {allSurveyItems.length === 0 ? (
+              <p style={{ color: C.dim, fontSize: 13 }}>No surveys found. Add survey items in the Content tab.</p>
+            ) : (
+              <div>
+                {allSurveyItems.map((survey) => {
+                  const isActive = activeSurvey?.itemId === survey.id;
+                  const surveyResponses = Object.keys(responses).filter(k => k.startsWith(`survey-${survey.id}-`)).length;
+                  return (
+                    <div key={survey.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '12px 14px', marginBottom: 8,
+                      background: isActive ? C.success + '12' : C.bg,
+                      borderRadius: 8, border: isActive ? `2px solid ${C.success}` : `1px solid ${C.border}`,
+                    }}>
+                      <span style={{ fontSize: 22 }}>📋</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{survey.title}</div>
+                        <div style={{ fontSize: 12, color: C.muted }}>
+                          {survey.moduleName} · {(survey.qs || []).length} question{(survey.qs || []).length !== 1 ? 's' : ''}
+                          {surveyResponses > 0 && <span style={{ color: C.success, fontWeight: 600 }}> · {surveyResponses} responses</span>}
+                        </div>
+                      </div>
+                      {isActive ? (
+                        <button onClick={clearSurvey} style={btn(C.error)}>
+                          ✕ Close
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => pushSurvey(survey.id)}
+                          disabled={!!activeSurvey}
+                          style={{
+                            ...btn(C.primary),
+                            opacity: activeSurvey ? 0.5 : 1,
+                            cursor: activeSurvey ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          📤 Push
+                        </button>
+                      )}
                     </div>
                   );
                 })}

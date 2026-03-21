@@ -697,6 +697,7 @@ export default function App() {
   const [participants, setParticipants] = useState(() => load('pedrra-participants') || []);
   const [responses, setResponses] = useState(() => load('pedrra-responses') || {});
   const [activeQ, setActiveQ] = useState(() => load('pedrra-activeq'));
+  const [activeSurvey, setActiveSurvey] = useState(null); // { itemId, item } when a survey is pushed live
   const [users, setUsersState] = useState(() => {
     const stored = load('pedrra-users');
     if (!stored) return [{ id: 'admin-default', username: 'admin', name: 'Administrator', role: 'admin', password: 'EDPS2026', status: 'active', createdAt: Date.now() }];
@@ -843,6 +844,8 @@ export default function App() {
             break;
           case 'PUSH_Q': setActiveQ(payload); startTimer(payload.timer); break;
           case 'REVEAL': setActiveQ((prev) => prev ? { ...prev, revealed: true } : prev); stopTimer(); break;
+          case 'PUSH_SURVEY': setActiveSurvey(payload); break;
+          case 'CLEAR_SURVEY': setActiveSurvey(null); break;
           case 'SESSION': setSession(payload); break;
           case 'PRESENT_START':
             setPresentationActive(true);
@@ -954,11 +957,16 @@ export default function App() {
         // Update participant data if server sent it
         if (data.participants) setParticipants(data.participants);
       },
+      onSurveyPush: (data) => {
+        if (data) setActiveSurvey(data);
+        else setActiveSurvey(null);
+      },
       onSessionEnd: () => {
         setSession(null);
         setPresentationActive(false);
         setPresentationSlides(null);
         setActiveQ(null);
+        setActiveSurvey(null);
       },
     });
 
@@ -1071,7 +1079,26 @@ export default function App() {
 
   const recordSurvey = useCallback((participantId, itemId, answers) => {
     setResponses((prev) => ({ ...prev, [`survey-${itemId}-${participantId}`]: { answers, submittedAt: Date.now() } }));
-  }, []);
+    // Also sync survey response via WebSocket
+    if (session?.code) {
+      Sync.submitAnswer(session.code, { participantId, itemId, type: 'survey', answers });
+    }
+  }, [session]);
+
+  const pushSurvey = useCallback((itemId) => {
+    const item = course?.modules.flatMap((m) => m.items).find((i) => i.id === itemId);
+    if (!item) return;
+    const payload = { itemId, title: item.title, desc: item.desc, qs: item.qs, pushedAt: Date.now() };
+    setActiveSurvey(payload);
+    broadcastMsg('PUSH_SURVEY', payload);
+    if (session?.code) Sync.pushSurvey(session.code, payload);
+  }, [course, session]);
+
+  const clearSurvey = useCallback(() => {
+    setActiveSurvey(null);
+    broadcastMsg('CLEAR_SURVEY', {});
+    if (session?.code) Sync.clearSurvey(session.code);
+  }, [session]);
 
   const markComplete = useCallback(() => {}, []);
 
@@ -1184,6 +1211,7 @@ export default function App() {
     participants, setParticipants,
     responses,
     activeQ, pushQuestion, revealAnswer,
+    activeSurvey, pushSurvey, clearSurvey,
     timer,
     getResponseCount, getResponseDist,
     recordAnswer, recordSurvey, markComplete,
@@ -1194,6 +1222,8 @@ export default function App() {
         if (type === 'PUSH_Q') Sync.pushQuestion(session.code, payload);
         else if (type === 'REVEAL') Sync.revealAnswer(session.code);
         else if (type === 'SLIDE_NAV') Sync.navigateSlide(session.code, payload.slideIdx);
+        else if (type === 'PUSH_SURVEY') Sync.pushSurvey(session.code, payload);
+        else if (type === 'CLEAR_SURVEY') Sync.clearSurvey(session.code);
       }
     },
     setView,

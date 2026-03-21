@@ -59,6 +59,9 @@ function handleWsMessage(event) {
         if (payload.activeQ !== undefined && handlers.onActiveQ) {
           handlers.onActiveQ(payload.activeQ);
         }
+        if (payload.activeSurvey && handlers.onSurveyPush) {
+          handlers.onSurveyPush(payload.activeSurvey);
+        }
         if (payload.participants && handlers.onParticipants) {
           handlers.onParticipants(payload.participants);
         }
@@ -93,6 +96,14 @@ function handleWsMessage(event) {
 
       case 'ANSWER':
         if (handlers.onAnswer) handlers.onAnswer(payload);
+        break;
+
+      case 'PUSH_SURVEY':
+        if (handlers.onSurveyPush) handlers.onSurveyPush(payload);
+        break;
+
+      case 'CLEAR_SURVEY':
+        if (handlers.onSurveyPush) handlers.onSurveyPush(null);
         break;
 
       case 'PARTICIPANT_JOINED':
@@ -230,4 +241,14 @@ export function revealAnswer(code) {
 export function submitAnswer(code, answerData) {
   broadcastLocal('ANSWER', answerData);
   send('ANSWER', code, answerData);
+}
+
+export function pushSurvey(code, surveyData) {
+  broadcastLocal('PUSH_SURVEY', surveyData);
+  send('PUSH_SURVEY', code, surveyData);
+}
+
+export function clearSurvey(code) {
+  broadcastLocal('CLEAR_SURVEY', {});
+  send('CLEAR_SURVEY', code, {});
 }

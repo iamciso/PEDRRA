@@ -40,6 +40,7 @@ function getSession(code) {
       session: null,
       presentation: { active: false, slideIdx: 0, slides: null, itemId: null },
       activeQ: null,
+      activeSurvey: null,
       participants: {},   // id → participant
       responses: {},      // "itemId-qIndex" → { counts: [], answers: [] }
       clients: new Set(), // WebSocket connections subscribed to this session
@@ -103,6 +104,7 @@ function handleMessage(ws, msg) {
           session: s.session,
           presentation: s.presentation,
           activeQ: s.activeQ,
+          activeSurvey: s.activeSurvey,
           participants: Object.values(s.participants),
           responses: s.responses,
         },
@@ -174,6 +176,17 @@ function handleMessage(ws, msg) {
     case 'CLEAR_Q':
       s.activeQ = null;
       broadcast(code, 'ACTIVE_Q', null);
+      break;
+
+    // ── Survey push ──
+    case 'PUSH_SURVEY':
+      s.activeSurvey = { ...payload, pushedAt: Date.now() };
+      broadcast(code, 'PUSH_SURVEY', s.activeSurvey);
+      break;
+
+    case 'CLEAR_SURVEY':
+      s.activeSurvey = null;
+      broadcast(code, 'CLEAR_SURVEY', null);
       break;
 
     // ── Answer submission ──

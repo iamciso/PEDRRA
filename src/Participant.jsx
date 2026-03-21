@@ -335,6 +335,143 @@ function LiveQuestionOverlay({ activeQ, course, onAnswer, myAnswers, soundEnable
 }
 
 /* ================================================================
+   LIVE SURVEY OVERLAY — pushed by trainer during live session
+   ================================================================ */
+function LiveSurveyOverlay({ activeSurvey, onSubmit, participantId, soundEnabled }) {
+  const [answers, setAnswers] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [minimized, setMinimized] = useState(false);
+  const notifiedRef = useRef(false);
+
+  const questions = (activeSurvey.qs || []).filter((q) => q.type !== 'header');
+  const totalQuestions = questions.length;
+  const answeredCount = questions.filter((q) => {
+    if (q.type === 'text') return answers[q.id] !== undefined && answers[q.id] !== '';
+    return answers[q.id] !== undefined;
+  }).length;
+
+  // Sound notification when survey appears
+  useEffect(() => {
+    if (!notifiedRef.current && soundEnabled) {
+      notifiedRef.current = true;
+      try {
+        const a = new Audio(BEEP);
+        a.volume = 0.4;
+        a.play().catch(() => {});
+      } catch {}
+      try { navigator.vibrate?.(200); } catch {}
+    }
+  }, []);
+
+  // Reset when a new survey is pushed
+  useEffect(() => {
+    setAnswers({});
+    setSubmitted(false);
+    setMinimized(false);
+    notifiedRef.current = false;
+  }, [activeSurvey.itemId]);
+
+  const handleSubmit = () => {
+    const allRequired = questions.every((q) => {
+      if (q.type === 'text') return true;
+      return answers[q.id] !== undefined;
+    });
+    if (!allRequired) return;
+    onSubmit(activeSurvey.itemId, answers);
+    setSubmitted(true);
+  };
+
+  if (minimized) {
+    return (
+      <div
+        onClick={() => setMinimized(false)}
+        style={{
+          position: 'fixed', bottom: 20, right: 20, zIndex: 600,
+          background: submitted ? C.success : C.primary, color: '#fff',
+          borderRadius: 28, padding: '12px 20px', cursor: 'pointer',
+          boxShadow: '0 4px 20px rgba(0,0,0,.3)', fontSize: 14, fontWeight: 700,
+          animation: 'fadeIn .3s ease',
+        }}
+      >
+        {submitted ? '✅ Survey Submitted' : `📋 Survey (${answeredCount}/${totalQuestions})`}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 550,
+      background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 16, overflow: 'auto',
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 16, width: '100%', maxWidth: 520,
+        maxHeight: '90vh', overflow: 'auto', boxShadow: '0 12px 60px rgba(0,0,0,.4)',
+      }}>
+        {/* Header */}
+        <div style={{
+          background: C.primary, color: '#fff', padding: '16px 20px',
+          borderRadius: '16px 16px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>
+              Live Survey
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>{activeSurvey.title}</div>
+          </div>
+          <button onClick={() => setMinimized(true)} style={{
+            background: 'rgba(255,255,255,.2)', border: 'none', color: '#fff',
+            borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer',
+          }}>
+            ▼ Minimize
+          </button>
+        </div>
+
+        {/* Progress */}
+        <div style={{ padding: '12px 20px 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.muted }}>
+          <span>{answeredCount}/{totalQuestions} answered</span>
+          <div style={{ flex: 1, height: 4, background: C.border, borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{
+              width: `${totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0}%`,
+              height: '100%', background: C.primary, borderRadius: 2, transition: 'width .3s',
+            }} />
+          </div>
+        </div>
+
+        {submitted ? (
+          <div style={{ padding: 32, textAlign: 'center' }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 8 }}>Survey Submitted!</h3>
+            <p style={{ color: C.muted, fontSize: 14 }}>Thank you for your feedback.</p>
+            <button onClick={() => setMinimized(true)} style={{ ...btn(C.primary), marginTop: 16 }}>
+              Close
+            </button>
+          </div>
+        ) : (
+          <div style={{ padding: '12px 20px 20px' }}>
+            {(activeSurvey.qs || []).map((q) => (
+              <SurveyQuestion key={q.id} q={q} answers={answers} setAnswers={setAnswers} />
+            ))}
+            <button
+              onClick={handleSubmit}
+              disabled={answeredCount < totalQuestions}
+              style={{
+                ...btn(C.primary), width: '100%', marginTop: 12, padding: '14px',
+                fontSize: 15, fontWeight: 700,
+                opacity: answeredCount < totalQuestions ? 0.5 : 1,
+              }}
+            >
+              Submit Survey ({answeredCount}/{totalQuestions})
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================
    DOCUMENT VIEWER
    ================================================================ */
 function DocViewer({ item, onRead, isRead, onBack }) {
@@ -854,12 +991,13 @@ function CourseOverview({ course, progress, xp, onModuleSelect }) {
 /* ================================================================
    PARTICIPANT MAIN
    ================================================================ */
-export { LiveQuestionOverlay, DocViewer, SlideViewer, SurveyViewer, QuizInfo, QuizReview };
+export { LiveQuestionOverlay, LiveSurveyOverlay, DocViewer, SlideViewer, SurveyViewer, QuizInfo, QuizReview };
 
 export default function Participant({ participantId, onExit }) {
   const {
     course, participants, activeQ, broadcast, session,
-    recordAnswer, recordSurvey, markComplete,
+    activeSurvey, recordSurvey,
+    recordAnswer, markComplete,
     presentationActive, presentationSlides, presentationSlideIdx,
   } = useApp();
 
@@ -980,6 +1118,22 @@ export default function Participant({ participantId, onExit }) {
           course={course}
           onAnswer={handleAnswer}
           myAnswers={myAnswers}
+          soundEnabled={soundEnabled}
+        />
+      )}
+
+      {/* Live survey overlay — pushed by trainer */}
+      {activeSurvey && (
+        <LiveSurveyOverlay
+          activeSurvey={activeSurvey}
+          onSubmit={(itemId, answers) => {
+            handleSurveySubmit(
+              course.modules.find(m => m.items.some(i => i.id === itemId))?.id || '',
+              itemId,
+              answers
+            );
+          }}
+          participantId={participantId}
           soundEnabled={soundEnabled}
         />
       )}
