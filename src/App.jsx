@@ -6,7 +6,6 @@ import {
 } from './theme';
 import { DEFAULT_COURSE } from './courseData.js';
 import * as Sync from './sync.js';
-import { firebaseEnabled } from './firebase.js';
 import { Header, ProgressBar, useDragDrop, Leaderboard, XPPopup, SearchBar } from './components.jsx';
 import { Modal, ConfirmDialog, Toast } from './components.jsx';
 import { DocViewer, SlideViewer, SurveyViewer, QuizInfo, LiveQuestionOverlay } from './Participant.jsx';
@@ -889,12 +888,12 @@ export default function App() {
     return () => clearInterval(poll);
   }, [session, participants, responses, activeQ]);
 
-  /* ─── Firebase real-time listeners (cross-device sync) ─── */
+  /* ─── WebSocket real-time sync (cross-device) ─── */
   useEffect(() => {
     const code = session?.code || currentUser?._sessionCode;
-    if (!code || !firebaseEnabled()) return;
+    if (!code) return;
 
-    const unsub = Sync.subscribeToSession(code, {
+    Sync.connect(code, {
       onPresentation: (data) => {
         if (data.active) {
           setPresentationActive(true);
@@ -907,6 +906,18 @@ export default function App() {
           setPresentationSlideIdx(0);
           setPresentationItemId(null);
         }
+      },
+      onSlideNav: (slideIdx) => {
+        setPresentationSlideIdx(slideIdx);
+        // Clear presentation polls when navigating
+        setActiveQ(prev => prev?.fromPresentation ? null : prev);
+      },
+      onPresentationEnd: () => {
+        setPresentationActive(false);
+        setPresentationSlides(null);
+        setPresentationSlideIdx(0);
+        setPresentationItemId(null);
+        setActiveQ(prev => prev?.fromPresentation ? null : prev);
       },
       onActiveQ: (data) => {
         if (data) {
@@ -923,9 +934,31 @@ export default function App() {
       onResponses: (data) => {
         setResponses(data);
       },
+      onAnswer: (data) => {
+        // Update local response counts from server
+        setResponses(prev => {
+          const key = `${data.itemId}-${data.qIndex}`;
+          const existing = prev[key] || { counts: [], answers: [] };
+          return {
+            ...prev,
+            [key]: {
+              counts: data.responseCounts || existing.counts,
+              answers: [...(existing.answers || []), data],
+            },
+          };
+        });
+        // Update participant data if server sent it
+        if (data.participants) setParticipants(data.participants);
+      },
+      onSessionEnd: () => {
+        setSession(null);
+        setPresentationActive(false);
+        setPresentationSlides(null);
+        setActiveQ(null);
+      },
     });
 
-    return unsub;
+    return () => Sync.disconnect();
   }, [session?.code, currentUser?._sessionCode]);
 
   /* ─── Online / Offline ─── */
