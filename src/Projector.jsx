@@ -355,11 +355,26 @@ export default function Projector({ onExit }) {
             )}
           </div>
 
-          {/* QR code for latecomers during active poll */}
+          {/* Prominent QR code during active poll for voting */}
           {!activeQ.revealed && joinUrl && (
-            <div style={{ position: 'absolute', bottom: 56, right: 24, background: '#fff', borderRadius: 10, padding: 8, opacity: 0.8 }}>
-              <QRCodeSVG value={joinUrl} size={80} bgColor="#fff" fgColor={C.dark} level="L" />
-              <div style={{ fontSize: 9, textAlign: 'center', color: C.muted, marginTop: 2 }}>{session?.code}</div>
+            <div style={{
+              position: 'absolute', bottom: 24, right: 24,
+              background: 'rgba(255,255,255,.97)', borderRadius: 16, padding: 16,
+              boxShadow: '0 8px 40px rgba(0,0,0,.5)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+              animation: 'fadeIn .5s ease',
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.primary, textTransform: 'uppercase', letterSpacing: 1 }}>
+                Scan to Vote
+              </div>
+              <QRCodeSVG value={joinUrl} size={140} bgColor="#fff" fgColor={C.dark} level="M" />
+              <div style={{
+                fontSize: 28, fontWeight: 800, color: C.primary,
+                fontFamily: 'monospace', letterSpacing: 4,
+              }}>{session?.code}</div>
+              <div style={{ fontSize: 10, color: C.muted, textAlign: 'center' }}>
+                {window.location.host}
+              </div>
             </div>
           )}
 

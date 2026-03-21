@@ -643,6 +643,26 @@ export function PresenterView({ slides, itemId, onClose, broadcast, activeQ, get
     setTimeout(() => setSlideTransition(null), 450);
   };
 
+  // Auto-launch poll when arriving at a poll/rating slide
+  useEffect(() => {
+    const s = slides[idx];
+    const isAutoLaunchPoll = s?.l === 'poll' || s?.l === 'rating';
+    if (isAutoLaunchPoll && !pollLaunched) {
+      // Small delay so the slide renders first
+      const timer = setTimeout(() => {
+        setPollLaunched(true);
+        const opts = s.l === 'rating' ? ['1','2','3','4','5'] : s.opts;
+        broadcast('PUSH_Q', {
+          itemId, slideIdx: idx, text: s.text || s.t, opts, ok: s.ok ?? -1,
+          xp: s.xp || 0, timer: s.timer || 30, fromPresentation: true,
+          autoReveal: s.autoReveal || false, pollType: s.l,
+        });
+        if (pushQuestion) pushQuestion(itemId, idx, true);
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [idx]);
+
   // Auto-advance timer
   useEffect(() => {
     const slide = slides[idx];

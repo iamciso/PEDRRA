@@ -909,8 +909,12 @@ export default function App() {
       },
       onSlideNav: (slideIdx) => {
         setPresentationSlideIdx(slideIdx);
-        // Clear presentation polls when navigating
-        setActiveQ(prev => prev?.fromPresentation ? null : prev);
+        // Clear presentation polls when navigating to a DIFFERENT slide
+        setActiveQ(prev => {
+          if (!prev?.fromPresentation) return prev;
+          if (prev.slideIdx === slideIdx) return prev; // same slide, keep poll
+          return null;
+        });
       },
       onPresentationEnd: () => {
         setPresentationActive(false);
