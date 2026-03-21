@@ -494,6 +494,44 @@ export function Slide({ s, big, showNotes, transition, fullscreen }) {
     );
   }
 
+  // QR Link layout — shows QR code linking to a quiz/survey
+  if (s.l === 'qr' && s.linkedItemId) {
+    const qrUrl = `${window.location.origin}${window.location.pathname}?item=${s.linkedItemId}`;
+    const iconType = s.linkedItemType === 'quiz' ? '❓' : '📋';
+    return (
+      <div style={{
+        ...base,
+        background: s.bgColor || 'linear-gradient(135deg, #003399 0%, #001a4d 100%)',
+        color: s.textColor || '#fff',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', textAlign: 'center',
+        borderTop: '4px solid #FFCC00',
+      }}>
+        <div style={{ fontSize: 11 * f, fontWeight: 700, color: 'rgba(255,255,255,.5)', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 * f }}>
+          {s.linkedItemType === 'quiz' ? 'QUIZ' : 'SURVEY'}
+        </div>
+        <h2 style={{ fontSize: (l.title || 28) * f, fontWeight: 700, margin: `0 0 ${16 * f}px`, lineHeight: 1.3 }}>
+          {s.t || s.linkedItemTitle || 'Scan to participate'}
+        </h2>
+        {s.c && <p style={{ fontSize: 14 * f, margin: `0 0 ${20 * f}px`, opacity: 0.8, maxWidth: '80%' }}>{s.c}</p>}
+        <div style={{
+          background: '#fff', borderRadius: 16 * f, padding: 16 * f,
+          boxShadow: '0 8px 40px rgba(0,0,0,.4)', marginBottom: 12 * f,
+        }}>
+          <QRCodeSVG value={qrUrl} size={Math.round(160 * f)} bgColor="#fff" fgColor="#003399" level="M" />
+        </div>
+        <div style={{
+          fontSize: 13 * f, color: 'rgba(255,255,255,.7)', fontWeight: 600,
+          display: 'flex', alignItems: 'center', gap: 6 * f,
+        }}>
+          <span>{iconType}</span>
+          <span>{s.linkedItemTitle || 'Activity'}</span>
+        </div>
+        {showNotes && s.notes && <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFF9DB', borderRadius: 6, fontSize: 12, color: '#744210', borderLeft: '3px solid #ECC94B' }}>📝 {s.notes}</div>}
+      </div>
+    );
+  }
+
   // Default layouts (title, content, quote) — EDPS styled
   const isTitle = s.l === 'title';
   return (

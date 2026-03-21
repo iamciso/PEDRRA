@@ -78,8 +78,10 @@ function migrateCourses() {
    ================================================================ */
 function LoginScreen({ users, onLogin, onJoinSession, installPrompt, onInstall }) {
   const { t } = useI18n();
-  const urlCode = new URLSearchParams(window.location.search).get('code');
-  const [mode, setMode] = useState(urlCode && urlCode.length === 6 ? 'join' : 'login');
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlCode = urlParams.get('code');
+  const urlItem = urlParams.get('item');
+  const [mode, setMode] = useState((urlCode && urlCode.length === 6) || urlItem ? 'join' : 'login');
   const [username, setUsername] = useState('');
   const [pwd, setPwd] = useState('');
   const [error, setError] = useState('');
@@ -973,6 +975,27 @@ export default function App() {
     return () => Sync.disconnect();
   }, [session?.code, currentUser?._sessionCode]);
 
+  /* ─── Handle ?item= URL parameter for direct QR navigation ─── */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlItemId = params.get('item');
+    if (urlItemId && currentUser) {
+      // Find the item in any course
+      for (const c of courses) {
+        for (const mod of c.modules) {
+          const item = mod.items.find(i => i.id === urlItemId);
+          if (item) {
+            setActiveCourseId(c.id);
+            setActivityContext({ module: mod, item });
+            setViewRaw('activity');
+            window.history.replaceState({}, '', window.location.pathname);
+            return;
+          }
+        }
+      }
+    }
+  }, []); // Run once on mount
+
   /* ─── Online / Offline ─── */
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   useEffect(() => {
@@ -1119,6 +1142,21 @@ export default function App() {
     window.history.replaceState({}, '', window.location.pathname);
   };
 
+  // Navigate directly to a specific item (used when scanning QR codes)
+  const navigateToItem = useCallback((itemId) => {
+    const course = courses.find(c => c.id === activeCourseId) || courses[0];
+    if (!course) return;
+    for (const mod of course.modules) {
+      const item = mod.items.find(i => i.id === itemId);
+      if (item) {
+        setActiveCourseId(course.id);
+        setActivityContext({ module: mod, item });
+        setView('activity');
+        return;
+      }
+    }
+  }, [courses, activeCourseId]);
+
   const handleJoinSession = async (code, name, team) => {
     const id = genId();
     const participant = { id, name, team, xp: 0, answers: 0, joinedAt: Date.now() };
@@ -1131,6 +1169,19 @@ export default function App() {
     const tempUser = { id, username: `participant-${id}`, name, role: 'viewer', _isParticipant: true, _team: team, _sessionCode: code };
     setCurrentUser(tempUser);
     save('pedrra-currentUser', tempUser);
+
+    // Check for ?item= parameter (QR code scan)
+    const urlItemId = new URLSearchParams(window.location.search).get('item');
+    if (urlItemId) {
+      // Navigate directly to the linked item
+      if (session?.courseId) setActiveCourseId(session.courseId);
+      else if (courses.length === 1) setActiveCourseId(courses[0].id);
+      // Small delay to let state settle, then navigate
+      setTimeout(() => navigateToItem(urlItemId), 100);
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+
     // If there's a session with a courseId, go directly to that course
     if (session?.courseId) {
       setActiveCourseId(session.courseId);

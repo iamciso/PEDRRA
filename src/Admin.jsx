@@ -420,7 +420,7 @@ export function FullscreenSlideEditor({ item, onSave, onSaveAndClose, onClose, m
     setShowTemplates(false);
   };
 
-  const SLIDE_ICONS = { title: '🎯', content: '📝', quote: '💬', twocol: '📑', bullets: '📋', image: '🖼️', poll: '📊', rating: '⭐', video: '🎬' };
+  const SLIDE_ICONS = { title: '🎯', content: '📝', quote: '💬', twocol: '📑', bullets: '📋', image: '🖼️', poll: '📊', rating: '⭐', video: '🎬', qr: '🔗' };
   const LAYOUT_OPTIONS = [
     { value: 'title', label: 'Title (gradient)' },
     { value: 'content', label: 'Content (white)' },
@@ -431,7 +431,15 @@ export function FullscreenSlideEditor({ item, onSave, onSaveAndClose, onClose, m
     { value: 'video', label: 'Video' },
     { value: 'poll', label: 'Poll' },
     { value: 'rating', label: 'Rating' },
+    { value: 'qr', label: '🔗 QR Link (Quiz/Survey)' },
   ];
+
+  // All quiz and survey items for QR linking
+  const allLinkableItems = course.modules.flatMap((m) =>
+    m.items.filter((i) => i.type === 'quiz' || i.type === 'survey').map((i) => ({
+      id: i.id, title: i.title, type: i.type, moduleName: m.title, moduleId: m.id,
+    }))
+  );
 
   // Image handlers
   const handleImageDrop = (e) => {
@@ -896,6 +904,59 @@ export function FullscreenSlideEditor({ item, onSave, onSaveAndClose, onClose, m
             </div>
           </>
         )}
+
+        {/* QR Link fields */}
+        {currentSlide.l === 'qr' && (
+          <>
+            <div style={formGroup}>
+              <label style={label}>Link to Quiz / Survey</label>
+              <select style={{ ...input, background: C.white }}
+                value={currentSlide.linkedItemId || ''}
+                onChange={(e) => {
+                  const item = allLinkableItems.find(i => i.id === e.target.value);
+                  updateSlide(activeSlide, 'linkedItemId', e.target.value);
+                  updateSlide(activeSlide, 'linkedItemType', item?.type || '');
+                  updateSlide(activeSlide, 'linkedItemTitle', item?.title || '');
+                  if (!currentSlide.t && item) updateSlide(activeSlide, 't', item.title);
+                }}
+              >
+                <option value="">— Select an item —</option>
+                {allLinkableItems.map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.type === 'quiz' ? '❓' : '📋'} {item.title} ({item.moduleName})
+                  </option>
+                ))}
+              </select>
+            </div>
+            {currentSlide.linkedItemId && (
+              <div style={{
+                padding: 16, background: C.bg, borderRadius: 10, textAlign: 'center',
+                border: `1px dashed ${C.border}`,
+              }}>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
+                  QR Preview
+                </div>
+                <div style={{
+                  background: '#fff', borderRadius: 8, padding: 8, display: 'inline-block',
+                  boxShadow: '0 2px 8px rgba(0,0,0,.1)',
+                }}>
+                  <QRCodeSVG
+                    value={`${window.location.origin}${window.location.pathname}?item=${currentSlide.linkedItemId}`}
+                    size={100} bgColor="#fff" fgColor="#003399" level="M"
+                  />
+                </div>
+                <div style={{ fontSize: 12, color: C.text, fontWeight: 600, marginTop: 8 }}>
+                  {currentSlide.linkedItemType === 'quiz' ? '❓' : '📋'} {currentSlide.linkedItemTitle || 'Selected item'}
+                </div>
+              </div>
+            )}
+            {allLinkableItems.length === 0 && (
+              <div style={{ padding: 12, background: C.warning + '18', borderRadius: 8, fontSize: 12, color: C.warning }}>
+                ⚠️ No quiz or survey items found. Create them first in the course modules.
+              </div>
+            )}
+          </>
+        )}
       </div>
     );
   };
@@ -1042,6 +1103,11 @@ export function FullscreenSlideEditor({ item, onSave, onSaveAndClose, onClose, m
         <div style={{ display: 'flex', gap: 6, position: 'relative' }}>
           <button onClick={addSlide} style={btnSm(C.primary)}>+ Slide</button>
           <button onClick={addPoll} style={btnSm('#D89E00')}>+ Poll</button>
+          <button onClick={() => {
+            const s = [...slides, { t: 'Scan to participate', c: '', l: 'qr', linkedItemId: '', linkedItemType: '', linkedItemTitle: '', notes: '' }];
+            set('slides', s);
+            setActiveSlide(s.length - 1);
+          }} style={btnSm('#38A169')}>+ QR Link</button>
           <button onClick={() => setShowTemplates(!showTemplates)} style={btnSm('#805AD5')}>📄 Template</button>
           <button onClick={() => document.getElementById('import-file-input')?.click()} disabled={importing}
             style={btnSm('#0891b2')}>
