@@ -9,6 +9,7 @@ import {
 import { Modal, ConfirmDialog, Toast, PresenterView, Slide, SearchBar, useDragDrop } from './components.jsx';
 import { DEFAULT_COURSE } from './courseData.js';
 import { useI18n, LanguageSelector } from './i18n.jsx';
+import { importPptx, importHtml } from './importSlides.js';
 
 /* ================================================================
    UTILITIES
@@ -145,7 +146,8 @@ function TopBar({ title, children }) {
 /* ================================================================
    FULLSCREEN SLIDE EDITOR - PowerPoint-like editor
    ================================================================ */
-function FullscreenSlideEditor({ item, onSave, onClose }) {
+export function FullscreenSlideEditor({ item, onSave, onSaveAndClose, onClose, moduleId }) {
+  const { course } = useApp();
   const { t } = useI18n();
   const [editItem, setEditItem] = useState(() => JSON.parse(JSON.stringify(item)));
   const [activeSlide, setActiveSlide] = useState(0);
@@ -153,6 +155,10 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
   const [showTemplates, setShowTemplates] = useState(false);
   const [hasUnsaved, setHasUnsaved] = useState(false);
   const [showOutline, setShowOutline] = useState(false);
+  const [saveFlash, setSaveFlash] = useState(false);
+
+  // Resolve module name for breadcrumb
+  const moduleName = course?.modules?.find(m => m.id === moduleId)?.title || '';
   const contentRef = useRef(null);
 
   // Undo/Redo system
@@ -299,6 +305,77 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
 
   const handleSave = () => {
     onSave({ ...editItem, id: editItem.id || genId() });
+    setHasUnsaved(false);
+    setSaveFlash(true);
+    setTimeout(() => setSaveFlash(false), 1500);
+  };
+
+  const handleSaveAndClose = () => {
+    if (onSaveAndClose) {
+      onSaveAndClose({ ...editItem, id: editItem.id || genId() });
+    } else {
+      onSave({ ...editItem, id: editItem.id || genId() });
+      onClose();
+    }
+  };
+
+  // Import slides from file (PPTX or HTML)
+  const [importing, setImporting] = useState(false);
+  const handleImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setImporting(true);
+    try {
+      let newSlides;
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (ext === 'pptx' || ext === 'ppt') {
+        newSlides = await importPptx(file);
+      } else if (ext === 'html' || ext === 'htm') {
+        newSlides = await importHtml(file);
+      } else {
+        // Try as HTML text
+        const text = await file.text();
+        if (text.includes('<') && text.includes('>')) {
+          newSlides = await importHtml(text);
+        } else {
+          // Plain text — split by double newlines into slides
+          const parts = text.split(/\n\n+/).filter(p => p.trim());
+          newSlides = parts.map((p, i) => {
+            const lines = p.split('\n');
+            return { t: lines[0] || `Slide ${i + 1}`, c: lines.slice(1).join('\n'), l: i === 0 ? 'title' : 'content' };
+          });
+        }
+      }
+      if (newSlides && newSlides.length > 0) {
+        const merged = [...slides, ...newSlides];
+        set('slides', merged);
+        setActiveSlide(slides.length); // jump to first imported slide
+      }
+    } catch (err) {
+      console.error('Import failed:', err);
+      alert(`Import failed: ${err.message}`);
+    }
+    setImporting(false);
+  };
+
+  // Import from pasted HTML
+  const handleImportHtmlPaste = async () => {
+    const html = prompt('Paste HTML content here:');
+    if (!html || !html.trim()) return;
+    setImporting(true);
+    try {
+      const newSlides = await importHtml(html);
+      if (newSlides && newSlides.length > 0) {
+        const merged = [...slides, ...newSlides];
+        set('slides', merged);
+        setActiveSlide(slides.length);
+      }
+    } catch (err) {
+      console.error('HTML import failed:', err);
+      alert(`Import failed: ${err.message}`);
+    }
+    setImporting(false);
   };
 
   // Formatting helpers
@@ -509,6 +586,28 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
     }
 
     if (rightTab === 'media') {
+      const posOptions = [
+        { value: 'center', label: '⬛ Center' },
+        { value: 'top', label: '⬆️ Top' },
+        { value: 'bottom', label: '⬇️ Bottom' },
+        { value: 'left', label: '⬅️ Left' },
+        { value: 'right', label: '➡️ Right' },
+        { value: 'top-left', label: '↖️ Top Left' },
+        { value: 'top-right', label: '↗️ Top Right' },
+        { value: 'bottom-left', label: '↙️ Bottom Left' },
+        { value: 'bottom-right', label: '↘️ Bottom Right' },
+      ];
+      const sizeOptions = [
+        { value: 'small', label: 'S' },
+        { value: 'medium', label: 'M' },
+        { value: 'large', label: 'L' },
+        { value: 'full', label: 'Full' },
+      ];
+      const fitOptions = [
+        { value: 'contain', label: 'Contain' },
+        { value: 'cover', label: 'Cover' },
+        { value: 'fill', label: 'Stretch' },
+      ];
       return (
         <div>
           {/* Image */}
@@ -520,14 +619,84 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
             <div onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = C.primary; }}
               onDragLeave={(e) => e.currentTarget.style.borderColor = C.border}
               onDrop={handleImageDrop} onPaste={handleImagePaste} tabIndex={0}
+              onClick={() => document.getElementById('img-upload-fullscreen')?.click()}
               style={{ marginTop: 6, padding: 16, border: `2px dashed ${C.border}`, borderRadius: 8,
                 textAlign: 'center', fontSize: 11, color: C.dim, cursor: 'pointer', background: C.bg }}>
-              Drop image or paste (Ctrl+V) · Max 500KB
+              📁 Click to browse, drop image, or paste (Ctrl+V) · Max 500KB
             </div>
-            {currentSlide.img && currentSlide.img.startsWith('data:') && (
-              <p style={{ fontSize: 10, color: C.warning, marginTop: 4 }}>Embedded: {Math.round(currentSlide.img.length / 1024)}KB</p>
+            <input id="img-upload-fullscreen" type="file" accept="image/*" style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 512000) { alert('Image too large (max 500KB). Consider using a URL instead.'); return; }
+                const reader = new FileReader();
+                reader.onload = (ev) => updateSlide(activeSlide, 'img', ev.target.result);
+                reader.readAsDataURL(file);
+                e.target.value = '';
+              }} />
+            {currentSlide.img && (
+              <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <img src={currentSlide.img} alt="" style={{ width: 48, height: 27, objectFit: 'cover', borderRadius: 4, border: `1px solid ${C.border}` }} />
+                {currentSlide.img.startsWith('data:') && (
+                  <span style={{ fontSize: 10, color: C.warning }}>Embedded: {Math.round(currentSlide.img.length / 1024)}KB</span>
+                )}
+                <button onClick={() => updateSlide(activeSlide, 'img', '')}
+                  style={{ marginLeft: 'auto', background: 'none', border: `1px solid ${C.border}`, borderRadius: 4, padding: '2px 8px', fontSize: 10, color: C.error, cursor: 'pointer' }}>
+                  ✕ Remove
+                </button>
+              </div>
             )}
           </div>
+          {/* Image position & size controls */}
+          {(currentSlide.img || currentSlide.l === 'image') && (
+            <div style={formGroup}>
+              <label style={label}>📐 Image Position & Size</label>
+              {/* Position grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginBottom: 8 }}>
+                {['top-left','top','top-right','left','center','right','bottom-left','bottom','bottom-right'].map((pos) => (
+                  <button key={pos} onClick={() => updateSlide(activeSlide, 'imgPos', pos)}
+                    style={{
+                      padding: '5px 2px', fontSize: 10, borderRadius: 4, cursor: 'pointer', fontWeight: 600,
+                      border: (currentSlide.imgPos || 'center') === pos ? `2px solid ${C.primary}` : `1px solid ${C.border}`,
+                      background: (currentSlide.imgPos || 'center') === pos ? C.light : C.white,
+                      color: (currentSlide.imgPos || 'center') === pos ? C.primary : C.muted,
+                    }}>
+                    {posOptions.find(p => p.value === pos)?.label || pos}
+                  </button>
+                ))}
+              </div>
+              {/* Size buttons */}
+              <label style={{ ...label, marginTop: 4 }}>Size</label>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {sizeOptions.map((sz) => (
+                  <button key={sz.value} onClick={() => updateSlide(activeSlide, 'imgSize', sz.value)}
+                    style={{
+                      flex: 1, padding: '5px 4px', fontSize: 11, borderRadius: 4, cursor: 'pointer', fontWeight: 600,
+                      border: (currentSlide.imgSize || 'large') === sz.value ? `2px solid ${C.primary}` : `1px solid ${C.border}`,
+                      background: (currentSlide.imgSize || 'large') === sz.value ? C.light : C.white,
+                      color: (currentSlide.imgSize || 'large') === sz.value ? C.primary : C.muted,
+                    }}>
+                    {sz.label}
+                  </button>
+                ))}
+              </div>
+              {/* Fit mode */}
+              <label style={{ ...label, marginTop: 4 }}>Fit</label>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {fitOptions.map((ft) => (
+                  <button key={ft.value} onClick={() => updateSlide(activeSlide, 'imgFit', ft.value)}
+                    style={{
+                      flex: 1, padding: '5px 4px', fontSize: 11, borderRadius: 4, cursor: 'pointer', fontWeight: 600,
+                      border: (currentSlide.imgFit || 'contain') === ft.value ? `2px solid ${C.primary}` : `1px solid ${C.border}`,
+                      background: (currentSlide.imgFit || 'contain') === ft.value ? C.light : C.white,
+                      color: (currentSlide.imgFit || 'contain') === ft.value ? C.primary : C.muted,
+                    }}>
+                    {ft.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {/* Video */}
           <div style={formGroup}>
             <label style={label}>🎬 {t('editor.tab.media')} - Video</label>
@@ -536,6 +705,39 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
               placeholder="YouTube URL or direct video URL" />
             <p style={{ fontSize: 10, color: C.dim, marginTop: 3 }}>YouTube, .mp4, .webm</p>
           </div>
+          {/* Video position & size controls */}
+          {(currentSlide.videoUrl || currentSlide.l === 'video') && (
+            <div style={formGroup}>
+              <label style={label}>📐 Video Position & Size</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginBottom: 8 }}>
+                {['top-left','top','top-right','left','center','right','bottom-left','bottom','bottom-right'].map((pos) => (
+                  <button key={pos} onClick={() => updateSlide(activeSlide, 'videoPos', pos)}
+                    style={{
+                      padding: '5px 2px', fontSize: 10, borderRadius: 4, cursor: 'pointer', fontWeight: 600,
+                      border: (currentSlide.videoPos || 'center') === pos ? `2px solid ${C.primary}` : `1px solid ${C.border}`,
+                      background: (currentSlide.videoPos || 'center') === pos ? C.light : C.white,
+                      color: (currentSlide.videoPos || 'center') === pos ? C.primary : C.muted,
+                    }}>
+                    {posOptions.find(p => p.value === pos)?.label || pos}
+                  </button>
+                ))}
+              </div>
+              <label style={{ ...label, marginTop: 4 }}>Size</label>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {sizeOptions.map((sz) => (
+                  <button key={sz.value} onClick={() => updateSlide(activeSlide, 'videoSize', sz.value)}
+                    style={{
+                      flex: 1, padding: '5px 4px', fontSize: 11, borderRadius: 4, cursor: 'pointer', fontWeight: 600,
+                      border: (currentSlide.videoSize || 'large') === sz.value ? `2px solid ${C.primary}` : `1px solid ${C.border}`,
+                      background: (currentSlide.videoSize || 'large') === sz.value ? C.light : C.white,
+                      color: (currentSlide.videoSize || 'large') === sz.value ? C.primary : C.muted,
+                    }}>
+                    {sz.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {/* Audio */}
           <div style={formGroup}>
             <label style={label}>🔊 {t('editor.audioUrl')}</label>
@@ -700,11 +902,22 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
 
   return (
     <div className="fullscreen-editor">
-      {/* Top Bar */}
+      {/* Top Bar with breadcrumbs */}
       <div className="editor-toolbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
-          <button onClick={() => { if (hasUnsaved) { if (confirm(t('editor.unsaved') + '?')) onClose(); } else onClose(); }}
-            style={{ ...btnSm(C.muted), fontSize: 16, padding: '4px 10px' }}>←</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+          {/* Breadcrumb navigation */}
+          <nav style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: C.muted, flexShrink: 0 }}>
+            <button onClick={() => { if (hasUnsaved) { if (confirm(t('editor.unsaved') + '?')) onClose(); } else onClose(); }}
+              style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, padding: '2px 4px', fontWeight: 500 }}
+              title="Back to Content">
+              Content
+            </button>
+            {moduleName && <>
+              <span style={{ color: C.dim }}>/</span>
+              <span style={{ color: C.muted, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{moduleName}</span>
+            </>}
+            <span style={{ color: C.dim }}>/</span>
+          </nav>
           <input className="editor-title-input" value={editItem.title}
             onChange={(e) => set('title', e.target.value)} placeholder="Presentation title" />
         </div>
@@ -719,8 +932,10 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
           <span style={{ fontSize: 12, color: C.dim }}>
             {slides.length > 0 ? `${activeSlide + 1} / ${slides.length}` : '0 slides'}
           </span>
-          {hasUnsaved && <span style={{ fontSize: 11, color: C.warning, fontWeight: 600 }}>{t('editor.unsaved')}</span>}
-          <button onClick={handleSave} style={btn(C.success)}>💾 Save</button>
+          {saveFlash && <span style={{ fontSize: 11, color: C.success, fontWeight: 600, transition: 'opacity 0.3s' }}>Saved!</span>}
+          {hasUnsaved && !saveFlash && <span style={{ fontSize: 11, color: C.warning, fontWeight: 600 }}>{t('editor.unsaved')}</span>}
+          <button onClick={handleSave} style={btn(C.primary)} title="Save (Ctrl+S)">💾 Save</button>
+          <button onClick={handleSaveAndClose} style={btn(C.success)} title="Save and go back">Save & Close</button>
         </div>
       </div>
 
@@ -828,6 +1043,16 @@ function FullscreenSlideEditor({ item, onSave, onClose }) {
           <button onClick={addSlide} style={btnSm(C.primary)}>+ Slide</button>
           <button onClick={addPoll} style={btnSm('#D89E00')}>+ Poll</button>
           <button onClick={() => setShowTemplates(!showTemplates)} style={btnSm('#805AD5')}>📄 Template</button>
+          <button onClick={() => document.getElementById('import-file-input')?.click()} disabled={importing}
+            style={btnSm('#0891b2')}>
+            {importing ? '⏳...' : '📥 Import'}
+          </button>
+          <input id="import-file-input" type="file" accept=".pptx,.ppt,.html,.htm,.txt" style={{ display: 'none' }}
+            onChange={handleImportFile} />
+          <button onClick={handleImportHtmlPaste} disabled={importing}
+            style={btnSm('#059669')}>
+            {'</>'} Paste HTML
+          </button>
           {showTemplates && (
             <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: 4, background: '#fff',
               border: `1px solid ${C.border}`, borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,.15)',
@@ -1035,13 +1260,15 @@ export function ItemModal({ open, onClose, onSave, initial, moduleId }) {
   const { dragHandlers: slideDrag, overIdx: slideOver } = useDragDrop(item.slides || [], reorderSlides);
   const { dragHandlers: qDrag, overIdx: qOver } = useDragDrop(item.qs || [], reorderQs);
 
-  // Fullscreen editor for slides
+  // Fullscreen editor for slides — save does NOT close (save-and-stay)
   if (open && item.type === 'slides') {
     return (
       <FullscreenSlideEditor
         item={item}
-        onSave={(updated) => { onSave(updated); onClose(); }}
+        onSave={(updated) => { onSave(updated, true); }}
+        onSaveAndClose={(updated) => { onSave(updated); onClose(); }}
         onClose={onClose}
+        moduleId={moduleId}
       />
     );
   }
@@ -1254,19 +1481,71 @@ export function ItemModal({ open, onClose, onSave, initial, moduleId }) {
                           }
                         }}
                         tabIndex={0}
+                        onClick={() => document.getElementById('img-upload-modal')?.click()}
                         style={{
                           marginTop: 6, padding: 16, border: `2px dashed ${C.border}`, borderRadius: 8,
                           textAlign: 'center', fontSize: 12, color: C.dim, cursor: 'pointer',
                           background: C.bg, transition: 'border-color .2s',
                         }}
                       >
-                        Drop image here or click and paste (Ctrl+V) · Max 500KB
+                        📁 Click to browse, drop image, or paste (Ctrl+V) · Max 500KB
                       </div>
-                      {currentSlide.img && currentSlide.img.startsWith('data:') && (
-                        <p style={{ fontSize: 11, color: C.warning, marginTop: 4 }}>
-                          Embedded image ({Math.round(currentSlide.img.length / 1024)}KB in data)
-                        </p>
+                      <input id="img-upload-modal" type="file" accept="image/*" style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 512000) { alert('Image too large (max 500KB). Consider using a URL instead.'); return; }
+                          const reader = new FileReader();
+                          reader.onload = (ev) => updateSlide(activeSlide, 'img', ev.target.result);
+                          reader.readAsDataURL(file);
+                          e.target.value = '';
+                        }} />
+                      {currentSlide.img && (
+                        <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <img src={currentSlide.img} alt="" style={{ width: 48, height: 27, objectFit: 'cover', borderRadius: 4, border: `1px solid ${C.border}` }} />
+                          {currentSlide.img.startsWith('data:') && (
+                            <span style={{ fontSize: 10, color: C.warning }}>Embedded: {Math.round(currentSlide.img.length / 1024)}KB</span>
+                          )}
+                          <button onClick={() => updateSlide(activeSlide, 'img', '')}
+                            style={{ marginLeft: 'auto', background: 'none', border: `1px solid ${C.border}`, borderRadius: 4, padding: '2px 8px', fontSize: 10, color: C.error, cursor: 'pointer' }}>
+                            ✕ Remove
+                          </button>
+                        </div>
                       )}
+                      {/* Image position/size */}
+                      <div style={{ marginTop: 8 }}>
+                        <label style={{ ...label, fontSize: 11 }}>📐 Position</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2, marginBottom: 6 }}>
+                          {['top-left','top','top-right','left','center','right','bottom-left','bottom','bottom-right'].map((pos) => {
+                            const icons = { 'top-left':'↖','top':'⬆','top-right':'↗','left':'⬅','center':'⬛','right':'➡','bottom-left':'↙','bottom':'⬇','bottom-right':'↘' };
+                            return (
+                              <button key={pos} onClick={() => updateSlide(activeSlide, 'imgPos', pos)}
+                                style={{
+                                  padding: '3px', fontSize: 10, borderRadius: 3, cursor: 'pointer',
+                                  border: (currentSlide.imgPos || 'center') === pos ? `2px solid ${C.primary}` : `1px solid ${C.border}`,
+                                  background: (currentSlide.imgPos || 'center') === pos ? C.light : C.white,
+                                  color: (currentSlide.imgPos || 'center') === pos ? C.primary : C.muted,
+                                }}>
+                                {icons[pos]}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <label style={{ ...label, fontSize: 11 }}>Size</label>
+                        <div style={{ display: 'flex', gap: 3 }}>
+                          {[{ v: 'small', l: 'S' }, { v: 'medium', l: 'M' }, { v: 'large', l: 'L' }, { v: 'full', l: 'Full' }].map((sz) => (
+                            <button key={sz.v} onClick={() => updateSlide(activeSlide, 'imgSize', sz.v)}
+                              style={{
+                                flex: 1, padding: '3px', fontSize: 10, borderRadius: 3, cursor: 'pointer',
+                                border: (currentSlide.imgSize || 'large') === sz.v ? `2px solid ${C.primary}` : `1px solid ${C.border}`,
+                                background: (currentSlide.imgSize || 'large') === sz.v ? C.light : C.white,
+                                color: (currentSlide.imgSize || 'large') === sz.v ? C.primary : C.muted,
+                              }}>
+                              {sz.l}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   )}
                   {currentSlide.l === 'poll' && (
@@ -1378,6 +1657,40 @@ export function ItemModal({ open, onClose, onSave, initial, moduleId }) {
                       <p style={{ fontSize: 11, color: C.dim, marginTop: 3 }}>
                         Supports YouTube links and direct video file URLs (.mp4, .webm)
                       </p>
+                      {/* Video position/size */}
+                      <div style={{ marginTop: 8 }}>
+                        <label style={{ ...label, fontSize: 11 }}>📐 Position</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2, marginBottom: 6 }}>
+                          {['top-left','top','top-right','left','center','right','bottom-left','bottom','bottom-right'].map((pos) => {
+                            const icons = { 'top-left':'↖','top':'⬆','top-right':'↗','left':'⬅','center':'⬛','right':'➡','bottom-left':'↙','bottom':'⬇','bottom-right':'↘' };
+                            return (
+                              <button key={pos} onClick={() => updateSlide(activeSlide, 'videoPos', pos)}
+                                style={{
+                                  padding: '3px', fontSize: 10, borderRadius: 3, cursor: 'pointer',
+                                  border: (currentSlide.videoPos || 'center') === pos ? `2px solid ${C.primary}` : `1px solid ${C.border}`,
+                                  background: (currentSlide.videoPos || 'center') === pos ? C.light : C.white,
+                                  color: (currentSlide.videoPos || 'center') === pos ? C.primary : C.muted,
+                                }}>
+                                {icons[pos]}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <label style={{ ...label, fontSize: 11 }}>Size</label>
+                        <div style={{ display: 'flex', gap: 3 }}>
+                          {[{ v: 'small', l: 'S' }, { v: 'medium', l: 'M' }, { v: 'large', l: 'L' }, { v: 'full', l: 'Full' }].map((sz) => (
+                            <button key={sz.v} onClick={() => updateSlide(activeSlide, 'videoSize', sz.v)}
+                              style={{
+                                flex: 1, padding: '3px', fontSize: 10, borderRadius: 3, cursor: 'pointer',
+                                border: (currentSlide.videoSize || 'large') === sz.v ? `2px solid ${C.primary}` : `1px solid ${C.border}`,
+                                background: (currentSlide.videoSize || 'large') === sz.v ? C.light : C.white,
+                                color: (currentSlide.videoSize || 'large') === sz.v ? C.primary : C.muted,
+                              }}>
+                              {sz.l}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   )}
                   <div style={formGroup}>
@@ -1705,7 +2018,7 @@ function LiveSessionTab() {
       <PresenterView
         slides={presenting.slides}
         itemId={presenting.itemId}
-        onClose={() => setPresenting(null)}
+        onClose={() => { try { document.exitFullscreen?.(); } catch {} setPresenting(null); }}
         broadcast={broadcast}
         activeQ={activeQ}
         getResponseCount={getResponseCount}
@@ -1713,6 +2026,7 @@ function LiveSessionTab() {
         pushQuestion={pushQuestion}
         revealAnswer={revealAnswer}
         participantCount={participants.length}
+        session={session}
       />
     );
   }
@@ -1860,7 +2174,10 @@ function LiveSessionTab() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setPresenting({ itemId: deck.id, slides: deck.slides })}
+                  onClick={() => {
+                    setPresenting({ itemId: deck.id, slides: deck.slides });
+                    try { document.documentElement.requestFullscreen?.(); } catch {}
+                  }}
                   style={btn(C.success)}
                 >
                   Start Presenting
@@ -2697,20 +3014,35 @@ function SettingsTab({ onPasswordChange, onLogout }) {
 /* ================================================================
    CONTENT TAB - Overview of all items across modules
    ================================================================ */
-function ContentTab() {
+function ContentTab({ adminEditing, setAdminEditing, closeAdminEditing }) {
   const { course, setCourse } = useApp();
   const { t } = useI18n();
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterModule, setFilterModule] = useState('all');
-  const [editItem, setEditItem] = useState(null);
-  const [editModuleId, setEditModuleId] = useState(null);
   const [addItemModuleId, setAddItemModuleId] = useState(null);
   const [deleteItem, setDeleteItem] = useState(null);
   const [toast, setToast] = useState(null);
   const showToast = (msg, type = 'success') => setToast({ message: msg, type });
 
-  const handleSaveItem = (moduleId, item) => {
+  // Editing state is now lifted to App.jsx for browser history integration
+  // Resolve the actual item and moduleId from the editing state
+  const editModuleId = adminEditing?.moduleId || null;
+  const editItem = adminEditing ? (() => {
+    const mod = course.modules.find(m => m.id === adminEditing.moduleId);
+    const it = mod?.items?.find(i => i.id === adminEditing.itemId);
+    return it ? { ...it, moduleId: mod.id, moduleName: mod.title } : null;
+  })() : null;
+
+  const openEditItem = (it) => {
+    setAdminEditing({ itemId: it.id, moduleId: it.moduleId });
+  };
+
+  const closeEditItem = () => {
+    closeAdminEditing();
+  };
+
+  const handleSaveItem = (moduleId, item, keepOpen) => {
     setCourse({
       ...course,
       modules: course.modules.map((m) =>
@@ -2722,9 +3054,10 @@ function ContentTab() {
       ),
     });
     showToast(editItem ? 'Item updated' : 'Item added');
-    setEditItem(null);
-    setEditModuleId(null);
-    setAddItemModuleId(null);
+    if (!keepOpen) {
+      closeEditItem();
+      setAddItemModuleId(null);
+    }
   };
 
   const handleDuplicate = (moduleId, item) => {
@@ -2864,7 +3197,7 @@ function ContentTab() {
                       color: it.type === 'slides' ? '#6366f1' : it.type === 'quiz' ? '#E53E3E' : it.type === 'survey' ? '#ED8936' : '#38A169',
                     }}>{it.type}</span>
                     <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                      <button onClick={() => { setEditItem(it); setEditModuleId(it.moduleId); }}
+                      <button onClick={() => openEditItem(it)}
                         style={btnSm(C.primary)} title={t('content.edit')}>✏️</button>
                       <button onClick={() => handleDuplicate(it.moduleId, it)}
                         style={btnSm('#805AD5')} title={t('content.duplicate')}>📋</button>
@@ -2882,8 +3215,8 @@ function ContentTab() {
       {/* Modals */}
       <ItemModal
         open={!!editItem}
-        onClose={() => { setEditItem(null); setEditModuleId(null); }}
-        onSave={(item) => handleSaveItem(editModuleId, item)}
+        onClose={closeEditItem}
+        onSave={(item, keepOpen) => handleSaveItem(editModuleId, item, keepOpen)}
         initial={editItem}
         moduleId={editModuleId}
       />
@@ -2908,11 +3241,11 @@ function ContentTab() {
 /* ================================================================
    ADMIN MAIN
    ================================================================ */
-export default function Admin({ onExit, currentUser: propUser }) {
+export default function Admin({ onExit, currentUser: propUser, adminTab: tab, setAdminTab, adminEditing, setAdminEditing, closeAdminEditing }) {
   const { course, session, users, setUsers, currentUser: ctxUser } = useApp();
   const currentUser = propUser || ctxUser;
 
-  const [tab, setTab] = useState('live');
+  const setTab = (t) => { setAdminTab(t); };
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = () => {
@@ -2963,7 +3296,7 @@ export default function Admin({ onExit, currentUser: propUser }) {
         </TopBar>
 
         {tab === 'live' && perms.live && <LiveSessionTab />}
-        {tab === 'content' && perms.modules && <ContentTab />}
+        {tab === 'content' && perms.modules && <ContentTab adminEditing={adminEditing} setAdminEditing={setAdminEditing} closeAdminEditing={closeAdminEditing} />}
         {tab === 'participants' && perms.participants && <ParticipantsTab />}
         {tab === 'results' && perms.results && <ResultsTab />}
         {tab === 'users' && perms.users && <UsersTab />}

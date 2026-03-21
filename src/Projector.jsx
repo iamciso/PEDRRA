@@ -175,10 +175,25 @@ export default function Projector({ onExit }) {
       {projectorState === 'presenting' && currentPresentationSlide && (
         <div style={{
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40,
+          position: 'relative',
         }}>
           <div style={{ width: '85vw', maxWidth: 960 }}>
             <Slide s={currentPresentationSlide} big />
           </div>
+          {/* Small QR for latecomers during presentation */}
+          {joinUrl && (
+            <div style={{
+              position: 'absolute', bottom: 16, right: 16,
+              background: 'rgba(255,255,255,.85)', borderRadius: 8, padding: 6,
+              opacity: 0.6, transition: 'opacity .3s',
+            }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
+            >
+              <QRCodeSVG value={joinUrl} size={64} bgColor="#fff" fgColor={C.dark} level="L" />
+              <div style={{ fontSize: 8, textAlign: 'center', color: C.muted, marginTop: 1 }}>{session?.code}</div>
+            </div>
+          )}
         </div>
       )}
 

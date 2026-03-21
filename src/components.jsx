@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { C, ANS, card, btn, btnOutline, input, header, label, modal, modalBox, formGroup } from './theme';
 
 /* ================================================================
@@ -287,9 +288,9 @@ function renderFormattedText(text) {
 /* ================================================================
    SLIDE
    ================================================================ */
-export function Slide({ s, big, showNotes, transition }) {
+export function Slide({ s, big, showNotes, transition, fullscreen }) {
   if (!s) return null;
-  const f = big ? 1 : 0.55;
+  const f = fullscreen ? 1.6 : big ? 1 : 0.55;
   // Font size multiplier from slide setting
   const fsm = s.fontSize === 'small' ? 0.8 : s.fontSize === 'large' ? 1.25 : s.fontSize === 'xlarge' ? 1.5 : 1;
   // EDPS-style layouts with institutional blue and gold accents
@@ -313,12 +314,64 @@ export function Slide({ s, big, showNotes, transition }) {
     ? { borderTop: `4px solid ${l.accent}` }
     : { borderLeft: `4px solid ${l.accent}` };
   const base = {
-    ...bgStyle, color: textColor, borderRadius: 4, padding: l.pad,
+    ...bgStyle, color: textColor, borderRadius: fullscreen ? 0 : 4, padding: l.pad,
     minHeight: big ? 360 : 160, display: 'flex', flexDirection: 'column',
     justifyContent: 'center', textAlign: l.align,
     fontFamily: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
     ...accentBar,
     ...(transition ? { animation: `slide-${transition} 0.4s ease-out` } : {}),
+    ...(fullscreen ? { flex: 1, width: '100%', height: '100%', boxSizing: 'border-box' } : {}),
+  };
+
+  // Helper: compute media position/size styles
+  const getMediaLayout = (pos, size, isVideo) => {
+    const sizeMap = { small: 0.35, medium: 0.55, large: 0.8, full: 1.0 };
+    const pct = sizeMap[size] || sizeMap.large;
+    const maxW = `${Math.round(pct * 100)}%`;
+    const maxH = isVideo ? (big ? 400 : 200) : (big ? (fullscreen ? 500 : 300) : 140);
+    const posMap = {
+      'center': { alignSelf: 'center', margin: '0 auto' },
+      'top': { alignSelf: 'center', margin: '0 auto' },
+      'bottom': { alignSelf: 'center', margin: '0 auto' },
+      'left': { alignSelf: 'flex-start', margin: '0 auto 0 0' },
+      'right': { alignSelf: 'flex-end', margin: '0 0 0 auto' },
+      'top-left': { alignSelf: 'flex-start', margin: '0 auto 0 0' },
+      'top-right': { alignSelf: 'flex-start', margin: '0 0 0 auto' },
+      'bottom-left': { alignSelf: 'flex-end', margin: '0 auto 0 0' },
+      'bottom-right': { alignSelf: 'flex-end', margin: '0 0 0 auto' },
+    };
+    const posStyle = posMap[pos] || posMap.center;
+    const flexDir = (pos === 'bottom' || pos === 'bottom-left' || pos === 'bottom-right') ? 'bottom' : 'top';
+    return { maxW, maxH: maxH * pct, posStyle, flexDir };
+  };
+
+  // Reusable image element for any layout
+  const renderInlineImage = () => {
+    if (!s.img) return null;
+    const ml = getMediaLayout(s.imgPos, s.imgSize, false);
+    const imgFit = s.imgFit || 'contain';
+    return (
+      <img src={s.img} alt={s.t} style={{
+        maxWidth: ml.maxW, maxHeight: ml.maxH, objectFit: imgFit,
+        borderRadius: 8, marginTop: 12, display: 'block', ...ml.posStyle,
+      }} />
+    );
+  };
+
+  // Reusable video element for any layout
+  const renderInlineVideo = () => {
+    if (!s.videoUrl) return null;
+    const isYT = s.videoUrl.includes('youtube.com') || s.videoUrl.includes('youtu.be');
+    const ytId = isYT ? s.videoUrl.match(/(?:youtu\.be\/|v=)([^&?#]+)/)?.[1] : null;
+    const ml = getMediaLayout(s.videoPos, s.videoSize, true);
+    if (ytId) {
+      return (
+        <div style={{ position: 'relative', paddingBottom: `${56.25 * (parseFloat(ml.maxW) / 100)}%`, width: ml.maxW, height: 0, overflow: 'hidden', borderRadius: 8, marginTop: 12, ...ml.posStyle }}>
+          <iframe src={`https://www.youtube-nocookie.com/embed/${ytId}`} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title={s.t} />
+        </div>
+      );
+    }
+    return <video src={s.videoUrl} controls style={{ maxWidth: ml.maxW, maxHeight: ml.maxH, borderRadius: 8, marginTop: 12, display: 'block', ...ml.posStyle }} />;
   };
 
   // Two-column layout
@@ -331,6 +384,8 @@ export function Slide({ s, big, showNotes, transition }) {
           <div style={{ width: 1, background: C.border, flexShrink: 0 }} />
           <div style={{ flex: 1, fontSize: l.body, lineHeight: 1.7, opacity: 0.9 }}>{renderFormattedText(s.c2 || '')}</div>
         </div>
+        {renderInlineImage()}
+        {renderInlineVideo()}
         {showNotes && s.notes && <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFF9DB', borderRadius: 6, fontSize: 12, color: '#744210', borderLeft: '3px solid #ECC94B' }}>📝 {s.notes}</div>}
       </div>
     );
@@ -350,46 +405,43 @@ export function Slide({ s, big, showNotes, transition }) {
             </li>
           ))}
         </ul>
+        {renderInlineImage()}
+        {renderInlineVideo()}
         {showNotes && s.notes && <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFF9DB', borderRadius: 6, fontSize: 12, color: '#744210', borderLeft: '3px solid #ECC94B' }}>📝 {s.notes}</div>}
       </div>
     );
   }
 
-  // Image layout
+  // Image layout — dedicated layout with placeholder when no image
   if (s.l === 'image') {
+    const ml = getMediaLayout(s.imgPos, s.imgSize, false);
+    const titleEl = <h2 style={{ fontSize: l.title, fontWeight: 700, margin: '0 0 12px', lineHeight: 1.3 }}>{s.t}</h2>;
+    const captionEl = s.c ? <div style={{ fontSize: l.body, lineHeight: 1.7, opacity: 0.9 }}>{renderFormattedText(s.c)}</div> : null;
+    const imgEl = s.img ? renderInlineImage() : (
+      <div style={{ width: ml.maxW, height: big ? 200 : 100, background: C.border, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.dim, fontSize: 14, marginBottom: 12, ...ml.posStyle }}>
+        🖼️ Image placeholder
+      </div>
+    );
     return (
       <div style={base}>
-        <h2 style={{ fontSize: l.title, fontWeight: 700, margin: '0 0 12px', lineHeight: 1.3 }}>{s.t}</h2>
-        {s.img ? (
-          <img src={s.img} alt={s.t} style={{ maxWidth: '100%', maxHeight: big ? 300 : 140, objectFit: 'contain', borderRadius: 8, margin: '0 auto 12px' }} />
-        ) : (
-          <div style={{ width: '100%', height: big ? 200 : 100, background: C.border, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.dim, fontSize: 14, marginBottom: 12 }}>
-            🖼️ Image placeholder
-          </div>
-        )}
-        {s.c && <div style={{ fontSize: l.body, lineHeight: 1.7, opacity: 0.9 }}>{renderFormattedText(s.c)}</div>}
+        {ml.flexDir === 'bottom' ? <>{titleEl}{captionEl}{imgEl}</> : <>{titleEl}{imgEl}{captionEl}</>}
         {showNotes && s.notes && <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFF9DB', borderRadius: 6, fontSize: 12, color: '#744210', borderLeft: '3px solid #ECC94B' }}>📝 {s.notes}</div>}
       </div>
     );
   }
 
-  // Video layout
+  // Video layout — dedicated layout with placeholder when no video
   if (s.l === 'video') {
-    const isYT = s.videoUrl && (s.videoUrl.includes('youtube.com') || s.videoUrl.includes('youtu.be'));
-    const ytId = isYT ? s.videoUrl.match(/(?:youtu\.be\/|v=)([^&?#]+)/)?.[1] : null;
+    const ml = getMediaLayout(s.videoPos, s.videoSize, true);
+    const titleEl = <h2 style={{ fontSize: l.title, fontWeight: 700, margin: '0 0 12px', lineHeight: 1.3 }}>{s.t}</h2>;
+    const captionEl = s.c ? <div style={{ fontSize: l.body, lineHeight: 1.7, opacity: 0.9 }}>{renderFormattedText(s.c)}</div> : null;
+    const videoEl = s.videoUrl ? renderInlineVideo() : (
+      <div style={{ width: ml.maxW, padding: 40, textAlign: 'center', color: C.dim, background: C.border, borderRadius: 8, marginBottom: 12, ...ml.posStyle }}>🎬 Video placeholder</div>
+    );
     return (
       <div style={base}>
-        <h2 style={{ fontSize: l.title, fontWeight: 700, margin: '0 0 12px', lineHeight: 1.3 }}>{s.t}</h2>
-        {ytId ? (
-          <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 8, marginBottom: 12 }}>
-            <iframe src={`https://www.youtube-nocookie.com/embed/${ytId}`} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title={s.t} />
-          </div>
-        ) : s.videoUrl ? (
-          <video src={s.videoUrl} controls style={{ width: '100%', maxHeight: big ? 400 : 200, borderRadius: 8, marginBottom: 12 }} />
-        ) : (
-          <div style={{ padding: 40, textAlign: 'center', color: C.dim, background: C.border, borderRadius: 8, marginBottom: 12 }}>🎬 Video placeholder</div>
-        )}
-        {s.c && <div style={{ fontSize: l.body, lineHeight: 1.7, opacity: 0.9 }}>{renderFormattedText(s.c)}</div>}
+        {ml.flexDir === 'bottom' ? <>{titleEl}{captionEl}{videoEl}</> : <>{titleEl}{videoEl}{captionEl}</>}
+        {renderInlineImage()}
         {showNotes && s.notes && <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFF9DB', borderRadius: 6, fontSize: 12, color: '#744210', borderLeft: '3px solid #ECC94B' }}>📝 {s.notes}</div>}
       </div>
     );
@@ -449,6 +501,8 @@ export function Slide({ s, big, showNotes, transition }) {
         ...(isTitle ? { fontFamily: "'Georgia', 'Trajan Pro', 'Times New Roman', serif", letterSpacing: 0.5 } : {}) }}>{s.t}</h2>
       {isTitle && <div style={{ width: 60 * f, height: 3, background: '#FFCC00', margin: l.align === 'center' ? '0 auto 16px' : '0 0 16px', borderRadius: 2 }} />}
       <div style={{ fontSize: l.body, lineHeight: 1.7, opacity: 0.9 }}>{renderFormattedText(s.c)}</div>
+      {renderInlineImage()}
+      {renderInlineVideo()}
       {showNotes && s.notes && <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFF9DB', borderRadius: 6, fontSize: 12, color: '#744210', borderLeft: '3px solid #ECC94B' }}>📝 {s.notes}</div>}
       {s.audioUrl && (
         <div style={{ padding: '8px 16px', background: 'rgba(0,0,0,.15)', borderTop: '1px solid rgba(255,255,255,.1)' }}>
@@ -508,9 +562,13 @@ export function PresentationMode({ slides, startIdx, onClose }) {
         fontSize: 13, cursor: 'pointer', zIndex: 10, fontWeight: 600,
       }}>✕ Exit</button>
 
-      {/* Slide */}
-      <div style={{ width: '85vw', maxWidth: 960 }}>
-        <Slide s={slides[idx]} big transition={slideTransition} />
+      {/* Slide — fill viewport maintaining 16:9 aspect ratio */}
+      <div style={{
+        width: 'min(92vw, calc((100vh - 120px) * 16 / 9))',
+        height: 'min(calc(92vw * 9 / 16), calc(100vh - 120px))',
+        display: 'flex',
+      }}>
+        <Slide s={slides[idx]} big transition={slideTransition} fullscreen />
       </div>
 
       {/* Bottom bar */}
@@ -548,7 +606,7 @@ export function PresentationMode({ slides, startIdx, onClose }) {
 /* ================================================================
    PRESENTER VIEW (trainer's control panel with notes + poll controls)
    ================================================================ */
-export function PresenterView({ slides, itemId, onClose, broadcast, activeQ, getResponseCount, getResponseDist, pushQuestion, revealAnswer, participantCount = 0 }) {
+export function PresenterView({ slides, itemId, onClose, broadcast, activeQ, getResponseCount, getResponseDist, pushQuestion, revealAnswer, participantCount = 0, session }) {
   const [idx, setIdx] = useState(0);
   const [pollLaunched, setPollLaunched] = useState(false);
   const [slideTransition, setSlideTransition] = useState(null);
@@ -556,6 +614,7 @@ export function PresenterView({ slides, itemId, onClose, broadcast, activeQ, get
   const startTimeRef = useRef(Date.now());
   const [clock, setClock] = useState(new Date());
   const [elapsed, setElapsed] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const slide = slides[idx];
   const nextSlide = slides[idx + 1] || null;
@@ -592,6 +651,22 @@ export function PresenterView({ slides, itemId, onClose, broadcast, activeQ, get
       return () => clearTimeout(timer);
     }
   }, [idx, slides]);
+
+  // Fullscreen toggle
+  const toggleFullscreen = () => {
+    try {
+      if (document.fullscreenElement) { document.exitFullscreen(); }
+      else { ref.current?.requestFullscreen?.(); }
+    } catch { /* noop */ }
+  };
+
+  // Request fullscreen on mount + track changes
+  useEffect(() => {
+    try { ref.current?.requestFullscreen?.(); } catch { /* noop */ }
+    const onFSChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFSChange);
+    return () => document.removeEventListener('fullscreenchange', onFSChange);
+  }, []);
 
   // Broadcast start on mount, end on close
   useEffect(() => {
@@ -656,7 +731,11 @@ export function PresenterView({ slides, itemId, onClose, broadcast, activeQ, get
           <span style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, fontFamily: 'monospace' }}>
             ⏱ {formatElapsed(elapsed)}
           </span>
-          <button onClick={onClose} style={{
+          <button onClick={toggleFullscreen} style={{
+            background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff',
+            borderRadius: 6, padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 600,
+          }}>{isFullscreen ? '⛶ Exit Fullscreen' : '⛶ Fullscreen'}</button>
+          <button onClick={() => { try { document.exitFullscreen?.(); } catch {} onClose(); }} style={{
             background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff',
             borderRadius: 6, padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 600,
           }}>✕ End Presentation</button>
@@ -666,10 +745,44 @@ export function PresenterView({ slides, itemId, onClose, broadcast, activeQ, get
       {/* Main content */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Left panel: current slide */}
-        <div style={{ flex: 65, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div style={{ width: '100%', maxWidth: 900 }}>
-            <Slide s={slide} big showNotes={false} transition={slideTransition} />
+        <div style={{ flex: 65, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, position: 'relative' }}>
+          <div style={{
+            width: 'min(100%, calc((100vh - 80px) * 16 / 9 * 0.65))',
+            height: 'min(calc(100% - 0px), calc(100vh - 80px))',
+            display: 'flex',
+          }}>
+            <Slide s={slide} big showNotes={false} transition={slideTransition} fullscreen />
           </div>
+
+          {/* QR overlay on slide when poll is active */}
+          {isPoll && pollLaunched && activeQ && !activeQ.revealed && session?.code && (
+            <div style={{
+              position: 'absolute', bottom: 24, right: 24,
+              background: 'rgba(255,255,255,.95)', borderRadius: 12, padding: 10,
+              boxShadow: '0 4px 20px rgba(0,0,0,.4)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+              zIndex: 10, animation: 'fadeIn .4s ease',
+            }}>
+              <QRCodeSVG
+                value={`${window.location.origin}${window.location.pathname}?code=${session.code}`}
+                size={90}
+                bgColor="#fff"
+                fgColor="#003399"
+                level="L"
+              />
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#003399', fontFamily: 'monospace', letterSpacing: 2 }}>
+                {session.code}
+              </div>
+              <div style={{ fontSize: 9, color: '#666', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Scan to vote
+              </div>
+              {respCount > 0 && (
+                <div style={{ fontSize: 10, color: '#003399', fontWeight: 600 }}>
+                  {respCount} vote{respCount !== 1 ? 's' : ''}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right panel: preview + notes + controls */}
@@ -704,6 +817,39 @@ export function PresenterView({ slides, itemId, onClose, broadcast, activeQ, get
                 fontSize: 13, color: '#744210', lineHeight: 1.6, whiteSpace: 'pre-wrap',
               }}>
                 {slide.notes}
+              </div>
+            </div>
+          )}
+
+          {/* Session join info — QR + code for participants */}
+          {session?.code && (
+            <div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>
+                Join Session
+              </div>
+              <div style={{ background: 'rgba(255,255,255,.08)', borderRadius: 8, padding: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ background: '#fff', borderRadius: 6, padding: 4, flexShrink: 0 }}>
+                  <QRCodeSVG
+                    value={`${window.location.origin}${window.location.pathname}?code=${session.code}`}
+                    size={72}
+                    bgColor="#fff"
+                    fgColor="#003399"
+                  />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,.5)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Code
+                  </div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#FFCC00', fontFamily: 'monospace', letterSpacing: 3 }}>
+                    {session.code}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,.5)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {`${window.location.origin}${window.location.pathname}?code=${session.code}`}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,.7)', marginTop: 4 }}>
+                    👥 {participantCount} participant{participantCount !== 1 ? 's' : ''} connected
+                  </div>
+                </div>
               </div>
             </div>
           )}

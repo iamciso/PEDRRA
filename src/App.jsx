@@ -667,7 +667,7 @@ function ActivityView({ currentUser, module: mod, item, onBack }) {
 
   switch (item.type) {
     case 'doc': return <DocViewer item={item} isRead={isDone} onRead={markDone} onBack={onBack} />;
-    case 'slides': return <SlideViewer item={item} isComplete={isDone} onComplete={markDone} onBack={onBack} />;
+    case 'slides': return <SlideViewer item={item} isComplete={isDone} onComplete={markDone} onBack={onBack} currentUser={currentUser} moduleId={mod.id} />;
     case 'survey': return <SurveyViewer item={item} isSubmitted={isDone} savedAnswers={null} onSubmit={handleSurveySubmit} onBack={onBack} />;
     case 'quiz': return <QuizInfo item={item} onBack={onBack} />;
     default: return <div style={{ padding: 20 }}><button onClick={onBack} style={btnOutline()}>← Back</button><p>Unknown item type.</p></div>;
@@ -741,18 +741,47 @@ export default function App() {
   const [editCourseData, setEditCourseData] = useState(null);
   const [deleteCourseData, setDeleteCourseData] = useState(null);
 
-  const setView = useCallback((v) => {
+  // Admin sub-navigation state (lifted from Admin so we can persist across history)
+  const [adminTab, setAdminTabRaw] = useState('live');
+  const [adminEditing, setAdminEditing] = useState(null); // { itemId, moduleId } when editing an item
+
+  const setView = useCallback((v, extra) => {
     setViewRaw((prev) => {
-      if (prev !== v) window.history.pushState({ view: v }, '', '');
+      if (prev !== v) {
+        const state = { view: v, ...extra };
+        window.history.pushState(state, '', '');
+      }
       return v;
     });
+  }, []);
+
+  const setAdminTab = useCallback((tab) => {
+    setAdminTabRaw(tab);
+    window.history.pushState({ view: 'admin', adminTab: tab }, '', '');
+  }, []);
+
+  const setAdminEditingWithHistory = useCallback((editing) => {
+    setAdminEditing(editing);
+    if (editing) {
+      window.history.pushState({ view: 'admin', adminTab: adminTab, editing }, '', '');
+    }
+  }, [adminTab]);
+
+  const closeAdminEditing = useCallback(() => {
+    setAdminEditing(null);
   }, []);
 
   useEffect(() => {
     const onPop = (e) => {
       const state = e.state;
-      if (state?.view) setViewRaw(state.view);
-      else { setViewRaw('courseList'); setActivityContext(null); }
+      if (!state?.view) { setViewRaw('courseList'); setActivityContext(null); setAdminEditing(null); return; }
+      setViewRaw(state.view);
+      if (state.view === 'admin') {
+        setAdminTabRaw(state.adminTab || 'live');
+        setAdminEditing(state.editing || null);
+      } else {
+        setAdminEditing(null);
+      }
     };
     window.addEventListener('popstate', onPop);
     window.history.replaceState({ view: 'courseList' }, '', '');
@@ -1142,7 +1171,9 @@ export default function App() {
             </div>
           )}
           {view === 'admin' && (
-            <Admin onExit={() => setView(activeCourseId ? 'course' : 'courseList')} currentUser={currentUser} />
+            <Admin onExit={() => setView(activeCourseId ? 'course' : 'courseList')} currentUser={currentUser}
+              adminTab={adminTab} setAdminTab={setAdminTab}
+              adminEditing={adminEditing} setAdminEditing={setAdminEditingWithHistory} closeAdminEditing={closeAdminEditing} />
           )}
           {view === 'projector' && (
             <Projector onExit={() => setView('admin')} />

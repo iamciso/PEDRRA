@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useApp } from './context.js';
 import { C, phaseColor, phaseLabel, itemIcon, ANS, card, btn, btnOutline, btnSm, input } from './theme';
 import { Header, ProgressBar, Slide, SurveyQuestion, PresentationMode, useSwipe, SearchBar } from './components.jsx';
+import { FullscreenSlideEditor } from './Admin.jsx';
 
 /* base64 beep sound for poll notifications */
 const BEEP = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAbBp5tn5AAAAAAAAAAAAAAAAAAAAAP/jOMAAAGEAIAAAAABMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/jOMAAAAGkAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/4zjAAAABpAAAABExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
@@ -383,11 +384,23 @@ function DocViewer({ item, onRead, isRead, onBack }) {
 /* ================================================================
    SLIDE VIEWER
    ================================================================ */
-function SlideViewer({ item, onComplete, isComplete, onBack }) {
+function SlideViewer({ item, onComplete, isComplete, onBack, currentUser, moduleId }) {
+  const { course, setCourse } = useApp();
   const [idx, setIdx] = useState(0);
   const [presenting, setPresenting] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [showThumbnails, setShowThumbnails] = useState(true);
-  const slides = item.slides || [];
+  const canEdit = currentUser?.role === 'admin' || currentUser?.role === 'trainer';
+
+  // Re-read item from course to get latest data after editing
+  const liveItem = (() => {
+    if (!course || !moduleId) return item;
+    const mod = course.modules?.find(m => m.id === moduleId);
+    const it = mod?.items?.find(i => i.id === item.id);
+    return it || item;
+  })();
+
+  const slides = liveItem.slides || [];
   const total = slides.length;
   const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768;
 
@@ -408,23 +421,56 @@ function SlideViewer({ item, onComplete, isComplete, onBack }) {
     return () => document.removeEventListener('keydown', handleKey);
   }, [total, presenting]);
 
+  // Save handler for inline editing
+  const handleEditSave = (updatedItem) => {
+    if (!course || !moduleId) return;
+    setCourse({
+      ...course,
+      modules: course.modules.map(m =>
+        m.id === moduleId
+          ? { ...m, items: m.items.map(it => it.id === updatedItem.id ? updatedItem : it) }
+          : m
+      ),
+    });
+  };
+
   if (presenting && total > 0) {
     return <PresentationMode slides={slides} startIdx={idx} onClose={() => setPresenting(false)} />;
   }
 
+  if (editing && canEdit) {
+    return (
+      <FullscreenSlideEditor
+        item={liveItem}
+        moduleId={moduleId}
+        onSave={(updated) => { handleEditSave(updated); }}
+        onSaveAndClose={(updated) => { handleEditSave(updated); setEditing(false); }}
+        onClose={() => setEditing(false)}
+      />
+    );
+  }
+
   return (
     <div style={{ padding: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 8, flexWrap: 'wrap' }}>
         <button onClick={onBack}
           style={{ background: C.light, border: `1px solid ${C.primary}33`, color: C.primary, cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 8 }}>
           ← Back
         </button>
-        {total > 0 && (
-          <button onClick={() => setPresenting(true)}
-            style={{ ...btn(C.dark), display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13 }}>
-            📺 Present Fullscreen
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {canEdit && (
+            <button onClick={() => setEditing(true)}
+              style={{ ...btn(C.primary), display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13 }}>
+              ✏️ Edit Slides
+            </button>
+          )}
+          {total > 0 && (
+            <button onClick={() => setPresenting(true)}
+              style={{ ...btn(C.dark), display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13 }}>
+              📺 Present Fullscreen
+            </button>
+          )}
+        </div>
       </div>
       <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 4 }}>{item.title}</h2>
       {item.desc && <p style={{ color: C.muted, fontSize: 13, marginBottom: 4 }}>{item.desc}</p>}
@@ -466,7 +512,7 @@ function SlideViewer({ item, onComplete, isComplete, onBack }) {
                     textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%',
                     textAlign: 'center',
                   }}>
-                    {s.title || s.body?.substring(0, 20) || `Slide ${i + 1}`}
+                    {s.t || s.title || s.c?.substring(0, 20) || `Slide ${i + 1}`}
                   </span>
                 </button>
               ))}
@@ -812,9 +858,9 @@ export { LiveQuestionOverlay, DocViewer, SlideViewer, SurveyViewer, QuizInfo, Qu
 
 export default function Participant({ participantId, onExit }) {
   const {
-    course, participants, activeQ, broadcast,
+    course, participants, activeQ, broadcast, session,
     recordAnswer, recordSurvey, markComplete,
-    presentationActive,
+    presentationActive, presentationSlides, presentationSlideIdx,
   } = useApp();
 
   // Sound toggle
@@ -938,8 +984,63 @@ export default function Participant({ participantId, onExit }) {
         />
       )}
 
-      {/* Session in progress holding screen (during presentations, no active poll) */}
-      {presentationActive && !activeQ && (
+      {/* Live presentation sync — participants see slides in real-time */}
+      {presentationActive && !activeQ && presentationSlides?.length > 0 && (
+        <div style={{
+          position: 'fixed', inset: 0, background: '#111',
+          zIndex: 400, display: 'flex', flexDirection: 'column',
+        }}>
+          {/* Top bar */}
+          <div style={{
+            background: 'rgba(0,0,0,.6)', padding: '8px 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            flexShrink: 0,
+          }}>
+            <span style={{ color: 'rgba(255,255,255,.7)', fontSize: 12, fontWeight: 600 }}>
+              📺 Live · Slide {(presentationSlideIdx || 0) + 1} / {presentationSlides.length}
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ color: C.accent, fontWeight: 700, fontSize: 12 }}>{participant.xp || 0} ⭐</span>
+              {participants.length > 1 && (
+                <span style={{ color: 'rgba(255,255,255,.5)', fontSize: 11 }}>
+                  #{[...participants].sort((a, b) => b.xp - a.xp).findIndex(p => p.id === participantId) + 1}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Slide display */}
+          <div style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12,
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              width: 'min(100%, calc((100vh - 80px) * 16 / 9))',
+              height: 'min(calc(100vw * 9 / 16), calc(100vh - 80px))',
+              display: 'flex',
+            }}>
+              <Slide s={presentationSlides[presentationSlideIdx || 0]} big fullscreen />
+            </div>
+          </div>
+
+          {/* Slide dots */}
+          <div style={{
+            background: 'rgba(0,0,0,.5)', padding: '8px 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, flexShrink: 0,
+          }}>
+            {presentationSlides.map((_, i) => (
+              <div key={i} style={{
+                width: i === (presentationSlideIdx || 0) ? 16 : 6, height: 6, borderRadius: 3,
+                background: i === (presentationSlideIdx || 0) ? C.accent : 'rgba(255,255,255,.25)',
+                transition: 'all .3s',
+              }} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Fallback: presentation active but no slides data yet */}
+      {presentationActive && !activeQ && (!presentationSlides || presentationSlides.length === 0) && (
         <div style={{
           position: 'fixed', inset: 0, background: `linear-gradient(135deg, ${C.primary}, ${C.dark})`,
           zIndex: 400, display: 'flex', flexDirection: 'column',
@@ -949,28 +1050,9 @@ export default function Participant({ participantId, onExit }) {
           <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 700, margin: '0 0 8px', textAlign: 'center' }}>
             Session in Progress
           </h2>
-          <p style={{ color: 'rgba(255,255,255,.7)', fontSize: 15, margin: '0 0 32px', textAlign: 'center' }}>
-            Follow along on the projector
+          <p style={{ color: 'rgba(255,255,255,.7)', fontSize: 15, textAlign: 'center' }}>
+            Waiting for slides...
           </p>
-          <div style={{
-            background: 'rgba(255,255,255,.12)', borderRadius: 16, padding: 24,
-            textAlign: 'center', minWidth: 200,
-          }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.5)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>
-              Your XP
-            </div>
-            <div style={{ fontSize: 40, fontWeight: 800, color: C.accent, lineHeight: 1 }}>
-              {participant.xp || 0} ⭐
-            </div>
-          </div>
-          {participants.length > 1 && (
-            <div style={{
-              marginTop: 16, background: 'rgba(255,255,255,.08)', borderRadius: 12, padding: '12px 20px',
-              color: 'rgba(255,255,255,.6)', fontSize: 13, textAlign: 'center',
-            }}>
-              Position: {[...participants].sort((a, b) => b.xp - a.xp).findIndex(p => p.id === participantId) + 1} of {participants.length}
-            </div>
-          )}
         </div>
       )}
 
