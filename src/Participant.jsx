@@ -1139,7 +1139,7 @@ export default function Participant({ participantId, onExit }) {
       )}
 
       {/* Live presentation sync — participants see slides in real-time */}
-      {presentationActive && !activeQ && presentationSlides?.length > 0 && (
+      {presentationActive && presentationSlides?.length > 0 && (
         <div style={{
           position: 'fixed', inset: 0, background: '#111',
           zIndex: 400, display: 'flex', flexDirection: 'column',

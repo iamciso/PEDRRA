@@ -895,10 +895,12 @@ export default function App() {
 
   /* ─── WebSocket real-time sync (cross-device) ─── */
   useEffect(() => {
-    const code = session?.code || currentUser?._sessionCode;
-    if (!code) return;
+    if (!currentUser) return;
 
-    Sync.connect(code, {
+    const code = session?.code || currentUser?._sessionCode;
+
+    // Common message handlers
+    const messageHandlers = {
       onPresentation: (data) => {
         if (data.active) {
           setPresentationActive(true);
@@ -970,10 +972,26 @@ export default function App() {
         setActiveQ(null);
         setActiveSurvey(null);
       },
-    });
+      // When a session is discovered (for users without a code)
+      onDiscovered: (data) => {
+        if (data?.code && !session) {
+          setSession(data.session);
+          // Now subscribe to that session
+          Sync.connect(data.code, messageHandlers);
+        }
+      },
+    };
+
+    if (code) {
+      // We know the session code — connect directly
+      Sync.connect(code, messageHandlers);
+    } else {
+      // No session code — ask the server if there's an active session
+      Sync.connectAndDiscover(messageHandlers);
+    }
 
     return () => Sync.disconnect();
-  }, [session?.code, currentUser?._sessionCode]);
+  }, [session?.code, currentUser?.id]);
 
   /* ─── Handle ?item= URL parameter for direct QR navigation ─── */
   useEffect(() => {
@@ -1134,10 +1152,28 @@ export default function App() {
     return (responses[`${itemId}-${qIndex}`]?.counts) || [];
   }, [responses]);
 
+  /* ─── Auto-create session for admin/facilitator ─── */
+  useEffect(() => {
+    if (!currentUser) return;
+    const isTrainer = currentUser.role === 'admin' || currentUser.role === 'facilitator';
+    if (isTrainer && !session) {
+      // Auto-create a session so WebSocket connects and students can sync
+      const s = { code: genCode(), courseId: activeCourseId || courses[0]?.id, startedAt: Date.now() };
+      setSession(s);
+      broadcastMsg('SESSION', s);
+      Sync.createSession(s);
+    }
+  }, [currentUser?.id]); // Only run when user changes
+
   /* ─── Auth handlers ─── */
   const handleLogin = (user) => {
     setCurrentUser(user);
     save('pedrra-currentUser', user);
+    // If logging in as regular user (not participant), auto-assign session code
+    if (!user._isParticipant && session?.code) {
+      user._sessionCode = session.code;
+      save('pedrra-currentUser', user);
+    }
     setView('courseList');
     window.history.replaceState({}, '', window.location.pathname);
   };
@@ -1231,13 +1267,27 @@ export default function App() {
 
   /* ─── Context value ─── */
   const startPresentation = useCallback((itemId, slides) => {
+    // Auto-create session if none exists
+    let code = session?.code;
+    if (!code) {
+      const s = { code: genCode(), courseId: activeCourseId || courses[0]?.id, startedAt: Date.now() };
+      setSession(s);
+      broadcastMsg('SESSION', s);
+      Sync.createSession(s);
+      code = s.code;
+      // Give WebSocket time to connect before sending presentation
+      setTimeout(() => {
+        Sync.startPresentation(code, itemId, slides);
+      }, 500);
+    } else {
+      Sync.startPresentation(code, itemId, slides);
+    }
     setPresentationActive(true);
     setPresentationSlides(slides);
     setPresentationSlideIdx(0);
     setPresentationItemId(itemId);
     broadcastMsg('PRESENT_START', { itemId, slides });
-    Sync.startPresentation(session?.code, itemId, slides);
-  }, [session]);
+  }, [session, activeCourseId, courses]);
 
   const endPresentation = useCallback(() => {
     setPresentationActive(false);

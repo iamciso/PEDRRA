@@ -89,6 +89,20 @@ function broadcast(code, type, payload, excludeWs) {
 
 function handleMessage(ws, msg) {
   const { type, code, payload } = msg;
+
+  // DISCOVER: find active session (no code needed)
+  if (type === 'DISCOVER') {
+    // Return the first active session
+    for (const [sessionCode, data] of sessions) {
+      if (data.session) {
+        ws.send(JSON.stringify({ type: 'DISCOVERED', payload: { code: sessionCode, session: data.session } }));
+        return;
+      }
+    }
+    ws.send(JSON.stringify({ type: 'DISCOVERED', payload: null }));
+    return;
+  }
+
   if (!code) return;
 
   const s = getSession(code);

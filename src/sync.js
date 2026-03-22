@@ -114,6 +114,10 @@ function handleWsMessage(event) {
         if (handlers.onSessionEnd) handlers.onSessionEnd();
         break;
 
+      case 'DISCOVERED':
+        if (handlers.onDiscovered) handlers.onDiscovered(payload);
+        break;
+
       default:
         break;
     }
@@ -189,6 +193,61 @@ export function isConnected() {
 }
 
 // ─── API functions (called by App.jsx) ─────────────────────
+
+/**
+ * Discover active session (no code needed).
+ * The server will respond with DISCOVERED message handled by onDiscovered callback.
+ */
+export function discoverSession() {
+  const msg = JSON.stringify({ type: 'DISCOVER' });
+  if (ws && wsReady) {
+    ws.send(msg);
+  } else {
+    messageQueue.push(msg);
+  }
+}
+
+/**
+ * Connect without a session code to discover active sessions.
+ * Used by regular users who don't know the session code yet.
+ */
+export function connectAndDiscover(messageHandlers = {}) {
+  handlers = messageHandlers;
+
+  if (ws) {
+    discoverSession();
+    return true;
+  }
+
+  try {
+    ws = new WebSocket(getWsUrl());
+
+    ws.onopen = () => {
+      wsReady = true;
+      console.log('[Sync] WebSocket connected — discovering session...');
+      flushQueue();
+      discoverSession();
+    };
+
+    ws.onmessage = handleWsMessage;
+
+    ws.onclose = () => {
+      wsReady = false;
+      ws = null;
+      if (currentCode || handlers.onDiscovered) {
+        reconnectTimer = setTimeout(() => {
+          if (currentCode) connect(currentCode, handlers);
+          else connectAndDiscover(handlers);
+        }, 2000);
+      }
+    };
+
+    ws.onerror = () => {};
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function createSession(sessionData) {
   broadcastLocal('SESSION', sessionData);
