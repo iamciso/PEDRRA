@@ -1,0 +1,13 @@
+# Render.com Blueprint — deploy with one click
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: pedrra
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: node server.cjs
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: NODE_ENV
+        value: production
