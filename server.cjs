@@ -31,7 +31,9 @@ app.use((req, res, next) => {
 
 const server = http.createServer(app);
 
-// ─── In-memory session store ──────────────────────────────
+// ─── In-memory stores ─────────────────────────────────────
+let sharedUsers = null;   // Synced user list (set by admin, shared with all clients)
+let sharedCourses = null; // Synced course data
 const sessions = new Map(); // code → { session, presentation, activeQ, participants, responses }
 
 function getSession(code) {
@@ -96,10 +98,41 @@ function handleMessage(ws, msg) {
     for (const [sessionCode, data] of sessions) {
       if (data.session) {
         ws.send(JSON.stringify({ type: 'DISCOVERED', payload: { code: sessionCode, session: data.session } }));
+        // Also send shared data
+        if (sharedUsers) ws.send(JSON.stringify({ type: 'SYNC_USERS', payload: sharedUsers }));
+        if (sharedCourses) ws.send(JSON.stringify({ type: 'SYNC_COURSES', payload: sharedCourses }));
         return;
       }
     }
     ws.send(JSON.stringify({ type: 'DISCOVERED', payload: null }));
+    // Still send shared data even without a session
+    if (sharedUsers) ws.send(JSON.stringify({ type: 'SYNC_USERS', payload: sharedUsers }));
+    if (sharedCourses) ws.send(JSON.stringify({ type: 'SYNC_COURSES', payload: sharedCourses }));
+    return;
+  }
+
+  // SYNC_USERS: admin pushes user list to server
+  if (type === 'SYNC_USERS') {
+    sharedUsers = payload;
+    // Broadcast to ALL connected clients across all sessions
+    const msg = JSON.stringify({ type: 'SYNC_USERS', payload });
+    for (const [, data] of sessions) {
+      for (const client of data.clients) {
+        if (client !== ws && client.readyState === 1) client.send(msg);
+      }
+    }
+    return;
+  }
+
+  // SYNC_COURSES: admin pushes course data to server
+  if (type === 'SYNC_COURSES') {
+    sharedCourses = payload;
+    const msg = JSON.stringify({ type: 'SYNC_COURSES', payload });
+    for (const [, data] of sessions) {
+      for (const client of data.clients) {
+        if (client !== ws && client.readyState === 1) client.send(msg);
+      }
+    }
     return;
   }
 
@@ -123,6 +156,9 @@ function handleMessage(ws, msg) {
           responses: s.responses,
         },
       }));
+      // Also send shared users/courses
+      if (sharedUsers) ws.send(JSON.stringify({ type: 'SYNC_USERS', payload: sharedUsers }));
+      if (sharedCourses) ws.send(JSON.stringify({ type: 'SYNC_COURSES', payload: sharedCourses }));
       break;
 
     case 'SESSION_CREATE':

@@ -797,6 +797,8 @@ export default function App() {
     const val = typeof c === 'function' ? c(courses) : c;
     setCoursesState(val);
     save('pedrra-courses', val);
+    // Sync to server so other devices get the course data
+    Sync.syncCourses(val);
   }, [courses]);
 
   const setCourse = useCallback((updatedCourse) => {
@@ -812,6 +814,8 @@ export default function App() {
     const val = typeof u === 'function' ? u(users) : u;
     setUsersState(val);
     save('pedrra-users', val);
+    // Sync to server so other devices get the user list
+    Sync.syncUsers(val);
   }, [users]);
 
   /* ─── BroadcastChannel listener ─── */
@@ -978,6 +982,20 @@ export default function App() {
           setSession(data.session);
           // Now subscribe to that session
           Sync.connect(data.code, messageHandlers);
+        }
+      },
+      // Receive synced users from server (created by admin on another device)
+      onSyncUsers: (serverUsers) => {
+        if (serverUsers && Array.isArray(serverUsers) && serverUsers.length > 0) {
+          setUsersState(serverUsers);
+          save('pedrra-users', serverUsers);
+        }
+      },
+      // Receive synced courses from server
+      onSyncCourses: (serverCourses) => {
+        if (serverCourses && Array.isArray(serverCourses) && serverCourses.length > 0) {
+          setCoursesState(serverCourses);
+          save('pedrra-courses', serverCourses);
         }
       },
     };
@@ -1162,6 +1180,11 @@ export default function App() {
       setSession(s);
       broadcastMsg('SESSION', s);
       Sync.createSession(s);
+      // Push users and courses to server so other devices can access them
+      setTimeout(() => {
+        Sync.syncUsers(users);
+        Sync.syncCourses(courses);
+      }, 1000);
     }
   }, [currentUser?.id]); // Only run when user changes
 

@@ -118,6 +118,14 @@ function handleWsMessage(event) {
         if (handlers.onDiscovered) handlers.onDiscovered(payload);
         break;
 
+      case 'SYNC_USERS':
+        if (handlers.onSyncUsers) handlers.onSyncUsers(payload);
+        break;
+
+      case 'SYNC_COURSES':
+        if (handlers.onSyncCourses) handlers.onSyncCourses(payload);
+        break;
+
       default:
         break;
     }
@@ -310,4 +318,16 @@ export function pushSurvey(code, surveyData) {
 export function clearSurvey(code) {
   broadcastLocal('CLEAR_SURVEY', {});
   send('CLEAR_SURVEY', code, {});
+}
+
+/** Push user list to server so all clients get it */
+export function syncUsers(users) {
+  const msg = JSON.stringify({ type: 'SYNC_USERS', payload: users });
+  if (ws && wsReady) ws.send(msg);
+}
+
+/** Push course data to server so all clients get it */
+export function syncCourses(courses) {
+  const msg = JSON.stringify({ type: 'SYNC_COURSES', payload: courses });
+  if (ws && wsReady) ws.send(msg);
 }
