@@ -141,12 +141,14 @@ function LiveQuestionOverlay({ activeQ, course, onAnswer, myAnswers, soundEnable
 
   // Auto-submit when timer reaches 0
   useEffect(() => {
-    if (timerLeft === 0 && q && !answered) {
-      // Auto-submit with -1 (no answer / timeout)
-      const qIdx = isFromPresentation ? `slide-${activeQ.slideIdx}` : activeQ.qIndex;
-      onAnswer(activeQ.itemId, qIdx, -1, 0);
-    }
-  }, [timerLeft]);
+    if (timerLeft !== 0 || !q) return;
+    // Check if already answered by looking at myAnswers directly
+    const key = isFromPresentation ? `${activeQ.itemId}-slide-${activeQ.slideIdx}` : `${activeQ.itemId}-${activeQ.qIndex}`;
+    if (myAnswers?.[key] !== undefined) return;
+    // Auto-submit with -1 (no answer / timeout)
+    const qIdx = isFromPresentation ? `slide-${activeQ.slideIdx}` : activeQ.qIndex;
+    onAnswer(activeQ.itemId, qIdx, -1, 0);
+  }, [timerLeft, q, isFromPresentation, activeQ, myAnswers, onAnswer]);
 
   // Auto-expand when results are revealed
   useEffect(() => {

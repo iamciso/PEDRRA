@@ -818,12 +818,14 @@ export default function App() {
     Sync.syncUsers(val);
   }, [users]);
 
-  /* ─── BroadcastChannel listener ─── */
+  /* ─── BroadcastChannel listener (same-browser tabs only) ─── */
   useEffect(() => {
     let ch;
     try {
       ch = new BroadcastChannel(CH_NAME);
       ch.onmessage = (e) => {
+        // Skip if WebSocket is handling cross-device sync — avoid duplicate processing
+        if (Sync.isConnected()) return;
         const { type, payload } = e.data || {};
         switch (type) {
           case 'JOIN':
@@ -878,10 +880,12 @@ export default function App() {
     return () => { try { ch?.close(); } catch { /* noop */ } };
   }, [session]);
 
-  /* ─── localStorage polling fallback ─── */
+  /* ─── localStorage polling fallback (only when WebSocket unavailable) ─── */
   const syncVersionRef = useRef(localStorage.getItem('pedrra-sync-version') || '0');
   useEffect(() => {
     const poll = setInterval(() => {
+      // Skip polling when WebSocket is active (more efficient)
+      if (Sync.isConnected()) return;
       const current = localStorage.getItem('pedrra-sync-version') || '0';
       if (current === syncVersionRef.current) return;
       syncVersionRef.current = current;
@@ -898,6 +902,10 @@ export default function App() {
   }, [session, participants, responses, activeQ]);
 
   /* ─── WebSocket real-time sync (cross-device) ─── */
+  // Use refs so WebSocket handlers always see latest state
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+
   useEffect(() => {
     if (!currentUser) return;
 
@@ -1159,7 +1167,15 @@ export default function App() {
     if (session?.code) Sync.clearSurvey(session.code);
   }, [session]);
 
-  const markComplete = useCallback(() => {}, []);
+  const markComplete = useCallback((participantId, moduleId, itemId) => {
+    // Track completion via responses for analytics
+    if (participantId && moduleId && itemId) {
+      setResponses((prev) => ({
+        ...prev,
+        [`complete-${moduleId}-${itemId}-${participantId}`]: { completedAt: Date.now() },
+      }));
+    }
+  }, []);
 
   const getResponseCount = useCallback((itemId, qIndex) => {
     const r = responses[`${itemId}-${qIndex}`];
@@ -1190,14 +1206,20 @@ export default function App() {
 
   /* ─── Auth handlers ─── */
   const handleLogin = (user) => {
-    setCurrentUser(user);
-    save('pedrra-currentUser', user);
-    // If logging in as regular user (not participant), auto-assign session code
-    if (!user._isParticipant && session?.code) {
-      user._sessionCode = session.code;
-      save('pedrra-currentUser', user);
+    // Create a copy — never mutate the original
+    const loginUser = { ...user };
+    if (!loginUser._isParticipant && session?.code) {
+      loginUser._sessionCode = session.code;
     }
-    setView('courseList');
+    setCurrentUser(loginUser);
+    save('pedrra-currentUser', loginUser);
+    // Auto-select the first course if only one exists
+    if (courses.length === 1) {
+      setActiveCourseId(courses[0].id);
+      setView('course');
+    } else {
+      setView('courseList');
+    }
     window.history.replaceState({}, '', window.location.pathname);
   };
 
@@ -1341,7 +1363,7 @@ export default function App() {
     recordAnswer, recordSurvey, markComplete,
     broadcast: (type, payload) => {
       broadcastMsg(type, payload);
-      // Also sync via Firebase for cross-device
+      // Also sync via WebSocket for cross-device
       if (session?.code) {
         if (type === 'PUSH_Q') Sync.pushQuestion(session.code, payload);
         else if (type === 'REVEAL') Sync.revealAnswer(session.code);

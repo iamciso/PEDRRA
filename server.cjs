@@ -54,7 +54,12 @@ function getSession(code) {
 // ─── WebSocket server ─────────────────────────────────────
 const wss = new WebSocketServer({ server, path: '/ws' });
 
+let connectionCount = 0;
+
 wss.on('connection', (ws) => {
+  connectionCount++;
+  const connId = connectionCount;
+  console.log(`[WS] Client #${connId} connected (total: ${wss.clients.size})`);
   let subscribedCode = null;
 
   ws.on('message', (raw) => {
@@ -68,6 +73,7 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
+    console.log(`[WS] Client #${connId} disconnected (total: ${wss.clients.size - 1})`);
     // Remove from session clients
     if (subscribedCode) {
       const s = sessions.get(subscribedCode);
