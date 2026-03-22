@@ -901,6 +901,35 @@ export default function App() {
     return () => clearInterval(poll);
   }, [session, participants, responses, activeQ]);
 
+  /* ─── Pre-login sync: fetch users/courses from server ─── */
+  const [syncing, setSyncing] = useState(!currentUser); // Show "connecting" before login
+  useEffect(() => {
+    if (currentUser) { setSyncing(false); return; }
+    // Try to discover session and get shared data before showing login
+    Sync.connectAndDiscover({
+      onDiscovered: (data) => {
+        if (data?.session) setSession(data.session);
+        setSyncing(false);
+      },
+      onSyncUsers: (serverUsers) => {
+        if (serverUsers?.length > 0) {
+          setUsersState(serverUsers);
+          save('pedrra-users', serverUsers);
+        }
+        setSyncing(false);
+      },
+      onSyncCourses: (serverCourses) => {
+        if (serverCourses?.length > 0) {
+          setCoursesState(serverCourses);
+          save('pedrra-courses', serverCourses);
+        }
+      },
+    });
+    // Stop waiting after 3 seconds max (server might be cold-starting)
+    const timeout = setTimeout(() => setSyncing(false), 3000);
+    return () => { clearTimeout(timeout); Sync.disconnect(); };
+  }, [!!currentUser]);
+
   /* ─── WebSocket real-time sync (cross-device) ─── */
   // Use refs so WebSocket handlers always see latest state
   const sessionRef = useRef(session);
@@ -1388,7 +1417,16 @@ export default function App() {
           {_t('offline.banner')}
         </div>
       )}
-      {!currentUser ? (
+      {!currentUser && syncing ? (
+        <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: C.light, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 28 }}>🛡️</div>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: C.primary, margin: '0 0 8px' }}>PEDRRA</h1>
+            <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>Connecting to server...</p>
+            <div style={{ marginTop: 16, width: 32, height: 32, border: `3px solid ${C.border}`, borderTopColor: C.primary, borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+          </div>
+        </div>
+      ) : !currentUser ? (
         <LoginScreen users={users} onLogin={handleLogin} onJoinSession={handleJoinSession} installPrompt={installPrompt} onInstall={handleInstall} />
       ) : (
         <>

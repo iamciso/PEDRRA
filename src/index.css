@@ -1,3 +1,5 @@
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* ===== CSS Custom Properties ===== */
 /* EDPS brand: EU blue #003399, gold #FFCC00 */
 :root {
