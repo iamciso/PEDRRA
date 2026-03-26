@@ -338,6 +338,27 @@
           </div>
         </div>
 
+        <!-- #10 — SECTION SLIDE TEMPLATE (fullscreen) -->
+        <div v-else-if="currentSlide.type === 'section'" style="position:relative;width:100%;height:100%;background:#d0cdc8;overflow:hidden;">
+          <!-- Blue square + white circle - top left -->
+          <div style="position:absolute;top:0;left:0;width:90px;height:90px;background:var(--edps-blue,#1b4293);display:flex;align-items:center;justify-content:center;">
+            <div style="width:55px;height:55px;background:white;border-radius:50%;"></div>
+          </div>
+          <!-- Gold arc top-center -->
+          <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:180px;height:90px;background:var(--edps-gold,#dea133);border-radius:0 0 90px 90px;"></div>
+          <!-- White box top-right -->
+          <div style="position:absolute;top:0;right:0;width:35%;height:40%;background:white;opacity:0.85;"></div>
+          <!-- Main title box center-left -->
+          <div style="position:absolute;top:35%;left:8%;width:42%;padding:1.5rem 2rem;background:var(--edps-blue,#1b4293);">
+            <div style="color:white;font-weight:bold;font-size:1.6rem;line-height:1.3;">{{ currentSlide.title }}</div>
+            <div v-if="currentSlide.subtitle" style="color:rgba(255,255,255,0.8);font-size:0.95rem;margin-top:0.5rem;">{{ currentSlide.subtitle }}</div>
+          </div>
+          <!-- Gold bottom-left rectangle -->
+          <div style="position:absolute;bottom:0;left:0;width:28%;height:30%;background:var(--edps-gold,#dea133);opacity:0.85;"></div>
+          <!-- Slide number -->
+          <div style="position:absolute;bottom:1rem;right:1rem;color:var(--edps-blue,#1b4293);font-size:0.8rem;font-weight:bold;">{{ currentSlide.id }}</div>
+        </div>
+
         <!-- CONTENT / POLL / SURVEY TEMPLATES -->
         <template v-else>
           <div class="edps-header">
@@ -347,12 +368,26 @@
 
           <div class="edps-content-area" style="overflow-y: auto;">
             <div v-if="currentSlide.subtitle" style="color: var(--edps-blue); font-size: 1.4rem; font-weight: bold; margin-bottom: 2rem;">{{ currentSlide.subtitle }}</div>
-            
-            <div v-if="currentSlide.type === 'content'" style="white-space: pre-wrap;">{{ currentSlide.content }}</div>
-            <div v-if="currentSlide.image" style="margin-top: 1.5rem; text-align: center;">
-               <img :src="currentSlide.image" style="max-width: 100%; max-height: 350px; border-radius: 8px;" />
+
+            <!-- #11 — Content slide: render visual canvas elements if present -->
+            <template v-if="currentSlide.type === 'content'">
+              <template v-if="currentSlide.elements && currentSlide.elements.length">
+                <div style="position:relative;width:100%;min-height:300px;">
+                  <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden'}">
+                    <span v-if="el.kind==='text'" :style="{fontSize:el.fontSize+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',color:el.color||'#333',textAlign:el.textAlign||'left',whiteSpace:'pre-wrap',display:'block'}">{{ el.content }}</span>
+                    <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
+                    <iframe v-if="el.kind==='video'" :src="el.src" style="width:100%;height:100%;border:none;" frameborder="0" allowfullscreen></iframe>
+                  </div>
+                </div>
+              </template>
+              <template v-else>
+                <div style="white-space: pre-wrap;">{{ currentSlide.content }}</div>
+              </template>
+            </template>
+            <div v-if="currentSlide.image && !(currentSlide.elements && currentSlide.elements.length)" style="margin-top: 1.5rem; text-align: center;">
+               <img :src="resolveUrl(currentSlide.image)" style="max-width: 100%; max-height: 350px; border-radius: 8px;" />
             </div>
-            <div v-if="currentSlide.video" style="margin-top: 1.5rem; text-align: center;">
+            <div v-if="currentSlide.video && !(currentSlide.elements && currentSlide.elements.length)" style="margin-top: 1.5rem; text-align: center;">
                <iframe :src="currentSlide.video" style="width: 100%; height: 350px; border-radius: 8px; max-width: 800px;" frameborder="0" allowfullscreen></iframe>
             </div>
             
@@ -422,6 +457,7 @@
 <script>
 import { io } from 'socket.io-client';
 import { baseUrl } from '../config.js';
+import { authFetch, authHeaders } from '../auth.js';
 import SurveyResults from './SurveyResults.vue';
 import MediaManager from './MediaManager.vue';
 import SlideCanvas from './SlideCanvas.vue';
@@ -482,7 +518,8 @@ export default {
     await this.fetchSlides();
     this.fetchUsers();
 
-    this.socket = io(baseUrl);
+    // #6 — Socket auth
+    this.socket = io(baseUrl, { auth: { user: JSON.stringify(this.user) } });
     
     this.socket.on('slide:current', (id) => {
       const idx = this.slides.findIndex(s => s.id === id);
@@ -503,11 +540,12 @@ export default {
     window.addEventListener('resize', this.resizeSlide);
     window.addEventListener('keydown', this.handleKeydown);
 
-    // Clock
-    this.clockInterval = setInterval(() => {
-        const d = new Date();
-        this.currentTime = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }, 1000);
+    // #17 — Clock with immediate first tick
+    const clockTick = () => {
+        this.currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+    clockTick();
+    this.clockInterval = setInterval(clockTick, 1000);
   },
   unmounted() {
     if (this.socket) this.socket.disconnect();
@@ -590,14 +628,14 @@ export default {
     },
     async fetchUsers() {
       try {
-        const res = await fetch(`${baseUrl}/api/users`);
+        const res = await authFetch(`${baseUrl}/api/users`);
         this.usersList = await res.json();
       } catch (e) { console.error(e); }
     },
     async createUser() {
       if (!this.newUser.username || !this.newUser.password) return;
       try {
-        const res = await fetch(`${baseUrl}/api/users`, {
+        const res = await authFetch(`${baseUrl}/api/users`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.newUser)
@@ -613,7 +651,7 @@ export default {
     async deleteUser(id) {
       if(!confirm('Are you sure you want to delete this user?')) return;
       try {
-        const res = await fetch(`${baseUrl}/api/users/${id}`, { method: 'DELETE' });
+        const res = await authFetch(`${baseUrl}/api/users/${id}`, { method: 'DELETE' });
         if(res.ok) this.fetchUsers();
       } catch(e) { console.error(e); }
     },
@@ -641,10 +679,14 @@ export default {
       const slide = this.editSlides.splice(index, 1)[0];
       this.editSlides.splice(targetIndex, 0, slide);
     },
+    // #16 — openVisualEditor method
+    openVisualEditor(slide) {
+      slide._showCanvas = !slide._showCanvas;
+    },
     async saveSlides() {
       this.saveMessage = 'Saving...';
       try {
-        const res = await fetch(`${baseUrl}/api/slides`, {
+        const res = await authFetch(`${baseUrl}/api/slides`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.editSlides)
@@ -666,34 +708,41 @@ export default {
         this.socket.emit('poll:forcePublish', this.currentSlide.id);
       }
     },
+    // #9 — Clean up previous slide listeners before attaching new ones
     checkPollResults() {
+      // Clean up any previous listeners
+      if (this._prevPollSlideId) {
+        this.socket.off(`poll:results:trainer:${this._prevPollSlideId}`);
+        this.socket.off(`poll:progress:trainer:${this._prevPollSlideId}`);
+      }
       if (this.currentSlide.type === 'poll' || this.currentSlide.type === 'survey') {
         this.pollResults = [];
         this.pollProgress = { answered: 0, total: 0 };
-        
-        this.socket.off(`poll:results:trainer:${this.currentSlide.id}`);
-        this.socket.off(`poll:progress:trainer:${this.currentSlide.id}`);
-        
+        this._prevPollSlideId = this.currentSlide.id;
+
         this.socket.on(`poll:results:trainer:${this.currentSlide.id}`, (results) => {
           this.pollResults = results;
         });
-        
+
         this.socket.on(`poll:progress:trainer:${this.currentSlide.id}`, (progress) => {
           this.pollProgress = progress;
         });
-        
+
         this.socket.emit('poll:getResults', this.currentSlide.id);
+      } else {
+        this._prevPollSlideId = null;
       }
     },
     getPercentage(count) {
       if (!count || this.totalPollAnswers === 0) return 0;
       return (count / this.totalPollAnswers) * 100;
     },
+    // #12 — CSV with proper username escaping
     exportCSV() {
-        let headers = ['User', ...this.currentSlide.questions.map(q => `"${q.text.replace(/"/g, '""')}"`)];
+        let headers = ['"User"', ...this.currentSlide.questions.map(q => `"${q.text.replace(/"/g, '""')}"`)];
         let csvContent = headers.join(',') + '\n';
         this.parsedSurveyResults.forEach(r => {
-            const row = [r.username, ...this.currentSlide.questions.map((q, i) => `"${(r.answers[i] || '').toString().replace(/"/g, '""')}"`)];
+            const row = [`"${r.username.replace(/"/g, '""')}"`, ...this.currentSlide.questions.map((q, i) => `"${(r.answers[i] || '').toString().replace(/"/g, '""')}"`)];
             csvContent += row.join(',') + '\n';
         });
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -708,6 +757,10 @@ export default {
         link.href = dataStr;
         link.download = `Slide_${this.currentSlide.id}_Results.json`;
         link.click();
+    },
+    resolveUrl(url) {
+      if (!url) return '';
+      return url.startsWith('http') ? url : `${baseUrl}${url}`;
     },
     logout() {
       localStorage.removeItem('user');

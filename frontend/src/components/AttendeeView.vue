@@ -185,6 +185,7 @@ import { io } from 'socket.io-client';
 import { baseUrl } from '../config.js';
 
 const W = 1024, H = 576;
+let _prevResultsSlideId = null;
 
 export default {
   data() {
@@ -256,24 +257,31 @@ export default {
       this.slides = await r.json();
     } catch(e) { console.error(e); }
 
-    this.socket = io(baseUrl);
+    // #6 — Socket auth
+    this.socket = io(baseUrl, { auth: { user: JSON.stringify(this.user) } });
 
+    // #7 — Fix memory leak: properly clean up previous slide listeners
     this.socket.on('slide:current', (id) => {
       if (this.currentSlideId !== id) {
-        if (this.currentSlideId) this.socket.off(`poll:results:${this.currentSlideId}`);
+        if (_prevResultsSlideId) {
+          this.socket.off(`poll:results:${_prevResultsSlideId}`);
+        }
         this.surveyForm = {};
         this.publishedResults = null;
       }
       this.currentSlideId = id;
+      _prevResultsSlideId = id;
       this.socket.on(`poll:results:${id}`, rows => { this.publishedResults = rows; });
     });
 
     this.socket.on('slide:visibility', v => { this.isSlideVisible = v; });
 
+    // #8 — Fix reactivity: reassign object instead of delete
     this.socket.on('poll:reset', slideId => {
       const sid = String(slideId);
-      // Clear answered state for any key format
-      Object.keys(this.answeredPolls).forEach(k => { if (String(k) === sid) delete this.answeredPolls[k]; });
+      const newPolls = { ...this.answeredPolls };
+      Object.keys(newPolls).forEach(k => { if (String(k) === sid) delete newPolls[k]; });
+      this.answeredPolls = newPolls;
       if (String(this.currentSlideId) === sid) {
         this.publishedResults = null;
         this.surveyForm = {};
@@ -307,12 +315,12 @@ export default {
     submitPollAnswer(answer) {
       if (!this.socket || !this.currentSlide) return;
       this.socket.emit('poll:answer', { slideId: this.currentSlide.id, username: this.user.username, answer });
-      this.answeredPolls[this.currentSlide.id] = true;
+      this.answeredPolls = { ...this.answeredPolls, [this.currentSlide.id]: true };
     },
     submitSurvey() {
       if (!this.socket || !this.currentSlide) return;
       this.socket.emit('poll:answer', { slideId: this.currentSlide.id, username: this.user.username, answer: JSON.stringify(this.surveyForm) });
-      this.answeredPolls[this.currentSlide.id] = true;
+      this.answeredPolls = { ...this.answeredPolls, [this.currentSlide.id]: true };
     },
     getPct(count) {
       if (!count || !this.totalPublicAnswers) return 0;

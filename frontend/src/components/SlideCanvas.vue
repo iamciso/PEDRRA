@@ -3,8 +3,15 @@
     <!-- Toolbar -->
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;padding:0.75rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px 8px 0 0;border-bottom:none;">
       <button @click="addEl('text')" class="secondary" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;">＋ Text</button>
-      <button @click="addEl('image')" class="secondary" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;">🖼 Image URL</button>
-      <button @click="addEl('video')" class="secondary" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;">🎬 Video URL</button>
+      <button @click="showAddUrl('image')" class="secondary" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;">🖼 Image URL</button>
+      <button @click="showAddUrl('video')" class="secondary" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;">🎬 Video URL</button>
+
+      <!-- #18 — Inline URL input instead of prompt() -->
+      <template v-if="addUrlKind">
+        <input v-model="addUrlValue" :placeholder="addUrlKind === 'image' ? 'Paste image URL...' : 'Paste video embed URL...'" @keyup.enter="confirmAddUrl" @keyup.escape="cancelAddUrl" ref="addUrlInput" style="min-width:220px;padding:0.3rem 0.5rem;font-size:0.82rem;border:1px solid #cbd5e1;border-radius:4px;margin-bottom:0;" />
+        <button @click="confirmAddUrl" class="secondary" style="width:auto;padding:0.3rem 0.5rem;font-size:0.82rem;">Add</button>
+        <button @click="cancelAddUrl" class="secondary" style="width:auto;padding:0.3rem 0.5rem;font-size:0.82rem;">Cancel</button>
+      </template>
 
       <span v-if="sel" style="width:1px;height:24px;background:#cbd5e1;margin:0 0.3rem;"></span>
 
@@ -125,6 +132,8 @@ export default {
       selIdx: -1,
       editingIdx: -1,
       drag: null,
+      addUrlKind: null,
+      addUrlValue: '',
       fonts: ['Segoe UI','Arial','Georgia','Courier New','Verdana','Times New Roman','Calibri'],
     };
   },
@@ -181,21 +190,39 @@ export default {
 
     addEl(kind) {
       const id = 'el_' + Date.now();
-      let el;
-      if (kind === 'text') {
-        el = { id, kind, x: 80, y: 90, w: 500, h: 80, content: 'Double-click to edit this text', fontSize: 22, fontFamily: 'Segoe UI', bold: false, italic: false, color: '#333333', textAlign: 'left' };
-      } else if (kind === 'image') {
-        const url = prompt('Paste image URL (or path from Media Library):');
-        if (!url) return;
-        el = { id, kind, x: 200, y: 100, w: 350, h: 250, src: url };
-      } else {
-        const url = prompt('Paste video embed URL (YouTube embed or direct mp4):');
-        if (!url) return;
-        el = { id, kind, x: 150, y: 100, w: 500, h: 300, src: url };
-      }
+      const el = { id, kind, x: 80, y: 90, w: 500, h: 80, content: 'Double-click to edit this text', fontSize: 22, fontFamily: 'Segoe UI', bold: false, italic: false, color: '#333333', textAlign: 'left' };
       this.localEls.push(el);
       this.selIdx = this.localEls.length - 1;
       this.emit();
+    },
+    // #18 — Inline URL input methods
+    showAddUrl(kind) {
+      this.addUrlKind = kind;
+      this.addUrlValue = '';
+      this.$nextTick(() => {
+        const input = this.$refs.addUrlInput;
+        if (input) (Array.isArray(input) ? input[0] : input).focus();
+      });
+    },
+    confirmAddUrl() {
+      const url = this.addUrlValue.trim();
+      if (!url) { this.cancelAddUrl(); return; }
+      const id = 'el_' + Date.now();
+      let el;
+      if (this.addUrlKind === 'image') {
+        el = { id, kind: 'image', x: 200, y: 100, w: 350, h: 250, src: url };
+      } else {
+        el = { id, kind: 'video', x: 150, y: 100, w: 500, h: 300, src: url };
+      }
+      this.localEls.push(el);
+      this.selIdx = this.localEls.length - 1;
+      this.addUrlKind = null;
+      this.addUrlValue = '';
+      this.emit();
+    },
+    cancelAddUrl() {
+      this.addUrlKind = null;
+      this.addUrlValue = '';
     },
 
     deleteSelected() {

@@ -49,6 +49,7 @@
 
 <script>
 import { baseUrl } from '../config.js';
+import { authFetch, authHeaders } from '../auth.js';
 
 export default {
   data() {
@@ -67,7 +68,7 @@ export default {
     isImage(filename) { return /\.(png|jpe?g|gif|webp|svg)$/i.test(filename); },
     async fetchFiles() {
       try {
-        const res = await fetch(`${baseUrl}/api/uploads`);
+        const res = await authFetch(`${baseUrl}/api/uploads`);
         this.files = await res.json();
       } catch(e) { console.error(e); }
     },
@@ -85,7 +86,7 @@ export default {
         const fd = new FormData();
         fd.append('file', file);
         try {
-          await fetch(`${baseUrl}/api/upload`, { method: 'POST', body: fd });
+          await authFetch(`${baseUrl}/api/upload`, { method: 'POST', body: fd });
           count++;
         } catch(e) { console.error(e); }
       }
@@ -97,7 +98,7 @@ export default {
     async deleteFile(file) {
       if (!confirm(`Delete ${file.filename}?`)) return;
       try {
-        await fetch(`${baseUrl}/api/uploads/${encodeURIComponent(file.filename)}`, { method: 'DELETE' });
+        await authFetch(`${baseUrl}/api/uploads/${encodeURIComponent(file.filename)}`, { method: 'DELETE' });
         this.fetchFiles();
       } catch(e) { console.error(e); }
     },

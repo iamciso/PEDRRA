@@ -72,6 +72,7 @@
 
 <script>
 import { baseUrl } from '../config.js';
+import { authFetch } from '../auth.js';
 
 export default {
   props: ['slides'],
@@ -87,7 +88,7 @@ export default {
   methods: {
     async fetchAll() {
       try {
-        const res = await fetch(`${baseUrl}/api/surveys/results`);
+        const res = await authFetch(`${baseUrl}/api/surveys/results`);
         this.allAnswers = await res.json();
       } catch (e) { console.error(e); }
     },
@@ -112,14 +113,14 @@ export default {
     async resetUserVote(slideId, username) {
       if (!confirm(`Reset vote for ${username} on slide ${slideId}?`)) return;
       try {
-        await fetch(`${baseUrl}/api/answers/${slideId}/${encodeURIComponent(username)}`, { method: 'DELETE' });
+        await authFetch(`${baseUrl}/api/answers/${slideId}/${encodeURIComponent(username)}`, { method: 'DELETE' });
         this.fetchAll();
       } catch(e) { console.error(e); }
     },
     async resetSlideVotes(slideId) {
       if (!confirm('Reset ALL votes for this slide?')) return;
       try {
-        await fetch(`${baseUrl}/api/answers/${slideId}`, { method: 'DELETE' });
+        await authFetch(`${baseUrl}/api/answers/${slideId}`, { method: 'DELETE' });
         this.fetchAll();
       } catch(e) { console.error(e); }
     },
