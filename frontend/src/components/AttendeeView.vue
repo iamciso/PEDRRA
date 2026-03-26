@@ -113,13 +113,17 @@
               <div v-for="el in currentSlide.elements" :key="el.id" :style="elStyle(el)">
                 <span v-if="el.kind==='text'" :style="textStyle(el)">{{ el.content }}</span>
                 <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
-                <iframe v-if="el.kind==='video'" :src="el.src" style="width:100%;height:100%;border:none;" frameborder="0" allowfullscreen></iframe>
+                <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
+                <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
               </div>
             </template>
             <template v-else>
               <div style="white-space:pre-wrap;line-height:1.8;font-size:1.05rem;color:#333;">{{ currentSlide.content }}</div>
               <div v-if="currentSlide.image" style="margin-top:1rem;text-align:center;"><img :src="resolveUrl(currentSlide.image)" style="max-width:100%;max-height:270px;border-radius:6px;" /></div>
-              <div v-if="currentSlide.video" style="margin-top:1rem;"><iframe :src="currentSlide.video" style="width:100%;height:260px;border-radius:6px;border:none;" frameborder="0" allowfullscreen></iframe></div>
+              <div v-if="currentSlide.video" style="margin-top:1rem;">
+                <video v-if="isLocalVideoCheck(currentSlide.video)" :src="resolveUrl(currentSlide.video)" controls style="width:100%;max-height:260px;border-radius:6px;"></video>
+                <iframe v-else :src="toEmbedUrlCheck(currentSlide.video)" style="width:100%;height:260px;border-radius:6px;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+              </div>
             </template>
           </template>
 
@@ -194,6 +198,7 @@
 <script>
 import { io } from 'socket.io-client';
 import { baseUrl } from '../config.js';
+import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 
 const W = 1024, H = 576;
 let _prevResultsSlideId = null;
@@ -335,6 +340,8 @@ export default {
       if (!url) return '';
       return url.startsWith('http') ? url : `${baseUrl}${url}`;
     },
+    toEmbedUrlCheck(url) { return toEmbedUrl(url); },
+    isLocalVideoCheck(url) { return isLocalVideo(url); },
     elStyle(el) {
       return { position: 'absolute', left: el.x + 'px', top: el.y + 'px', width: el.w + 'px', height: el.h + 'px', overflow: 'hidden' };
     },

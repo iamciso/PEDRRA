@@ -3,12 +3,36 @@
     <!-- Toolbar -->
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;padding:0.75rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px 8px 0 0;border-bottom:none;">
       <button @click="addEl('text')" class="secondary" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;">＋ Text</button>
-      <button @click="showAddUrl('image')" class="secondary" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;">🖼 Image URL</button>
-      <button @click="showAddUrl('video')" class="secondary" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;">🎬 Video URL</button>
 
-      <!-- #18 — Inline URL input instead of prompt() -->
+      <!-- Image dropdown -->
+      <div style="position:relative;" ref="imageMenuRef">
+        <button @click="showImageMenu=!showImageMenu; showVideoMenu=false" class="secondary" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;">🖼 Image ▾</button>
+        <div v-if="showImageMenu" style="position:absolute;top:100%;left:0;z-index:200;background:white;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:170px;margin-top:4px;">
+          <button @click="showAddUrl('image'); showImageMenu=false" style="display:block;width:100%;text-align:left;padding:0.5rem 0.75rem;border:none;background:none;cursor:pointer;font-size:0.85rem;color:#334155;" @mouseenter="$event.target.style.background='#f1f5f9'" @mouseleave="$event.target.style.background='none'">🔗 Paste URL</button>
+          <button @click="triggerUpload('image'); showImageMenu=false" style="display:block;width:100%;text-align:left;padding:0.5rem 0.75rem;border:none;background:none;cursor:pointer;font-size:0.85rem;color:#334155;" @mouseenter="$event.target.style.background='#f1f5f9'" @mouseleave="$event.target.style.background='none'">📤 Upload File</button>
+          <button @click="openMediaPicker('image'); showImageMenu=false" style="display:block;width:100%;text-align:left;padding:0.5rem 0.75rem;border:none;background:none;cursor:pointer;font-size:0.85rem;color:#334155;" @mouseenter="$event.target.style.background='#f1f5f9'" @mouseleave="$event.target.style.background='none'">📂 Browse Library</button>
+        </div>
+      </div>
+
+      <!-- Video dropdown -->
+      <div style="position:relative;" ref="videoMenuRef">
+        <button @click="showVideoMenu=!showVideoMenu; showImageMenu=false" class="secondary" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;">🎬 Video ▾</button>
+        <div v-if="showVideoMenu" style="position:absolute;top:100%;left:0;z-index:200;background:white;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:170px;margin-top:4px;">
+          <button @click="showAddUrl('video'); showVideoMenu=false" style="display:block;width:100%;text-align:left;padding:0.5rem 0.75rem;border:none;background:none;cursor:pointer;font-size:0.85rem;color:#334155;" @mouseenter="$event.target.style.background='#f1f5f9'" @mouseleave="$event.target.style.background='none'">🔗 Paste URL</button>
+          <button @click="triggerUpload('video'); showVideoMenu=false" style="display:block;width:100%;text-align:left;padding:0.5rem 0.75rem;border:none;background:none;cursor:pointer;font-size:0.85rem;color:#334155;" @mouseenter="$event.target.style.background='#f1f5f9'" @mouseleave="$event.target.style.background='none'">📤 Upload File</button>
+          <button @click="openMediaPicker('video'); showVideoMenu=false" style="display:block;width:100%;text-align:left;padding:0.5rem 0.75rem;border:none;background:none;cursor:pointer;font-size:0.85rem;color:#334155;" @mouseenter="$event.target.style.background='#f1f5f9'" @mouseleave="$event.target.style.background='none'">📂 Browse Library</button>
+        </div>
+      </div>
+
+      <!-- Hidden file input for uploads -->
+      <input type="file" ref="fileInput" :accept="uploadKind==='image' ? 'image/png,image/jpeg,image/gif,image/webp' : 'video/mp4,video/webm'" style="display:none;" @change="onFileUpload" />
+
+      <!-- Upload progress -->
+      <span v-if="uploading" style="font-size:0.8rem;color:#64748b;">⏳ Uploading...</span>
+
+      <!-- Inline URL input -->
       <template v-if="addUrlKind">
-        <input v-model="addUrlValue" :placeholder="addUrlKind === 'image' ? 'Paste image URL...' : 'Paste video embed URL...'" @keyup.enter="confirmAddUrl" @keyup.escape="cancelAddUrl" ref="addUrlInput" style="min-width:220px;padding:0.3rem 0.5rem;font-size:0.82rem;border:1px solid #cbd5e1;border-radius:4px;margin-bottom:0;" />
+        <input v-model="addUrlValue" :placeholder="addUrlKind === 'image' ? 'Paste image URL...' : 'Paste YouTube or video URL...'" @keyup.enter="confirmAddUrl" @keyup.escape="cancelAddUrl" ref="addUrlInput" style="min-width:220px;padding:0.3rem 0.5rem;font-size:0.82rem;border:1px solid #cbd5e1;border-radius:4px;margin-bottom:0;" />
         <button @click="confirmAddUrl" class="secondary" style="width:auto;padding:0.3rem 0.5rem;font-size:0.82rem;">Add</button>
         <button @click="cancelAddUrl" class="secondary" style="width:auto;padding:0.3rem 0.5rem;font-size:0.82rem;">Cancel</button>
       </template>
@@ -39,7 +63,7 @@
       <button v-if="selIdx>=0" @click="deselect" class="secondary" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;">✕ Deselect</button>
     </div>
 
-    <!-- Canvas wrapper — clip overflow, show scrollbars if needed -->
+    <!-- Canvas wrapper -->
     <div style="overflow:auto;border:1px solid #e2e8f0;border-radius:0 0 8px 8px;background:#888;display:flex;align-items:center;justify-content:center;min-height:380px;">
       <div :style="canvasWrapStyle">
         <div ref="canvas"
@@ -67,7 +91,7 @@
             :style="elStyle(el, idx)"
             @mousedown.stop="startDrag(idx, $event)"
           >
-            <!-- Text: show normally, overlay textarea on double-click -->
+            <!-- Text -->
             <div
               v-if="el.kind==='text'"
               @dblclick.stop="startEdit(idx)"
@@ -86,21 +110,19 @@
             ></textarea>
 
             <!-- Image -->
-            <img v-if="el.kind==='image'" :src="el.src" style="width:100%;height:100%;object-fit:contain;pointer-events:none;" />
+            <img v-if="el.kind==='image'" :src="resolveElUrl(el.src)" style="width:100%;height:100%;object-fit:contain;pointer-events:none;" />
 
-            <!-- Video -->
-            <iframe v-if="el.kind==='video'" :src="el.src" style="width:100%;height:100%;border:none;pointer-events:none;" frameborder="0"></iframe>
+            <!-- Video: local file → <video>, external/YouTube → <iframe> -->
+            <video v-if="el.kind==='video' && isLocalVideo(el.src)" :src="resolveElUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;pointer-events:none;"></video>
+            <iframe v-else-if="el.kind==='video'" :src="toEmbedUrl(el.src)" style="width:100%;height:100%;border:none;pointer-events:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
             <!-- Selection handles -->
             <template v-if="selIdx===idx">
               <div style="position:absolute;inset:-2px;border:2px solid #1b4293;pointer-events:none;"></div>
-              <!-- Resize handle SE -->
               <div style="position:absolute;right:-5px;bottom:-5px;width:12px;height:12px;background:#1b4293;border-radius:50%;cursor:se-resize;z-index:10;"
                 @mousedown.stop="startResize(idx, $event,'se')"></div>
-              <!-- Resize handle E -->
               <div style="position:absolute;top:50%;right:-5px;width:10px;height:10px;background:#4a90d9;border-radius:50%;transform:translateY(-50%);cursor:e-resize;z-index:10;"
                 @mousedown.stop="startResize(idx, $event,'e')"></div>
-              <!-- Resize handle S -->
               <div style="position:absolute;bottom:-5px;left:50%;width:10px;height:10px;background:#4a90d9;border-radius:50%;transform:translateX(-50%);cursor:s-resize;z-index:10;"
                 @mousedown.stop="startResize(idx, $event,'s')"></div>
             </template>
@@ -112,12 +134,21 @@
     <div style="margin-top:0.5rem;font-size:0.78rem;color:#94a3b8;text-align:center;">
       Click to select · Drag to move · Double-click text to edit · Drag handles to resize
     </div>
+
+    <!-- Media Picker Modal -->
+    <MediaPicker v-if="showMediaPicker" :filter="mediaPickerFilter" @select="onMediaPicked" @close="showMediaPicker=false" />
   </div>
 </template>
 
 <script>
+import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
+import { authFetch } from '../auth.js';
+import { baseUrl } from '../config.js';
+import MediaPicker from './MediaPicker.vue';
+
 export default {
   name: 'SlideCanvas',
+  components: { MediaPicker },
   props: {
     modelValue: { type: Array, default: () => [] },
     slideTitle: { type: String, default: '' },
@@ -135,6 +166,12 @@ export default {
       addUrlKind: null,
       addUrlValue: '',
       fonts: ['Segoe UI','Arial','Georgia','Courier New','Verdana','Times New Roman','Calibri'],
+      showImageMenu: false,
+      showVideoMenu: false,
+      uploadKind: null,
+      uploading: false,
+      showMediaPicker: false,
+      mediaPickerFilter: 'all',
     };
   },
   computed: {
@@ -153,12 +190,27 @@ export default {
     window.addEventListener('mouseup', this.stopDrag);
     this.fitScale();
     window.addEventListener('resize', this.fitScale);
+    document.addEventListener('click', this.closeMenus);
   },
   beforeUnmount() {
     window.removeEventListener('mouseup', this.stopDrag);
     window.removeEventListener('resize', this.fitScale);
+    document.removeEventListener('click', this.closeMenus);
   },
   methods: {
+    toEmbedUrl,
+    isLocalVideo,
+
+    resolveElUrl(url) {
+      if (!url) return '';
+      return url.startsWith('http') ? url : `${baseUrl}${url}`;
+    },
+
+    closeMenus(e) {
+      if (this.$refs.imageMenuRef && !this.$refs.imageMenuRef.contains(e.target)) this.showImageMenu = false;
+      if (this.$refs.videoMenuRef && !this.$refs.videoMenuRef.contains(e.target)) this.showVideoMenu = false;
+    },
+
     fitScale() {
       const panel = this.$el.parentElement;
       if (!panel) return;
@@ -195,7 +247,7 @@ export default {
       this.selIdx = this.localEls.length - 1;
       this.emit();
     },
-    // #18 — Inline URL input methods
+
     showAddUrl(kind) {
       this.addUrlKind = kind;
       this.addUrlValue = '';
@@ -223,6 +275,60 @@ export default {
     cancelAddUrl() {
       this.addUrlKind = null;
       this.addUrlValue = '';
+    },
+
+    // File upload from canvas
+    triggerUpload(kind) {
+      this.uploadKind = kind;
+      this.$nextTick(() => {
+        this.$refs.fileInput.value = '';
+        this.$refs.fileInput.click();
+      });
+    },
+    async onFileUpload(e) {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      this.uploading = true;
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await authFetch(`${baseUrl}/api/upload`, { method: 'POST', body: fd });
+        if (!res.ok) throw new Error('Upload failed');
+        const data = await res.json();
+        const id = 'el_' + Date.now();
+        let el;
+        if (this.uploadKind === 'image') {
+          el = { id, kind: 'image', x: 200, y: 100, w: 350, h: 250, src: data.url };
+        } else {
+          el = { id, kind: 'video', x: 150, y: 100, w: 500, h: 300, src: data.url };
+        }
+        this.localEls.push(el);
+        this.selIdx = this.localEls.length - 1;
+        this.emit();
+      } catch (err) {
+        alert('Upload failed: ' + err.message);
+      } finally {
+        this.uploading = false;
+      }
+    },
+
+    // Media picker
+    openMediaPicker(filter) {
+      this.mediaPickerFilter = filter;
+      this.showMediaPicker = true;
+    },
+    onMediaPicked({ url, kind }) {
+      const id = 'el_' + Date.now();
+      let el;
+      if (kind === 'image') {
+        el = { id, kind: 'image', x: 200, y: 100, w: 350, h: 250, src: url };
+      } else {
+        el = { id, kind: 'video', x: 150, y: 100, w: 500, h: 300, src: url };
+      }
+      this.localEls.push(el);
+      this.selIdx = this.localEls.length - 1;
+      this.showMediaPicker = false;
+      this.emit();
     },
 
     deleteSelected() {

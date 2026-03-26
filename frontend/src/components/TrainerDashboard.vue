@@ -43,7 +43,8 @@
                  <img :src="currentSlide.image" style="max-width: 100%; max-height: 300px; border-radius: 4px;" />
              </div>
              <div v-if="currentSlide.video" style="margin-top: 1rem; text-align: center;">
-                 <iframe :src="currentSlide.video" style="width: 100%; height: 350px; border-radius: 8px;" frameborder="0" allowfullscreen></iframe>
+                 <video v-if="isLocalVideoCheck(currentSlide.video)" :src="resolveUrl(currentSlide.video)" controls style="width: 100%; max-height: 350px; border-radius: 8px;"></video>
+                 <iframe v-else :src="toEmbedUrlCheck(currentSlide.video)" style="width: 100%; height: 350px; border-radius: 8px;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
              </div>
           </div>
 
@@ -360,7 +361,8 @@
                <img :src="currentSlide.image" style="max-width: 100%; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" />
           </div>
           <div v-if="currentSlide.video" style="position:absolute; bottom: 100px; right: 5%; width: 400px; height: 225px; z-index: 5;">
-               <iframe :src="currentSlide.video" style="width: 100%; height: 100%; border-radius: 8px;" frameborder="0" allowfullscreen></iframe>
+               <video v-if="isLocalVideoCheck(currentSlide.video)" :src="resolveUrl(currentSlide.video)" controls style="width: 100%; height: 100%; border-radius: 8px;"></video>
+               <iframe v-else :src="toEmbedUrlCheck(currentSlide.video)" style="width: 100%; height: 100%; border-radius: 8px;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
           </div>
           <div class="edps-title-bottom">
              <div style="width: 35%;"></div>
@@ -408,7 +410,8 @@
                   <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden'}">
                     <span v-if="el.kind==='text'" :style="{fontSize:el.fontSize+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',color:el.color||'#333',textAlign:el.textAlign||'left',whiteSpace:'pre-wrap',display:'block'}">{{ el.content }}</span>
                     <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
-                    <iframe v-if="el.kind==='video'" :src="el.src" style="width:100%;height:100%;border:none;" frameborder="0" allowfullscreen></iframe>
+                    <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
+                    <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
                   </div>
                 </div>
               </template>
@@ -420,7 +423,8 @@
                <img :src="resolveUrl(currentSlide.image)" style="max-width: 100%; max-height: 350px; border-radius: 8px;" />
             </div>
             <div v-if="currentSlide.video && !(currentSlide.elements && currentSlide.elements.length)" style="margin-top: 1.5rem; text-align: center;">
-               <iframe :src="currentSlide.video" style="width: 100%; height: 350px; border-radius: 8px; max-width: 800px;" frameborder="0" allowfullscreen></iframe>
+               <video v-if="isLocalVideoCheck(currentSlide.video)" :src="resolveUrl(currentSlide.video)" controls style="width: 100%; max-height: 350px; border-radius: 8px; max-width: 800px;"></video>
+               <iframe v-else :src="toEmbedUrlCheck(currentSlide.video)" style="width: 100%; height: 350px; border-radius: 8px; max-width: 800px;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
             </div>
             
             <!-- Live Poll Tracker -->
@@ -498,6 +502,7 @@
 import { io } from 'socket.io-client';
 import { baseUrl } from '../config.js';
 import { authFetch, authHeaders } from '../auth.js';
+import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 import SurveyResults from './SurveyResults.vue';
 import MediaManager from './MediaManager.vue';
 import SlideCanvas from './SlideCanvas.vue';
@@ -830,6 +835,12 @@ export default {
     resolveUrl(url) {
       if (!url) return '';
       return url.startsWith('http') ? url : `${baseUrl}${url}`;
+    },
+    toEmbedUrlCheck(url) {
+      return toEmbedUrl(url);
+    },
+    isLocalVideoCheck(url) {
+      return isLocalVideo(url);
     },
     // Timer methods
     startTimer() {
