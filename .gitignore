@@ -5,3 +5,4 @@ pedrra.sqlite
 uploads/
 .env
 state.json
+*.bak

@@ -66,13 +66,21 @@ const upload = multer({
 // Separate upload for PPTX only (no MIME filter — browsers are inconsistent)
 const uploadPptx = multer({ storage, limits: { fileSize: 100 * 1024 * 1024 } });
 
-// Load content
+// Load content (with backup on startup)
 const contentFilePath = path.join(__dirname, 'content.json');
 let presentationData = { slides: [] };
 try {
     presentationData = JSON.parse(fs.readFileSync(contentFilePath, 'utf8'));
+    // Create backup on successful load
+    try { fs.writeFileSync(contentFilePath + '.bak', JSON.stringify(presentationData, null, 2)); } catch (e) { /* ignore */ }
+    console.log(`Loaded ${presentationData.slides?.length || 0} slides from content.json`);
 } catch (e) {
-    console.error("Could not load content.json");
+    console.error("Could not load content.json — starting with empty slides");
+    // Try to restore from backup
+    try {
+        presentationData = JSON.parse(fs.readFileSync(contentFilePath + '.bak', 'utf8'));
+        console.log(`Restored ${presentationData.slides?.length || 0} slides from backup`);
+    } catch (e2) { /* no backup available */ }
 }
 
 // #3 — Persist presentation state across server restarts
@@ -115,14 +123,22 @@ function authMiddleware(requiredRole) {
     };
 }
 
-// #15 — Rate limiting on login
+// Rate limiting
 const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 20, // max 20 attempts per window
+    windowMs: 15 * 60 * 1000,
+    max: 20,
     message: { error: 'Too many login attempts, please try again later.' },
     standardHeaders: true,
     legacyHeaders: false,
 });
+const apiLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    message: { error: 'Too many requests, please slow down.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+app.use('/api/', apiLimiter);
 
 // ============ REST API ============
 

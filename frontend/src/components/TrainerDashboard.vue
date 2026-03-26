@@ -1384,6 +1384,7 @@ export default {
     },
     async saveSlides() {
       this.saveMessage = 'Saving...';
+      const backup = JSON.parse(JSON.stringify(this.editSlides));
       try {
         const res = await authFetch(`${baseUrl}/api/slides`, {
           method: 'POST',
@@ -1400,7 +1401,11 @@ export default {
         this.saveMessage = 'Successfully saved!';
         this.hasUnsavedChanges = false;
         setTimeout(() => this.saveMessage = '', 3000);
-      } catch (e) { this.saveMessage = ''; this.showError('Error saving changes: ' + e.message); }
+      } catch (e) {
+        this.saveMessage = '';
+        this.editSlides = backup;
+        this.showError('Error saving changes: ' + e.message);
+      }
     },
     prevSlide() { if (this.currentIndex > 0) this.currentIndex--; },
     nextSlide() { if (this.currentIndex < this.slides.length - 1) this.currentIndex++; },
