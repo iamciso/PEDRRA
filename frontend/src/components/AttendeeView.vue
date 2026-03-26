@@ -199,6 +199,17 @@
           </template>
         </div>
 
+        <!-- Inline rating (when enabled on this slide) -->
+        <div v-if="currentSlide.ratingEnabled" style="position:absolute;bottom:42px;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:0.3rem;padding:0.3rem;background:rgba(255,255,255,0.9);z-index:5;">
+          <template v-if="answeredPolls['rating_'+currentSlide.id]">
+            <span style="font-size:0.8rem;color:#10b981;font-weight:bold;">✅ Rated!</span>
+          </template>
+          <template v-else>
+            <span style="font-size:0.7rem;color:#64748b;margin-right:0.3rem;">Rate:</span>
+            <button v-for="(emoji, i) in ['😡','😕','😐','🙂','😍']" :key="i" @click="submitRating(i+1)" style="font-size:1.3rem;background:none;border:1px solid #e2e8f0;border-radius:6px;padding:0.2rem 0.4rem;cursor:pointer;transition:transform 0.15s;" @mouseenter="$event.target.style.transform='scale(1.2)'" @mouseleave="$event.target.style.transform='scale(1)'">{{ emoji }}</button>
+          </template>
+        </div>
+
         <!-- Bottom bar with decorations -->
         <div style="position:absolute;bottom:0;left:0;right:0;height:38px;background:#e6e6e6;flex-shrink:0;"></div>
         <div class="edps-corner-graphics">
@@ -410,6 +421,12 @@ export default {
     getPct(count) {
       if (!count || !this.totalPublicAnswers) return 0;
       return (count / this.totalPublicAnswers) * 100;
+    },
+    submitRating(value) {
+      if (!this.socket || !this.currentSlide) return;
+      const ratingKey = 'rating_' + this.currentSlide.id;
+      this.socket.emit('poll:answer', { slideId: ratingKey, username: this.user.username, answer: String(value) });
+      this.answeredPolls = { ...this.answeredPolls, [ratingKey]: true };
     },
     sendReaction(emoji) {
       if (this.socket) this.socket.emit('reaction:send', emoji);

@@ -327,8 +327,17 @@
           <input v-model="slide.subtitle" placeholder="Subtitle (Optional)" />
         </template>
 
+        <!-- Rating toggle (all slide types) -->
+        <div style="margin-top:0.75rem;display:flex;align-items:center;gap:0.75rem;">
+          <label style="font-size:0.85rem;color:#64748b;cursor:pointer;display:flex;align-items:center;gap:0.4rem;">
+            <input type="checkbox" v-model="slide.ratingEnabled" style="width:16px;height:16px;margin:0;" />
+            😀 Enable rating on this slide
+          </label>
+          <span v-if="slide.ratingEnabled" style="font-size:0.75rem;color:#94a3b8;">Attendees will see: 😡😕😐🙂😍</span>
+        </div>
+
         <!-- Speaker Notes (all slide types) -->
-        <details style="margin-top: 1rem;">
+        <details style="margin-top: 0.75rem;">
           <summary style="cursor:pointer;font-size:0.85rem;color:#64748b;font-weight:bold;">📝 Speaker Notes</summary>
           <textarea v-model="slide.notes" placeholder="Private notes for the presenter (not visible to attendees)..." rows="2" style="margin-top:0.5rem;font-size:0.85rem;background:#fffef5;border-color:#e2e0c8;"></textarea>
         </details>
