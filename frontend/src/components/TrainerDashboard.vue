@@ -544,8 +544,8 @@
     </div>
 
     <!-- Modals -->
-    <SpinningWheel :visible="showWheel" :attendees="wheelAttendees" @close="showWheel=false; socket && socket.emit('overlay:hide')" @result="onWheelResult" />
-    <Leaderboard :visible="showLeaderboard" :entries="leaderboardEntries" @close="showLeaderboard=false; socket && socket.emit('overlay:hide')" />
+    <SpinningWheel :visible="showWheel" :attendees="wheelAttendees" @close="showWheel=false" @result="onWheelResult" />
+    <Leaderboard :visible="showLeaderboard" :entries="leaderboardEntries" @close="showLeaderboard=false" />
   </div>
 
   <!-- FULLSCREEN TRAINER VIEW (MIRRORS ATTENDEE EXACTLY) -->
@@ -737,6 +737,67 @@
     <div v-if="currentSlide.notes" style="position:absolute;bottom:3rem;left:1rem;right:50%;background:rgba(0,0,0,0.7);color:#e2e8f0;padding:0.75rem 1rem;border-radius:6px;font-size:0.85rem;z-index:100;max-height:120px;overflow-y:auto;line-height:1.4;">
       📝 {{ currentSlide.notes }}
     </div>
+    <!-- ═══ FULLSCREEN OVERLAYS (only trainer sees, projected to students) ═══ -->
+
+    <!-- Spinning Wheel overlay (fullscreen) -->
+    <div v-if="showWheel && isFullscreen" class="pres-overlay" @click.self="showWheel=false">
+      <div style="text-align:center;">
+        <div style="position:relative;width:400px;height:400px;margin:0 auto;">
+          <div :style="{width:'100%',height:'100%',borderRadius:'50%',border:'6px solid white',overflow:'hidden',transition:wheelSpinState?'transform 4s cubic-bezier(0.17,0.67,0.12,0.99)':'none',transform:'rotate('+fullscreenWheelRotation+'deg)',boxShadow:'0 0 50px rgba(0,0,0,0.5)'}">
+            <div v-for="(att, i) in wheelAttendees" :key="i" :style="fsWedgeStyle(i)" style="display:flex;align-items:center;justify-content:center;overflow:hidden;">
+              <span :style="{transform:'rotate('+(90+360/Math.max(wheelAttendees.length,1)/2)+'deg)',display:'block',fontSize:wheelAttendees.length>10?'0.6rem':'0.8rem',fontWeight:'bold',color:'white',textShadow:'1px 1px 3px rgba(0,0,0,0.6)',maxWidth:'70px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}">{{ att.display_name || att.username }}</span>
+            </div>
+          </div>
+          <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:18px solid transparent;border-right:18px solid transparent;border-top:32px solid #e11d48;z-index:10;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.4));"></div>
+        </div>
+        <div v-if="fullscreenWheelWinner" style="margin-top:2rem;padding:1.2rem 2.5rem;background:rgba(255,255,255,0.95);border-radius:20px;display:inline-flex;align-items:center;gap:1.2rem;animation:podiumRise 0.5s ease-out;">
+          <span style="font-size:3rem;">🎉</span>
+          <img v-if="fullscreenWheelWinner.avatar" :src="resolveUrl(fullscreenWheelWinner.avatar)" style="width:70px;height:70px;border-radius:50%;object-fit:cover;border:3px solid var(--edps-gold);" />
+          <span style="font-size:2.2rem;font-weight:bold;color:var(--edps-blue);">{{ fullscreenWheelWinner.display_name || fullscreenWheelWinner.username }}</span>
+          <span style="font-size:3rem;">🎉</span>
+        </div>
+        <div style="margin-top:1.5rem;display:flex;gap:0.8rem;justify-content:center;">
+          <button @click.stop="spinFullscreenWheel" :disabled="wheelSpinState || wheelAttendees.length < 2" style="padding:0.8rem 2.5rem;font-size:1.1rem;border-radius:30px;">🎡 Spin!</button>
+          <button @click.stop="showWheel=false" class="secondary" style="width:auto;padding:0.8rem 1.5rem;border-radius:30px;">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leaderboard overlay (fullscreen) -->
+    <div v-if="showLeaderboard && isFullscreen" class="pres-overlay" @click.self="showLeaderboard=false">
+      <div style="background:white;border-radius:24px;padding:2.5rem;width:85%;max-width:600px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+        <h2 style="margin:0 0 1.5rem;text-align:center;color:var(--edps-blue);font-size:2.2rem;">🏆 Leaderboard</h2>
+        <div v-if="leaderboardEntries.length >= 1" class="podium-container">
+          <div v-if="leaderboardEntries[1]" class="podium-place silver"><div class="podium-rank">🥈</div><img v-if="leaderboardEntries[1].avatar" :src="resolveUrl(leaderboardEntries[1].avatar)" class="podium-avatar" /><div class="podium-name">{{ leaderboardEntries[1].display_name || leaderboardEntries[1].username }}</div><div class="podium-points">{{ leaderboardEntries[1].total_points || 0 }} pts</div></div>
+          <div class="podium-place gold"><div class="podium-rank">🥇</div><img v-if="leaderboardEntries[0].avatar" :src="resolveUrl(leaderboardEntries[0].avatar)" class="podium-avatar" /><div class="podium-name">{{ leaderboardEntries[0].display_name || leaderboardEntries[0].username }}</div><div class="podium-points">{{ leaderboardEntries[0].total_points || 0 }} pts</div></div>
+          <div v-if="leaderboardEntries[2]" class="podium-place bronze"><div class="podium-rank">🥉</div><img v-if="leaderboardEntries[2].avatar" :src="resolveUrl(leaderboardEntries[2].avatar)" class="podium-avatar" /><div class="podium-name">{{ leaderboardEntries[2].display_name || leaderboardEntries[2].username }}</div><div class="podium-points">{{ leaderboardEntries[2].total_points || 0 }} pts</div></div>
+        </div>
+        <div v-for="(e, i) in leaderboardEntries.slice(3)" :key="e.username" style="display:flex;align-items:center;gap:1rem;padding:0.6rem 1rem;margin-bottom:0.4rem;background:#f8fafc;border-radius:8px;">
+          <span style="width:28px;text-align:center;font-weight:bold;color:#94a3b8;font-size:1.1rem;">{{ i+4 }}</span>
+          <span style="flex:1;font-weight:600;font-size:1.05rem;">{{ e.display_name || e.username }}</span>
+          <span style="font-weight:bold;color:var(--edps-blue);font-size:1.1rem;">{{ e.total_points || 0 }}</span>
+        </div>
+        <div style="text-align:center;margin-top:1.5rem;">
+          <button @click.stop="showLeaderboard=false" class="secondary" style="width:auto;padding:0.7rem 2rem;border-radius:20px;">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- QR Code sidebar overlay (fullscreen) -->
+    <div v-if="showQR && isFullscreen" class="qr-overlay" @click.self="showQR=false">
+      <div style="font-size:1.5rem;font-weight:bold;color:var(--edps-blue);margin-bottom:1.5rem;">📱 Join the Session</div>
+      <img v-if="qrCodeUrl" :src="qrCodeUrl" style="width:300px;height:300px;border:3px solid #e2e8f0;border-radius:16px;" />
+      <div v-if="sessionCode" style="margin-top:1.5rem;font-size:3rem;font-weight:900;color:var(--edps-blue);letter-spacing:10px;">{{ sessionCode }}</div>
+      <div style="margin-top:0.8rem;color:#94a3b8;font-size:1rem;">Scan QR code or enter PIN above</div>
+      <button @click.stop="showQR=false" class="secondary" style="margin-top:1.5rem;width:auto;padding:0.6rem 1.5rem;border-radius:20px;">Close</button>
+    </div>
+
+    <!-- Hand raise flying notifications (fullscreen) -->
+    <div v-for="hn in fullscreenHandNotifs" :key="hn.id" class="hand-notification">
+      <div class="hand-emoji">✋</div>
+      <div class="hand-name">{{ hn.name }}</div>
+    </div>
+
     <!-- Instructor Help overlay for fullscreen -->
     <div style="position: absolute; bottom: 1rem; left: 1rem; color: #94a3b8; font-size: 0.8rem; z-index: 100; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">
       LEFT/RIGHT to navigate · ESC to exit
@@ -795,6 +856,10 @@ export default {
       autoSaveLabel: '',
       hasUnsavedChanges: false,
       showQR: false,
+      fullscreenWheelRotation: 0,
+      wheelSpinState: false,
+      fullscreenWheelWinner: null,
+      fullscreenHandNotifs: [],
       showTemplateMenu: false,
       showWheel: false,
       showLeaderboard: false,
@@ -934,7 +999,15 @@ export default {
     this.socket.on('slide:freeze', (frozen) => { this.frozen = frozen; });
     // Hand raise
     this.socket.on('hand:count', (count) => { this.handRaisedCount = count; });
-    this.socket.on('hand:raised', (data) => { this.handRaisedCount++; });
+    this.socket.on('hand:raised', (data) => {
+      this.handRaisedCount++;
+      // Show fly-up notification in fullscreen
+      if (this.isFullscreen) {
+        const notif = { id: Date.now() + Math.random(), name: data.display_name || data.username };
+        this.fullscreenHandNotifs.push(notif);
+        setTimeout(() => { this.fullscreenHandNotifs = this.fullscreenHandNotifs.filter(n => n.id !== notif.id); }, 3500);
+      }
+    });
     this.socket.on('hand:cleared', () => { this.handRaisedCount = 0; });
 
     this.checkPollResults();
@@ -1568,8 +1641,6 @@ export default {
         if (res.ok) this.wheelAttendees = await res.json();
       } catch (e) { /* ignore */ }
       this.showWheel = true;
-      // Broadcast wheel overlay to attendees
-      if (this.socket) this.socket.emit('overlay:show', { type: 'wheel', attendees: this.wheelAttendees });
     },
     onWheelResult(winner) {
       if (this.socket) {
@@ -1583,15 +1654,33 @@ export default {
         if (res.ok) this.leaderboardEntries = await res.json();
       } catch (e) { /* ignore */ }
       this.showLeaderboard = true;
-      if (this.socket) this.socket.emit('overlay:show', { type: 'leaderboard', entries: this.leaderboardEntries });
     },
     showQROverlay() {
       this.showQR = !this.showQR;
-      if (this.showQR && this.socket) {
-        this.socket.emit('overlay:show', { type: 'qr', qrUrl: this.qrCodeUrl, sessionCode: this.sessionCode });
-      } else if (this.socket) {
-        this.socket.emit('overlay:hide');
-      }
+    },
+    fsWedgeStyle(i) {
+      const COLORS = ['#254A9A','#F1C064','#e11d48','#059669','#7c3aed','#d97706','#0891b2','#be185d','#4f46e5','#ca8a04','#0d9488','#dc2626'];
+      const n = this.wheelAttendees.length || 1;
+      const angle = 360 / n;
+      return {
+        position:'absolute', width:'50%', height:'50%', top:'0', right:'0',
+        transformOrigin:'0% 100%',
+        transform:`rotate(${angle*i-90}deg) skewY(${-(90-angle)}deg)`,
+        background: COLORS[i % COLORS.length],
+      };
+    },
+    spinFullscreenWheel() {
+      if (this.wheelSpinState || this.wheelAttendees.length < 2) return;
+      this.fullscreenWheelWinner = null;
+      this.wheelSpinState = true;
+      const extraSpins = 5 + Math.floor(Math.random() * 5);
+      const winnerIdx = Math.floor(Math.random() * this.wheelAttendees.length);
+      const angle = 360 / this.wheelAttendees.length;
+      this.fullscreenWheelRotation = 360 * extraSpins + (360 - angle * winnerIdx - angle / 2);
+      setTimeout(() => {
+        this.wheelSpinState = false;
+        this.fullscreenWheelWinner = this.wheelAttendees[winnerIdx];
+      }, 4200);
     },
     async loadAnalytics() {
       try {

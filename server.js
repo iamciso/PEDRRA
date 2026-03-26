@@ -577,15 +577,6 @@ io.on('connection', (socket) => {
         io.emit('wheel:result', data);
     });
 
-    // ── OVERLAY BROADCASTS (visible to attendees on projector) ──
-    socket.on('overlay:show', (overlay) => {
-        if (socket.user.role !== 'Trainer') return;
-        io.emit('overlay:show', overlay);
-    });
-    socket.on('overlay:hide', () => {
-        if (socket.user.role !== 'Trainer') return;
-        io.emit('overlay:hide');
-    });
 
     // ── REACTIONS ─────────────────────────────────────────────
     socket.on('reaction:send', (emoji) => {
