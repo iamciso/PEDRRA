@@ -42,19 +42,24 @@
 
       <!-- ═══ TITLE SLIDE ═══ -->
       <div v-if="currentSlide.type === 'title'" style="position:relative;width:100%;height:100%;background-image:url('/template/cover_bg.jpg');background-size:cover;background-position:center;overflow:hidden;">
-        <!-- EDPS logo (top-left, matching template: 0.31in from left, 0.33in from top) -->
-        <div style="position:absolute;top:3.5%;left:2%;z-index:3;">
+        <!-- EDPS logo (top-left beige area) -->
+        <div style="position:absolute;top:3%;left:2%;z-index:3;">
           <img src="/template/edps_logo.png" style="height:55px;" onerror="this.style.display='none'" />
         </div>
 
-        <!-- Title + subtitle in the white rectangle (center-left of cover bg) -->
-        <div style="position:absolute;top:30%;left:15%;width:33%;z-index:2;padding:1rem;">
-          <div style="color:var(--edps-blue);font-size:1.5rem;font-weight:900;line-height:1.3;">{{ currentSlide.title }}</div>
-          <div v-if="currentSlide.subtitle" style="color:#666;font-size:0.9rem;margin-top:0.8rem;">{{ currentSlide.subtitle }}</div>
+        <!-- PEDRRA title in the BLUE rectangle (top-right) -->
+        <div style="position:absolute;top:5%;right:3%;z-index:3;text-align:right;">
+          <div style="font-size:2.5rem;font-weight:900;color:white;letter-spacing:3px;text-shadow:0 2px 4px rgba(0,0,0,0.2);">PEDRRA</div>
         </div>
 
-        <!-- Content text in the gold rectangle area (right side) -->
-        <div v-if="currentSlide.content" style="position:absolute;top:55%;right:8%;width:35%;color:white;font-size:0.8rem;z-index:2;">{{ currentSlide.content }}</div>
+        <!-- Title + subtitle in the WHITE rectangle (center-left) -->
+        <div style="position:absolute;top:32%;left:17%;width:28%;z-index:2;">
+          <div style="color:var(--edps-blue);font-size:1.3rem;font-weight:900;line-height:1.3;">{{ currentSlide.title }}</div>
+          <div v-if="currentSlide.subtitle" style="color:#666;font-size:0.85rem;margin-top:0.6rem;">{{ currentSlide.subtitle }}</div>
+        </div>
+
+        <!-- Content text in the GOLD rectangle (bottom-right) -->
+        <div v-if="currentSlide.content" style="position:absolute;bottom:16%;right:5%;width:38%;color:white;font-size:0.75rem;z-index:2;line-height:1.4;">{{ currentSlide.content }}</div>
       </div>
 
       <!-- ═══ SECTION TITLE SLIDE ═══ -->
@@ -198,7 +203,7 @@
         </div>
 
         <!-- Bottom bar with decorations -->
-        <div style="position:absolute;bottom:0;left:0;right:0;height:38px;background:#e6e6e6;flex-shrink:0;"></div>
+        <!-- Bottom bar is part of the background image, no extra div needed -->
         <div class="edps-corner-graphics">
           <div class="edps-corner-gold-arc"></div>
           <div class="edps-corner-circle">{{ currentSlideNumber }}</div>

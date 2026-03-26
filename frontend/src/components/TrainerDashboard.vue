@@ -575,13 +575,17 @@
           <div style="position:absolute;top:3%;left:2%;z-index:3;">
             <img src="/template/edps_logo.png" style="height:55px;" alt="EDPS Logo" />
           </div>
-          <!-- Title in the white rectangle (center-left of cover bg) -->
-          <div style="position:absolute;top:30%;left:15%;width:33%;z-index:2;padding:1rem;">
-            <h2 style="margin:0;font-size:1.6rem;line-height:1.3;color:var(--edps-blue);">{{ currentSlide.title }}</h2>
-            <div v-if="currentSlide.subtitle" style="margin-top:0.8rem;font-size:1rem;color:#666;">{{ currentSlide.subtitle }}</div>
+          <!-- PEDRRA in blue rectangle (top-right) -->
+          <div style="position:absolute;top:5%;right:3%;z-index:3;text-align:right;">
+            <div style="font-size:2.5rem;font-weight:900;color:white;letter-spacing:3px;text-shadow:0 2px 4px rgba(0,0,0,0.2);">PEDRRA</div>
           </div>
-          <!-- Content in the gold rectangle area (right side) -->
-          <div v-if="currentSlide.content" style="position:absolute;top:55%;right:8%;width:35%;z-index:2;color:white;font-size:0.9rem;line-height:1.5;">{{ currentSlide.content }}</div>
+          <!-- Title in white rectangle (center-left) -->
+          <div style="position:absolute;top:32%;left:17%;width:28%;z-index:2;">
+            <h2 style="margin:0;font-size:1.4rem;line-height:1.3;color:var(--edps-blue);">{{ currentSlide.title }}</h2>
+            <div v-if="currentSlide.subtitle" style="margin-top:0.6rem;font-size:0.9rem;color:#666;">{{ currentSlide.subtitle }}</div>
+          </div>
+          <!-- Content in gold rectangle (bottom-right) -->
+          <div v-if="currentSlide.content" style="position:absolute;bottom:16%;right:5%;width:38%;z-index:2;color:white;font-size:0.8rem;line-height:1.4;">{{ currentSlide.content }}</div>
         </div>
 
         <!-- #10 — SECTION SLIDE TEMPLATE (fullscreen) -->
@@ -691,7 +695,7 @@
             </template>
           </div>
 
-          <div class="edps-bottom-bar"></div>
+          <!-- Bottom bar is part of the background image -->
           <div class="edps-corner-graphics">
              <div class="edps-corner-gold-arc"></div>
              <div class="edps-corner-circle">{{ currentSlide.id }}</div>
@@ -1641,8 +1645,17 @@ export default {
     async openWheel() {
       try {
         const res = await authFetch(`${baseUrl}/api/attendees`);
-        if (res.ok) this.wheelAttendees = await res.json();
-      } catch (e) { /* ignore */ }
+        if (res.ok) {
+          this.wheelAttendees = await res.json();
+        } else {
+          this.showError('Could not load attendees. Try logging out and back in.');
+          return;
+        }
+      } catch (e) { this.showError('Network error loading attendees'); return; }
+      if (this.wheelAttendees.length === 0) {
+        this.showError('No attendees registered yet. Add users in Manage Users.');
+        return;
+      }
       this.showWheel = true;
       this.slotItems = [...this.wheelAttendees];
       this.slotOffset = 0;
