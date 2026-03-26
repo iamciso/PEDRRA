@@ -44,30 +44,29 @@
             </div>
           </div>
           <div v-if="currentSlide.subtitle" class="slide-subtitle" style="margin-top: 0.5rem;">{{ currentSlide.subtitle }}</div>
-          <div class="slide-content">{{ currentSlide.content || currentSlide.question || currentSlide.description }}</div>
-          
+          <!-- Text content (from textarea, for poll question, survey description) -->
+          <div v-if="currentSlide.content && !(currentSlide.elements && currentSlide.elements.length)" style="white-space:pre-wrap;line-height:1.6;margin-top:0.5rem;">{{ currentSlide.content }}</div>
+          <div v-if="currentSlide.question" style="font-weight:bold;font-size:1.1rem;margin-top:0.5rem;">{{ currentSlide.question }}</div>
+          <div v-if="currentSlide.description" style="color:#64748b;margin-top:0.5rem;">{{ currentSlide.description }}</div>
+
           <div v-if="currentSlide.type === 'content' || currentSlide.type === 'title'">
-             <!-- Canvas visual elements (if present) -->
-             <template v-if="currentSlide.elements && currentSlide.elements.length">
-               <div style="position:relative;width:100%;min-height:280px;margin-top:1rem;">
-                 <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:(el.x*0.6)+'px',top:(el.y*0.5)+'px',width:(el.w*0.6)+'px',height:(el.h*0.5)+'px',overflow:'hidden'}">
-                   <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize*0.6)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',color:el.color||'#333',textAlign:el.textAlign||'left',whiteSpace:'pre-wrap',display:'block'}">{{ el.content }}</span>
-                   <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
-                   <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
-                   <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allowfullscreen></iframe>
-                 </div>
+             <!-- Canvas visual elements -->
+             <div v-if="currentSlide.elements && currentSlide.elements.length" style="position:relative;width:100%;min-height:250px;margin-top:0.5rem;background:#fafafa;border:1px solid #f0f0f0;border-radius:4px;overflow:hidden;">
+               <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:(el.x*0.55)+'px',top:(el.y*0.45)+'px',width:(el.w*0.55)+'px',height:(el.h*0.45)+'px',overflow:'hidden'}">
+                 <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize*0.55)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',color:el.color||'#333',textAlign:el.textAlign||'left',whiteSpace:'pre-wrap',display:'block'}">{{ el.content }}</span>
+                 <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
+                 <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
+                 <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allowfullscreen></iframe>
                </div>
-             </template>
-             <!-- Legacy fields (only if no canvas elements) -->
-             <template v-else>
-               <div v-if="currentSlide.image" style="margin-top: 1rem; text-align: center;">
-                   <img :src="resolveUrl(currentSlide.image)" style="max-width: 100%; max-height: 300px; border-radius: 4px;" />
-               </div>
-               <div v-if="currentSlide.video" style="margin-top: 1rem; text-align: center;">
-                   <video v-if="isLocalVideoCheck(currentSlide.video)" :src="resolveUrl(currentSlide.video)" controls style="width: 100%; max-height: 350px; border-radius: 8px;"></video>
-                   <iframe v-else :src="toEmbedUrlCheck(currentSlide.video)" style="width: 100%; height: 350px; border-radius: 8px;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-               </div>
-             </template>
+             </div>
+             <!-- Legacy image/video (only if no canvas elements) -->
+             <div v-if="currentSlide.image && !(currentSlide.elements && currentSlide.elements.length)" style="margin-top:0.5rem;text-align:center;">
+               <img :src="resolveUrl(currentSlide.image)" style="max-width:100%;max-height:250px;border-radius:4px;" />
+             </div>
+             <div v-if="currentSlide.video && !(currentSlide.elements && currentSlide.elements.length)" style="margin-top:0.5rem;text-align:center;">
+               <video v-if="isLocalVideoCheck(currentSlide.video)" :src="resolveUrl(currentSlide.video)" controls style="width:100%;max-height:300px;border-radius:8px;"></video>
+               <iframe v-else :src="toEmbedUrlCheck(currentSlide.video)" style="width:100%;height:300px;border-radius:8px;" frameborder="0" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe>
+             </div>
           </div>
 
           <!-- Live Poll Results (Bar Chart) -->
@@ -199,56 +198,59 @@
           <button class="secondary" @click="redo" :disabled="redoStack.length===0" style="width:auto;padding:0.5rem 0.6rem;font-size:0.82rem;" title="Redo (Ctrl+Y)">↪️</button>
           <button class="secondary" @click="importSlides" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;" title="Import slides from JSON file">📥 Import</button>
           <button class="secondary" @click="exportSlides" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;" title="Export slides to JSON file">📤 Export</button>
+          <button class="secondary" @click="toggleAllCollapsed" style="width:auto;padding:0.5rem 0.8rem;font-size:0.82rem;">{{ allCollapsed ? '▼ Expand All' : '▲ Collapse All' }}</button>
           <button @click="saveSlides" style="width: auto; padding: 0.5rem 1rem;">Save Changes</button>
         </div>
       </div>
       <input type="file" ref="importFileInput" accept=".json" style="display:none;" @change="onImportFile" />
       <div v-if="saveMessage" style="color: #10b981; font-weight: bold; margin-bottom: 1rem;">{{ saveMessage }}</div>
 
-      <div v-for="(slide, index) in editSlides" :key="slide.id" style="border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; background: #fff;" draggable="true" @dragstart="onDragStart(index, $event)" @dragover.prevent="onDragOver(index, $event)" @drop="onDrop(index)" @dragend="dragIdx=null" :style="{opacity: dragIdx===index ? 0.4 : 1, borderTop: dragOverIdx===index ? '3px solid var(--primary)' : '1px solid var(--border-color)'}">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <div v-for="(slide, index) in editSlides" :key="slide.id" draggable="true" @dragstart="onDragStart(index, $event)" @dragover.prevent="onDragOver(index, $event)" @drop="onDrop(index)" @dragend="dragIdx=null" :style="{border: '1px solid var(--border-color)', padding: '1.5rem', borderRadius: '8px', marginBottom: '0.75rem', background: '#fff', opacity: dragIdx===index ? 0.4 : 1, borderTop: dragOverIdx===index ? '3px solid var(--primary)' : '1px solid var(--border-color)'}">
+        <div style="display: flex; justify-content: space-between; align-items: center; cursor:pointer;" @click="slide._collapsed = !slide._collapsed">
           <div style="display:flex;align-items:center;gap:0.75rem;">
-            <div :style="{width:'50px',height:'30px',background:slideTypeColor(slide.type),borderRadius:'4px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.65rem',color:'white',fontWeight:'bold',flexShrink:0}">{{ slideTypeIcon(slide.type) }}</div>
-            <strong style="font-size: 1.1rem; color: var(--primary);">Slide {{ index + 1 }} — {{ slide.title || '(untitled)' }}</strong>
+            <div :style="{width:'40px',height:'26px',background:slideTypeColor(slide.type),borderRadius:'4px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.65rem',color:'white',fontWeight:'bold',flexShrink:0}">{{ slideTypeIcon(slide.type) }}</div>
+            <span style="font-size:0.8rem;color:#94a3b8;">{{ slide._collapsed ? '▶' : '▼' }}</span>
+            <strong style="font-size: 1rem; color: var(--primary);">{{ index + 1 }}. {{ slide.title || '(untitled)' }}</strong>
+            <span v-if="slide._collapsed && slide.subtitle" style="font-size:0.8rem;color:#94a3b8;">— {{ slide.subtitle }}</span>
           </div>
-          <div>
-             <button class="secondary" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem; margin-right: 0.5rem;" @click="moveSlide(index, -1)" :disabled="index === 0">↑</button>
-             <button class="secondary" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem; margin-right: 0.5rem;" @click="moveSlide(index, 1)" :disabled="index === editSlides.length - 1">↓</button>
-             <button class="secondary" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem; margin-right: 0.5rem;" @click="duplicateSlide(index)" title="Duplicate this slide">📋 Duplicate</button>
-             <button class="secondary" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem; margin-right: 0.5rem;" @click="slide._showPreview = !slide._showPreview">{{ slide._showPreview ? '🔽 Hide Preview' : '👁 Preview' }}</button>
-             <button class="danger" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem;" @click="removeSlide(index)">Delete</button>
+          <div @click.stop style="display:flex;gap:0.3rem;">
+             <button class="secondary" style="width:auto;padding:0.15rem 0.4rem;font-size:0.75rem;" @click="moveSlide(index, -1)" :disabled="index === 0">↑</button>
+             <button class="secondary" style="width:auto;padding:0.15rem 0.4rem;font-size:0.75rem;" @click="moveSlide(index, 1)" :disabled="index === editSlides.length - 1">↓</button>
+             <button class="secondary" style="width:auto;padding:0.15rem 0.4rem;font-size:0.75rem;" @click="duplicateSlide(index)">📋</button>
+             <button class="danger" style="width:auto;padding:0.15rem 0.4rem;font-size:0.75rem;" @click="removeSlide(index)">🗑</button>
           </div>
         </div>
-        
-        <input v-model="slide.title" placeholder="Slide Title" />
+
+        <template v-if="!slide._collapsed">
+        <input v-model="slide.title" placeholder="Slide Title" style="margin-top:0.75rem;" />
         
         <!-- Content/Title Slide Edit -->
         <template v-if="slide.type === 'content' || slide.type === 'title'">
           <input v-model="slide.subtitle" placeholder="Subtitle (Optional)" />
-          <div style="border:1px solid var(--border-color);border-radius:4px;overflow:hidden;margin-bottom:1rem;">
-            <div style="display:flex;gap:0.3rem;padding:0.3rem 0.5rem;background:#f8fafc;border-bottom:1px solid var(--border-color);">
-              <button type="button" @click="insertFormat(slide, '**', '**')" class="secondary" style="width:auto;padding:0.15rem 0.5rem;font-size:0.8rem;font-weight:bold;margin-bottom:0;">B</button>
-              <button type="button" @click="insertFormat(slide, '*', '*')" class="secondary" style="width:auto;padding:0.15rem 0.5rem;font-size:0.8rem;font-style:italic;margin-bottom:0;">I</button>
-              <button type="button" @click="insertFormat(slide, '\n• ', '')" class="secondary" style="width:auto;padding:0.15rem 0.5rem;font-size:0.8rem;margin-bottom:0;">• List</button>
-              <button type="button" @click="insertFormat(slide, '\n## ', '')" class="secondary" style="width:auto;padding:0.15rem 0.5rem;font-size:0.8rem;margin-bottom:0;">H2</button>
+
+          <!-- Text Content -->
+          <div style="margin-bottom:0.75rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.3rem;">
+              <label style="font-size:0.8rem;font-weight:bold;color:#64748b;">Text Content</label>
+              <button v-if="slide.content && !(slide.elements && slide.elements.length)" type="button" @click="convertTextToElement(slide)" class="secondary" style="width:auto;padding:0.15rem 0.5rem;font-size:0.75rem;margin-bottom:0;" title="Convert to visual element">→ Send to Visual Editor</button>
             </div>
-            <textarea v-model="slide.content" :ref="'content_' + slide.id" placeholder="Slide content text..." rows="3" style="border:none;border-radius:0;margin-bottom:0;"></textarea>
-          </div>
-          
-          <div style="display: flex; gap: 1rem;">
-             <input v-model="slide.image" placeholder="Image URL (legacy, or use Visual Editor)" style="flex: 1;" />
-             <input v-model="slide.video" placeholder="Video Embed URL (legacy)" style="flex: 1;" />
+            <textarea v-model="slide.content" :ref="'content_' + slide.id" placeholder="Slide content text..." rows="2" style="margin-bottom:0;font-size:0.9rem;"></textarea>
           </div>
 
-          <!-- Visual Editor Toggle -->
-          <div style="margin-top: 1rem;">
-            <button class="secondary" @click="openVisualEditor(slide)" style="width: auto; padding: 0.4rem 1rem; font-size: 0.85rem;">
-              {{ slide._showCanvas ? '🔼 Hide Visual Editor' : '🎨 Open Visual Slide Editor' }}
-            </button>
-            <span style="font-size: 0.78rem; color: #94a3b8; margin-left: 1rem;">Drag & position text, images, videos like PowerPoint</span>
-          </div>
-          <div v-if="slide._showCanvas" style="margin-top: 1rem;">
-            <SlideCanvas v-model="slide.elements" :slideTitle="slide.title" />
+          <!-- Visual Editor (always visible for content/title slides) -->
+          <div style="margin-top:0.5rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.3rem;">
+              <label style="font-size:0.8rem;font-weight:bold;color:#64748b;">🎨 Visual Editor</label>
+              <button class="secondary" @click="openVisualEditor(slide)" style="width:auto;padding:0.15rem 0.5rem;font-size:0.75rem;margin-bottom:0;">
+                {{ slide._showCanvas ? '▲ Collapse' : '▼ Expand' }}
+              </button>
+            </div>
+            <div v-if="slide.elements && slide.elements.length && !slide._showCanvas" style="padding:0.5rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;font-size:0.8rem;color:#64748b;">
+              {{ slide.elements.length }} visual element(s) — click Expand to edit
+            </div>
+            <div v-if="slide._showCanvas" style="margin-top:0.3rem;">
+              <SlideCanvas v-model="slide.elements" :slideTitle="slide.title" />
+            </div>
           </div>
         </template>
         
@@ -315,26 +317,7 @@
           <textarea v-model="slide.notes" placeholder="Private notes for the presenter (not visible to attendees)..." rows="2" style="margin-top:0.5rem;font-size:0.85rem;background:#fffef5;border-color:#e2e0c8;"></textarea>
         </details>
 
-        <!-- Inline Preview -->
-        <div v-if="slide._showPreview" style="margin-top:1rem;border:2px solid var(--primary);border-radius:8px;overflow:hidden;">
-          <div style="background:var(--primary);color:white;padding:0.3rem 0.75rem;font-size:0.8rem;font-weight:bold;">Preview — as seen by attendees</div>
-          <div style="background:white;padding:1.5rem;min-height:120px;">
-            <h3 style="color:var(--edps-blue);margin:0 0 0.3rem;">{{ slide.title }}</h3>
-            <div v-if="slide.subtitle" style="color:#64748b;margin-bottom:0.75rem;">{{ slide.subtitle }}</div>
-            <div v-if="slide.elements && slide.elements.length" style="position:relative;min-height:150px;">
-              <div v-for="el in slide.elements" :key="el.id" :style="{position:'absolute',left:(el.x*0.45)+'px',top:(el.y*0.4)+'px',width:(el.w*0.45)+'px',height:(el.h*0.4)+'px',overflow:'hidden'}">
-                <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize*0.45)+'px',fontFamily:el.fontFamily,fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',color:el.color,whiteSpace:'pre-wrap',display:'block'}">{{ el.content }}</span>
-                <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
-              </div>
-            </div>
-            <div v-else-if="slide.content" style="white-space:pre-wrap;font-size:0.9rem;">{{ slide.content }}</div>
-            <div v-if="slide.type==='poll'" style="margin-top:0.5rem;">
-              <div style="font-weight:bold;margin-bottom:0.5rem;">{{ slide.question }}</div>
-              <div v-for="opt in (slide.options||[])" :key="opt" style="padding:0.3rem 0.75rem;margin:0.2rem 0;background:#f1f5f9;border-radius:4px;font-size:0.85rem;">{{ opt }}</div>
-            </div>
-            <img v-if="slide.image && !(slide.elements && slide.elements.length)" :src="resolveUrl(slide.image)" style="max-width:50%;max-height:150px;margin-top:0.5rem;" />
-          </div>
-        </div>
+        </template>
       </div>
     </div>
 
@@ -714,6 +697,9 @@ export default {
     totalPollAnswers() {
       return Array.isArray(this.pollResults) ? this.pollResults.length : 0;
     },
+    allCollapsed() {
+      return this.editSlides.every(s => s._collapsed);
+    },
     qrCodeUrl() {
       const url = encodeURIComponent(window.location.origin);
       return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${url}`;
@@ -878,7 +864,7 @@ export default {
         if (!res.ok) throw new Error(`Failed to load slides (${res.status})`);
         const data = await res.json();
         this.slides = this.migrateQuestions(data);
-        this.editSlides = JSON.parse(JSON.stringify(this.slides));
+        this.editSlides = JSON.parse(JSON.stringify(this.slides)).map(s => ({ ...s, _collapsed: true }));
       } catch (e) { this.showError(e.message); }
       finally { this.loading = false; }
     },
@@ -1044,6 +1030,21 @@ export default {
       const icons = { title: '📌', content: '📝', section: '📂', poll: '📊', survey: '📋', timer: '⏱' };
       return icons[type] || '📄';
     },
+    toggleAllCollapsed() {
+      const target = !this.allCollapsed;
+      this.editSlides.forEach(s => { s._collapsed = target; });
+    },
+    convertTextToElement(slide) {
+      if (!slide.content) return;
+      if (!slide.elements) slide.elements = [];
+      const id = 'el_' + Date.now();
+      slide.elements.push({
+        id, kind: 'text', x: 50, y: 90, w: 900, h: 350,
+        content: slide.content,
+        fontSize: 20, fontFamily: 'Segoe UI', bold: false, italic: false, color: '#333333', textAlign: 'left'
+      });
+      slide._showCanvas = true;
+    },
     insertFormat(slide, prefix, suffix) {
       const ref = this.$refs['content_' + slide.id];
       const textarea = Array.isArray(ref) ? ref[0] : ref;
@@ -1064,11 +1065,14 @@ export default {
         const res = await authFetch(`${baseUrl}/api/slides`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.editSlides)
+          body: JSON.stringify(this.editSlides.map(s => {
+            const { _collapsed, _showCanvas, _showPreview, ...clean } = s;
+            return clean;
+          }))
         });
         const data = await res.json();
         this.slides = this.migrateQuestions(data.slides);
-        this.editSlides = JSON.parse(JSON.stringify(this.slides));
+        this.editSlides = JSON.parse(JSON.stringify(this.slides)).map(s => ({ ...s, _collapsed: true }));
         this.saveMessage = 'Successfully saved!';
         setTimeout(() => this.saveMessage = '', 3000);
       } catch (e) { this.saveMessage = ''; this.showError('Error saving changes: ' + e.message); }
