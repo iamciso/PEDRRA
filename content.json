@@ -6,7 +6,33 @@
       "title": "PEDRRA Training Exercise",
       "subtitle": "PErsonal Data bReach Risk Assessment",
       "content": "Welcome to the training. Please follow along closely as we begin our interactive scenarios on Data Breach Risk Management.",
-      "_showCanvas": true
+      "_showCanvas": true,
+      "elements": [
+        {
+          "id": "el_1774532969696",
+          "kind": "image",
+          "x": 560,
+          "y": 253,
+          "w": 405,
+          "h": 281,
+          "src": "/uploads/1774522144796_LINUX.png"
+        },
+        {
+          "id": "el_1774532976982",
+          "kind": "text",
+          "x": 80,
+          "y": 90,
+          "w": 500,
+          "h": 80,
+          "content": "Just a test. ",
+          "fontSize": 22,
+          "fontFamily": "Segoe UI",
+          "bold": false,
+          "italic": false,
+          "color": "#333333",
+          "textAlign": "left"
+        }
+      ]
     },
     {
       "id": 2,
@@ -21,7 +47,34 @@
       "type": "content",
       "title": "Scenario 1: The Encrypted Gateway",
       "subtitle": "Stolen Laptop",
-      "content": "An external consultant's laptop holding 150 expert contacts was stolen from a locked home office overnight. It has full-disk encryption and a strong passphrase. A remote wipe was initiated, but remains pending connection."
+      "content": "An external consultant's laptop holding 150 expert contacts was stolen from a locked home office overnight. It has full-disk encryption and a strong passphrase. A remote wipe was initiated, but remains pending connection.",
+      "_showCanvas": true,
+      "elements": [
+        {
+          "id": "el_1774530885334",
+          "kind": "image",
+          "x": 647,
+          "y": 31,
+          "w": 350,
+          "h": 250,
+          "src": "/uploads/1774529861631_images.jpg"
+        },
+        {
+          "id": "el_1774530889849",
+          "kind": "text",
+          "x": 80,
+          "y": 90,
+          "w": 500,
+          "h": 80,
+          "content": "asdfasdfasdfa",
+          "fontSize": 30,
+          "fontFamily": "Segoe UI",
+          "bold": false,
+          "italic": false,
+          "color": "#cf0707",
+          "textAlign": "left"
+        }
+      ]
     },
     {
       "id": 4,
