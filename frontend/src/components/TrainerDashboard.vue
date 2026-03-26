@@ -55,7 +55,7 @@
              <!-- Canvas visual elements -->
              <div v-if="currentSlide.elements && currentSlide.elements.length" style="position:relative;width:100%;min-height:250px;margin-top:0.5rem;background:#fafafa;border:1px solid #f0f0f0;border-radius:4px;overflow:hidden;">
                <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:(el.x*0.55)+'px',top:(el.y*0.45)+'px',width:(el.w*0.55)+'px',height:(el.h*0.45)+'px',overflow:'hidden'}">
-                 <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize*0.55)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',color:el.color||'#333',textAlign:el.textAlign||'left',whiteSpace:'pre-wrap',display:'block'}">{{ el.content }}</span>
+                 <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize*0.55)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block'}" v-html="renderMd(el.content)"></span>
                  <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
                  <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
                  <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allowfullscreen></iframe>
@@ -265,8 +265,8 @@
 
           <!-- Text Content (synced with first text element in visual editor) -->
           <div style="margin-bottom:0.75rem;">
-            <label style="font-size:0.8rem;font-weight:bold;color:#64748b;display:block;margin-bottom:0.3rem;">Text Content</label>
-            <textarea :value="getSlideText(slide)" @input="setSlideText(slide, $event.target.value)" placeholder="Slide content text (synced with visual editor)..." rows="2" style="margin-bottom:0;font-size:0.9rem;"></textarea>
+            <label style="font-size:0.8rem;font-weight:bold;color:#64748b;display:block;margin-bottom:0.3rem;">Text Content <span style="font-weight:normal;color:#94a3b8;">(supports **Markdown**)</span></label>
+            <textarea :value="getSlideText(slide)" @input="setSlideText(slide, $event.target.value)" placeholder="Slide content text (supports Markdown: **bold**, *italic*, - lists, ## headings)..." rows="3" style="margin-bottom:0;font-size:0.9rem;font-family:'Cascadia Code','Fira Code',monospace;"></textarea>
           </div>
 
           <!-- Visual Editor -->
@@ -637,7 +637,7 @@
               <template v-if="currentSlide.elements && currentSlide.elements.length">
                 <div style="position:relative;width:100%;min-height:300px;">
                   <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden'}">
-                    <span v-if="el.kind==='text'" :style="{fontSize:el.fontSize+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',color:el.color||'#333',textAlign:el.textAlign||'left',whiteSpace:'pre-wrap',display:'block'}">{{ el.content }}</span>
+                    <span v-if="el.kind==='text'" :style="{fontSize:el.fontSize+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block'}" v-html="renderMd(el.content)"></span>
                     <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
                     <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
                     <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
@@ -726,13 +726,31 @@
         </template>
       </div>
 
+    <!-- Fullscreen top bar: hand raises + presenter tools -->
+    <div style="position:absolute;top:0;left:0;right:0;z-index:200;display:flex;justify-content:space-between;align-items:center;padding:0.4rem 1rem;background:rgba(0,0,0,0.5);">
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <span v-if="handRaisedCount > 0" style="background:#ef4444;color:white;padding:0.3rem 0.8rem;border-radius:16px;font-size:0.85rem;font-weight:bold;animation:handPulse 1.5s ease infinite;">
+          ✋ {{ handRaisedCount }} hand{{ handRaisedCount > 1 ? 's' : '' }}
+        </span>
+        <span style="color:rgba(255,255,255,0.5);font-size:0.8rem;">Slide {{ currentIndex + 1 }}/{{ slides.length }}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.4rem;">
+        <button @click.stop="showWheel=!showWheel" style="background:rgba(255,255,255,0.15);border:none;color:white;padding:0.3rem 0.7rem;border-radius:16px;font-size:0.8rem;cursor:pointer;">🎡 Wheel</button>
+        <button @click.stop="showQR=!showQR" style="background:rgba(255,255,255,0.15);border:none;color:white;padding:0.3rem 0.7rem;border-radius:16px;font-size:0.8rem;cursor:pointer;">📱 QR</button>
+        <button @click.stop="fetchLeaderboard" style="background:rgba(255,255,255,0.15);border:none;color:white;padding:0.3rem 0.7rem;border-radius:16px;font-size:0.8rem;cursor:pointer;">🏆 Leaderboard</button>
+        <button v-if="handRaisedCount > 0" @click.stop="clearHands" style="background:rgba(255,255,255,0.15);border:none;color:white;padding:0.3rem 0.7rem;border-radius:16px;font-size:0.8rem;cursor:pointer;">✋ Clear hands</button>
+        <button @click.stop="toggleFreeze" :style="{background:frozen?'#ef4444':'rgba(255,255,255,0.15)',border:'none',color:'white',padding:'0.3rem 0.7rem',borderRadius:'16px',fontSize:'0.8rem',cursor:'pointer'}">{{ frozen ? '❄️ Unfreeze' : '🧊 Freeze' }}</button>
+        <span style="color:rgba(255,255,255,0.6);font-size:1rem;font-weight:bold;margin-left:0.5rem;font-variant-numeric:tabular-nums;">{{ currentTime }}</span>
+      </div>
+    </div>
+
     <!-- Speaker notes overlay for fullscreen (only trainer sees this) -->
     <div v-if="currentSlide.notes" style="position:absolute;bottom:3rem;left:1rem;right:50%;background:rgba(0,0,0,0.7);color:#e2e8f0;padding:0.75rem 1rem;border-radius:6px;font-size:0.85rem;z-index:100;max-height:120px;overflow-y:auto;line-height:1.4;">
       📝 {{ currentSlide.notes }}
     </div>
     <!-- Instructor Help overlay for fullscreen -->
     <div style="position: absolute; bottom: 1rem; left: 1rem; color: #94a3b8; font-size: 0.8rem; z-index: 100; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">
-      Slide {{ currentIndex + 1 }}/{{ slides.length }} · LEFT/RIGHT to navigate · ESC to exit
+      LEFT/RIGHT to navigate · ESC to exit
     </div>
 
   </div>
@@ -744,6 +762,7 @@ import { io } from 'socket.io-client';
 import { baseUrl } from '../config.js';
 import { authFetch, authHeaders, getToken, clearAuth } from '../auth.js';
 import PptxGenJS from 'pptxgenjs';
+import { marked } from 'marked';
 import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 import SurveyResults from './SurveyResults.vue';
 import MediaManager from './MediaManager.vue';
@@ -1097,23 +1116,24 @@ export default {
     },
     addSlide(type) {
       const id = Date.now();
+      const base = { ratingEnabled: false };
       if (type === 'poll') {
-        this.editSlides.push({ id, type, title: 'New Poll', question: 'What is your question?', correctOption: '', options: ['Option 1', 'Option 2'] });
+        this.editSlides.push({ ...base, id, type, title: 'New Poll', question: 'What is your question?', correctOption: '', options: ['Option 1', 'Option 2'] });
       } else if (type === 'survey') {
-        this.editSlides.push({ id, type, title: 'Survey', description: 'Please answer the following:', questions: [
-            { text: 'How do you rate this? (1-5)', type: 'rating', options: [] }, 
+        this.editSlides.push({ ...base, id, type, title: 'Survey', description: 'Please answer the following:', questions: [
+            { text: 'How do you rate this? (1-5)', type: 'rating', options: [] },
             { text: 'Feedback', type: 'text', options: [] }
         ] });
       } else if (type === 'title') {
-        this.editSlides.push({ id, type: 'title', title: 'New Topic', subtitle: 'A new section', content: 'Details here', image: '', video: '' });
+        this.editSlides.push({ ...base, id, type: 'title', title: 'New Topic', subtitle: 'A new section', content: 'Details here', image: '', video: '' });
       } else if (type === 'timer') {
-        this.editSlides.push({ id, type: 'timer', title: 'Countdown Timer', duration: 300 });
+        this.editSlides.push({ ...base, id, type: 'timer', title: 'Countdown Timer', duration: 300 });
       } else if (type === 'rating') {
-        this.editSlides.push({ id, type: 'rating', title: 'Rate this session', question: 'How would you rate this topic?', ratingType: 'emoji' });
+        this.editSlides.push({ ...base, id, type: 'rating', title: 'Rate this session', question: 'How would you rate this topic?', ratingType: 'emoji' });
       } else if (type === 'section') {
-        this.editSlides.push({ id, type: 'section', title: 'Section Title', subtitle: '' });
+        this.editSlides.push({ ...base, id, type: 'section', title: 'Section Title', subtitle: '' });
       } else {
-        this.editSlides.push({ id, type: 'content', title: 'Content Slide', subtitle: '', content: '', image: '', video: '' });
+        this.editSlides.push({ ...base, id, type: 'content', title: 'Content Slide', subtitle: '', content: '', image: '', video: '' });
       }
     },
     removeSlide(index) {
@@ -1224,12 +1244,19 @@ export default {
     setSlideText(slide, value) {
       // Always update legacy field
       slide.content = value;
-      // Also update first text element if it exists
-      if (slide.elements && slide.elements.length) {
-        const textEl = slide.elements.find(el => el.kind === 'text');
-        if (textEl) {
-          textEl.content = value;
-        }
+      // Also update first text element if it exists, or create one
+      if (!slide.elements) slide.elements = [];
+      const textEl = slide.elements.find(el => el.kind === 'text');
+      if (textEl) {
+        textEl.content = value;
+      } else if (value.trim()) {
+        // Auto-create a text element synced with content
+        slide.elements.unshift({
+          id: Date.now(), kind: 'text', content: value,
+          x: 40, y: 60, w: 600, h: 300,
+          fontSize: 18, fontFamily: 'Segoe UI', color: '#333333',
+          bold: false, italic: false, textAlign: 'left'
+        });
       }
     },
     toggleAllCollapsed() {
@@ -1343,6 +1370,10 @@ export default {
         link.href = dataStr;
         link.download = `Slide_${this.currentSlide.id}_Results.json`;
         link.click();
+    },
+    renderMd(text) {
+      if (!text) return '';
+      try { return marked.parse(text, { breaks: true }); } catch { return text; }
     },
     resolveUrl(url) {
       if (!url) return '';

@@ -125,14 +125,14 @@
           <template v-if="currentSlide.type === 'content'">
             <template v-if="currentSlide.elements && currentSlide.elements.length">
               <div v-for="el in currentSlide.elements" :key="el.id" :style="elStyle(el)">
-                <span v-if="el.kind==='text'" :style="textStyle(el)">{{ el.content }}</span>
+                <span v-if="el.kind==='text'" :style="textStyle(el)" v-html="renderMd(el.content)"></span>
                 <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
                 <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
                 <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
               </div>
             </template>
             <template v-else>
-              <div style="white-space:pre-wrap;line-height:1.8;font-size:1.05rem;color:#333;">{{ currentSlide.content }}</div>
+              <div style="line-height:1.8;font-size:1.05rem;color:#333;" v-html="renderMd(currentSlide.content)"></div>
               <div v-if="currentSlide.image" style="margin-top:1rem;text-align:center;"><img :src="resolveUrl(currentSlide.image)" style="max-width:100%;max-height:270px;border-radius:6px;" /></div>
               <div v-if="currentSlide.video" style="margin-top:1rem;">
                 <video v-if="isLocalVideoCheck(currentSlide.video)" :src="resolveUrl(currentSlide.video)" controls style="width:100%;max-height:260px;border-radius:6px;"></video>
@@ -260,6 +260,7 @@
 <script>
 import { io } from 'socket.io-client';
 import { baseUrl } from '../config.js';
+import { marked } from 'marked';
 import { getToken, clearAuth } from '../auth.js';
 import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 
@@ -470,6 +471,10 @@ export default {
       const ratingKey = 'rating_' + this.currentSlide.id;
       this.socket.emit('poll:answer', { slideId: ratingKey, username: this.user.username, answer: String(value) });
       this.answeredPolls = { ...this.answeredPolls, [ratingKey]: true };
+    },
+    renderMd(text) {
+      if (!text) return '';
+      try { return marked.parse(text, { breaks: true }); } catch { return text; }
     },
     toggleHandRaise() {
       this.handRaised = !this.handRaised;
