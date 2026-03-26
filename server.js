@@ -120,32 +120,66 @@ const loginLimiter = rateLimit({
 
 // ============ REST API ============
 
-// #1 — Auth with bcrypt password comparison
+// Login with username+password (trainer) or PIN (attendees)
 app.post('/api/login', loginLimiter, (req, res) => {
-    const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ error: 'Username and password required.' });
-    db.get('SELECT id, username, password, team, role FROM users WHERE username = ?', [username], (err, row) => {
+    const { username, password, pin } = req.body;
+
+    // PIN-based login (no password needed)
+    if (pin) {
+        db.get('SELECT id, username, password, team, role, display_name, avatar, pin FROM users WHERE pin = ?', [pin], (err, row) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (!row) return res.status(401).json({ error: 'Invalid PIN.' });
+            const userData = { id: row.id, username: row.username, team: row.team, role: row.role, display_name: row.display_name, avatar: row.avatar };
+            const token = jwt.sign(userData, JWT_SECRET, { expiresIn: '24h' });
+            res.json({ user: userData, token });
+        });
+        return;
+    }
+
+    // Username + password login
+    if (!username || !password) return res.status(400).json({ error: 'Username and password (or PIN) required.' });
+    db.get('SELECT id, username, password, team, role, display_name, avatar, pin FROM users WHERE username = ?', [username], (err, row) => {
         if (err) return res.status(500).json({ error: err.message });
         if (!row) return res.status(401).json({ error: 'Invalid credentials.' });
         bcrypt.compare(password, row.password, (bcryptErr, match) => {
             if (bcryptErr) return res.status(500).json({ error: 'Auth error.' });
             if (!match) return res.status(401).json({ error: 'Invalid credentials.' });
-            const userData = { id: row.id, username: row.username, team: row.team, role: row.role };
+            const userData = { id: row.id, username: row.username, team: row.team, role: row.role, display_name: row.display_name, avatar: row.avatar };
             const token = jwt.sign(userData, JWT_SECRET, { expiresIn: '24h' });
             res.json({ user: userData, token });
         });
     });
 });
 
+// Session code
+app.get('/api/session-code', (req, res) => {
+    db.get("SELECT value FROM session_config WHERE key = 'session_code'", (err, row) => {
+        if (err || !row) return res.json({ code: '0000' });
+        res.json({ code: row.value });
+    });
+});
+
+app.post('/api/session-code/regenerate', authMiddleware('Trainer'), (req, res) => {
+    const code = require('crypto').randomInt(1000, 9999).toString();
+    db.run("INSERT OR REPLACE INTO session_config (key, value) VALUES ('session_code', ?)", [code], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ code });
+    });
+});
+
 // Users CRUD — protected, Trainer only
 app.post('/api/users', authMiddleware('Trainer'), async (req, res) => {
-    const { username, password, team, role } = req.body;
+    const { username, password, team, role, display_name, avatar } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Username and password required.' });
     try {
         const hashed = await bcrypt.hash(password, 10);
-        db.run('INSERT INTO users (username, password, team, role) VALUES (?, ?, ?, ?)', [username, hashed, team, role], function(err) {
+        const pin = require('./db.js').generatePin();
+        const chars = require('./db.js').FICTIONAL_CHARACTERS;
+        const dname = display_name || chars[Math.floor(Math.random() * chars.length)];
+        db.run('INSERT INTO users (username, password, team, role, display_name, avatar, pin) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [username, hashed, team || '', role || 'Attendee', dname, avatar || '', pin], function(err) {
             if (err) return res.status(400).json({ error: 'Username already exists or DB locked' });
-            res.json({ success: true, user: { id: this.lastID, username, team, role } });
+            res.json({ success: true, user: { id: this.lastID, username, team, role, display_name: dname, avatar: avatar || '', pin } });
         });
     } catch (e) {
         res.status(500).json({ error: 'Failed to hash password.' });
@@ -153,33 +187,37 @@ app.post('/api/users', authMiddleware('Trainer'), async (req, res) => {
 });
 
 app.get('/api/users', authMiddleware('Trainer'), (req, res) => {
-    db.all('SELECT id, username, team, role FROM users', (err, rows) => {
+    db.all('SELECT id, username, team, role, display_name, avatar, pin FROM users', (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });
 });
 
+// Get fictional character names list
+app.get('/api/characters', authMiddleware('Trainer'), (req, res) => {
+    res.json(require('./db.js').FICTIONAL_CHARACTERS);
+});
+
 // Update user — Trainer only
 app.put('/api/users/:id', authMiddleware('Trainer'), async (req, res) => {
-    const { username, password, team, role } = req.body;
+    const { username, password, team, role, display_name, avatar } = req.body;
     const id = req.params.id;
     if (!username) return res.status(400).json({ error: 'Username is required.' });
     try {
-        // If password provided, hash it; otherwise keep existing
         if (password && password.trim()) {
             const hashed = await bcrypt.hash(password, 10);
-            db.run('UPDATE users SET username = ?, password = ?, team = ?, role = ? WHERE id = ?',
-                [username, hashed, team || '', role || 'Attendee', id], function(err) {
+            db.run('UPDATE users SET username = ?, password = ?, team = ?, role = ?, display_name = ?, avatar = ? WHERE id = ?',
+                [username, hashed, team || '', role || 'Attendee', display_name || '', avatar || '', id], function(err) {
                     if (err) return res.status(400).json({ error: 'Username already exists or DB error.' });
                     if (this.changes === 0) return res.status(404).json({ error: 'User not found.' });
-                    res.json({ success: true, user: { id: Number(id), username, team, role } });
+                    res.json({ success: true, user: { id: Number(id), username, team, role, display_name, avatar } });
                 });
         } else {
-            db.run('UPDATE users SET username = ?, team = ?, role = ? WHERE id = ?',
-                [username, team || '', role || 'Attendee', id], function(err) {
+            db.run('UPDATE users SET username = ?, team = ?, role = ?, display_name = ?, avatar = ? WHERE id = ?',
+                [username, team || '', role || 'Attendee', display_name || '', avatar || '', id], function(err) {
                     if (err) return res.status(400).json({ error: 'Username already exists or DB error.' });
                     if (this.changes === 0) return res.status(404).json({ error: 'User not found.' });
-                    res.json({ success: true, user: { id: Number(id), username, team, role } });
+                    res.json({ success: true, user: { id: Number(id), username, team, role, display_name, avatar } });
                 });
         }
     } catch (e) {
@@ -239,7 +277,7 @@ app.get('/api/slides', (req, res) => {
 });
 
 // #2 — Slide data validation
-const VALID_SLIDE_TYPES = ['title', 'content', 'section', 'poll', 'survey', 'timer'];
+const VALID_SLIDE_TYPES = ['title', 'content', 'section', 'poll', 'survey', 'timer', 'rating'];
 function validateSlides(req, res, next) {
     if (!Array.isArray(req.body)) {
         return res.status(400).json({ error: 'Slides must be an array.' });
@@ -412,12 +450,100 @@ io.on('connection', (socket) => {
         socket.emit(`timer:update:${slideId}`, timerState[slideId] || null);
     });
 
+    // ── QUIZ ──────────────────────────────────────────────────
+    socket.on('quiz:score', ({ slideId, correct, timeMs, points }) => {
+        db.run('INSERT OR REPLACE INTO quiz_scores (username, slide_id, correct, time_ms, points) VALUES (?, ?, ?, ?, ?)',
+            [socket.user.username, slideId, correct ? 1 : 0, timeMs || 0, points || 0]);
+        // Broadcast updated leaderboard
+        db.all(`SELECT username, SUM(points) as total_points FROM quiz_scores GROUP BY username ORDER BY total_points DESC`, (err, rows) => {
+            if (!err) io.emit('quiz:leaderboard', rows);
+        });
+    });
+
+    // ── SPINNING WHEEL ───────────────────────────────────────
+    socket.on('wheel:spin', () => {
+        if (socket.user.role !== 'Trainer') return;
+        io.emit('wheel:spinning');
+    });
+    socket.on('wheel:result', (username) => {
+        if (socket.user.role !== 'Trainer') return;
+        io.emit('wheel:result', username);
+    });
+
     // ── REACTIONS ─────────────────────────────────────────────
     socket.on('reaction:send', (emoji) => {
         if (!emoji || typeof emoji !== 'string') return;
         const allowed = ['👍', '❓', '🐌', '👏', '🎉'];
         if (!allowed.includes(emoji)) return;
         io.emit('reaction:new', { emoji, username: socket.user.username });
+    });
+});
+
+// Quiz scores
+app.post('/api/quiz/score', authMiddleware(), (req, res) => {
+    const { slide_id, correct, time_ms, points } = req.body;
+    const username = req.user.username;
+    db.run('INSERT OR REPLACE INTO quiz_scores (username, slide_id, correct, time_ms, points) VALUES (?, ?, ?, ?, ?)',
+        [username, slide_id, correct ? 1 : 0, time_ms || 0, points || 0], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
+    });
+});
+
+app.get('/api/quiz/leaderboard', (req, res) => {
+    db.all(`SELECT username, SUM(points) as total_points, SUM(correct) as total_correct, COUNT(*) as total_answers
+            FROM quiz_scores GROUP BY username ORDER BY total_points DESC`, (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        // Add avatar info
+        db.all('SELECT username, display_name, avatar FROM users', (err2, users) => {
+            const userMap = {};
+            (users || []).forEach(u => { userMap[u.username] = u; });
+            const result = rows.map(r => ({
+                ...r,
+                display_name: userMap[r.username]?.display_name || r.username,
+                avatar: userMap[r.username]?.avatar || ''
+            }));
+            res.json(result);
+        });
+    });
+});
+
+app.delete('/api/quiz/scores', authMiddleware('Trainer'), (req, res) => {
+    db.run('DELETE FROM quiz_scores', function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, changes: this.changes });
+    });
+});
+
+// Analytics
+app.get('/api/analytics', authMiddleware('Trainer'), (req, res) => {
+    const analytics = {};
+    db.get("SELECT COUNT(*) as count FROM users WHERE role = 'Attendee'", (err, r) => {
+        analytics.totalAttendees = r?.count || 0;
+        db.get("SELECT COUNT(DISTINCT slide_id) as count FROM answers", (err2, r2) => {
+            analytics.slidesWithAnswers = r2?.count || 0;
+            db.get("SELECT COUNT(*) as count FROM answers", (err3, r3) => {
+                analytics.totalResponses = r3?.count || 0;
+                db.all("SELECT slide_id, COUNT(*) as responses FROM answers GROUP BY slide_id ORDER BY slide_id", (err4, r4) => {
+                    analytics.responsesPerSlide = r4 || [];
+                    db.all(`SELECT slide_id, username, answer, answered_at FROM answers ORDER BY answered_at DESC LIMIT 100`, (err5, r5) => {
+                        analytics.recentAnswers = r5 || [];
+                        db.all(`SELECT username, SUM(points) as total_points, SUM(correct) as correct FROM quiz_scores GROUP BY username ORDER BY total_points DESC`, (err6, r6) => {
+                            analytics.quizLeaderboard = r6 || [];
+                            res.json(analytics);
+                        });
+                    });
+                });
+            });
+        });
+    });
+});
+
+// Attendee list for spinning wheel
+app.get('/api/attendees', (req, res) => {
+    db.all("SELECT username, display_name, avatar FROM users WHERE role = 'Attendee'", (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
     });
 });
 

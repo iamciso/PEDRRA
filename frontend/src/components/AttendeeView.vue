@@ -5,7 +5,8 @@
     <div style="position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:0.4rem 1.2rem;background:rgba(0,0,0,0.45);">
       <span style="color:rgba(255,255,255,0.7);font-size:0.8rem;">
         <span :style="{display:'inline-block',width:'8px',height:'8px',borderRadius:'50%',marginRight:'6px',background:connected?'#10b981':'#ef4444'}" :title="connected?'Connected':'Disconnected'"></span>
-        PEDRRA • {{ user?.username }}
+        <img v-if="user?.avatar" :src="resolveUrl(user.avatar)" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;" />
+        {{ user?.display_name || user?.username }}
       </span>
       <span v-if="slideProgress" style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-right:0.5rem;">{{ slideProgress }}</span>
       <a href="#" @click.prevent="logout" style="color:var(--edps-gold,#dea133);font-weight:bold;text-decoration:none;font-size:0.8rem;">Log Out</a>
@@ -180,6 +181,20 @@
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;min-height:280px;">
               <div style="font-size:5rem;font-weight:bold;font-variant-numeric:tabular-nums;color:var(--edps-blue,#1b4293);letter-spacing:6px;">{{ timerDisplay }}</div>
               <div style="margin-top:0.8rem;font-size:1rem;color:#64748b;">{{ timerRunning ? 'Time remaining...' : (timerSeconds > 0 ? 'Paused' : 'Ready') }}</div>
+            </div>
+          </template>
+
+          <!-- Emoji Rating -->
+          <template v-if="currentSlide.type === 'rating'">
+            <div style="margin-top:1rem;text-align:center;">
+              <div style="font-weight:bold;font-size:1.1rem;margin-bottom:1.5rem;">{{ currentSlide.question }}</div>
+              <div v-if="hasAnswered" style="padding:1rem;background:#f0fdf4;color:#166534;border-radius:8px;font-weight:bold;">✅ Thanks for your rating!</div>
+              <div v-else style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
+                <button v-for="(emoji, i) in ['😡','😕','😐','🙂','😍']" :key="i" @click="submitPollAnswer(String(i+1))" style="font-size:2.5rem;background:none;border:2px solid #e2e8f0;border-radius:12px;padding:0.75rem 1rem;cursor:pointer;transition:all 0.2s;" @mouseenter="$event.target.style.borderColor='var(--edps-blue,#1b4293)';$event.target.style.transform='scale(1.2)'" @mouseleave="$event.target.style.borderColor='#e2e8f0';$event.target.style.transform='scale(1)'">
+                  {{ emoji }}
+                  <div style="font-size:0.7rem;color:#64748b;margin-top:0.2rem;">{{ ['Terrible','Bad','OK','Good','Excellent'][i] }}</div>
+                </button>
+              </div>
             </div>
           </template>
         </div>

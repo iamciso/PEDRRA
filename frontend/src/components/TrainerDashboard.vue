@@ -15,8 +15,9 @@
       <button :class="['tab-link', { active: activeTab === 'live' }]" @click="activeTab = 'live'">Live Presentation</button>
       <button :class="['tab-link', { active: activeTab === 'content' }]" @click="activeTab = 'content'">Manage Content</button>
       <button :class="['tab-link', { active: activeTab === 'users' }]" @click="activeTab = 'users'">Manage Users</button>
-      <button :class="['tab-link', { active: activeTab === 'results' }]" @click="activeTab = 'results'">📊 Survey Results</button>
-      <button :class="['tab-link', { active: activeTab === 'media' }]" @click="activeTab = 'media'">🖼 Media Library</button>
+      <button :class="['tab-link', { active: activeTab === 'results' }]" @click="activeTab = 'results'">📊 Results</button>
+      <button :class="['tab-link', { active: activeTab === 'analytics' }]" @click="activeTab = 'analytics'; loadAnalytics()">📈 Analytics</button>
+      <button :class="['tab-link', { active: activeTab === 'media' }]" @click="activeTab = 'media'">🖼 Media</button>
     </div>
 
     <!-- Error banner -->
@@ -159,7 +160,16 @@
           <li style="margin-bottom: 0.5rem">Click the Fullscreen icon to expand the view to your entire projector.</li>
           <li style="margin-bottom: 0.5rem">Poll results are hidden until all attendees complete them.</li>
         </ul>
-        <button class="secondary" @click="showQR=!showQR" style="width:auto;padding:0.4rem 0.8rem;font-size:0.85rem;margin-top:0.5rem;">📱 {{ showQR ? 'Hide' : 'Show' }} QR Code</button>
+        <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.75rem;">
+          <button class="secondary" @click="openWheel" style="width:auto;padding:0.4rem 0.8rem;font-size:0.85rem;">🎡 Wheel</button>
+          <button class="secondary" @click="openLeaderboard" style="width:auto;padding:0.4rem 0.8rem;font-size:0.85rem;">🏆 Leaderboard</button>
+          <button class="secondary" @click="openPresenterMode" style="width:auto;padding:0.4rem 0.8rem;font-size:0.85rem;">🖥 Presenter</button>
+          <button class="secondary" @click="showQR=!showQR" style="width:auto;padding:0.4rem 0.8rem;font-size:0.85rem;">📱 QR</button>
+        </div>
+        <div v-if="sessionCode" style="margin-top:0.5rem;padding:0.5rem;background:#e0f2fe;border-radius:6px;text-align:center;">
+          <span style="font-size:0.8rem;color:#64748b;">Session PIN:</span>
+          <span style="font-size:1.5rem;font-weight:bold;color:var(--edps-blue,#1b4293);letter-spacing:4px;margin-left:0.5rem;">{{ sessionCode }}</span>
+        </div>
         <div v-if="showQR" style="margin-top:0.75rem;text-align:center;">
           <img :src="qrCodeUrl" style="width:180px;height:180px;border:1px solid #e2e8f0;border-radius:8px;" alt="QR Code" />
           <div style="font-size:0.75rem;color:#94a3b8;margin-top:0.3rem;">Scan to join the session</div>
@@ -187,6 +197,7 @@
           <button class="secondary" @click="addSlide('poll')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">+ Poll</button>
           <button class="secondary" @click="addSlide('survey')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">+ Survey</button>
           <button class="secondary" @click="addSlide('timer')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">⏱ Timer</button>
+          <button class="secondary" @click="addSlide('rating')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">😀 Rating</button>
           <div style="position:relative;" ref="templateMenuRef">
             <button class="secondary" @click="showTemplateMenu=!showTemplateMenu" style="width:auto;padding:0.5rem 0.8rem;font-size:0.82rem;">📐 Template ▾</button>
             <div v-if="showTemplateMenu" style="position:absolute;top:100%;left:0;z-index:200;background:white;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:200px;margin-top:4px;">
@@ -303,6 +314,14 @@
           </div>
         </template>
 
+        <!-- Rating Slide Edit -->
+        <template v-if="slide.type === 'rating'">
+          <input v-model="slide.question" placeholder="What should attendees rate?" />
+          <div style="margin-top:0.5rem;font-size:0.85rem;color:#64748b;">
+            Attendees will see: 😡 😕 😐 🙂 😍 (1-5 scale)
+          </div>
+        </template>
+
         <!-- Section Slide Edit -->
         <template v-if="slide.type === 'section'">
           <input v-model="slide.subtitle" placeholder="Subtitle (Optional)" />
@@ -328,84 +347,100 @@
 
       <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem;">
         <h4 style="margin-top: 0; color: var(--primary);">Provision New User</h4>
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap: 1rem; align-items: end;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto; gap: 0.75rem; align-items: end;">
           <div>
-            <label style="font-size: 0.8rem; font-weight: bold; color: #64748b;">Username</label>
-            <input v-model="newUser.username" placeholder="jdoe" style="margin-bottom: 0;" />
+            <label style="font-size: 0.75rem; font-weight: bold; color: #64748b;">Username</label>
+            <input v-model="newUser.username" placeholder="jdoe" style="margin-bottom:0;font-size:0.85rem;" />
           </div>
           <div>
-            <label style="font-size: 0.8rem; font-weight: bold; color: #64748b;">Password</label>
-            <input v-model="newUser.password" type="password" placeholder="***" style="margin-bottom: 0;" />
+            <label style="font-size: 0.75rem; font-weight: bold; color: #64748b;">Password</label>
+            <input v-model="newUser.password" type="password" placeholder="***" style="margin-bottom:0;font-size:0.85rem;" />
           </div>
           <div>
-            <label style="font-size: 0.8rem; font-weight: bold; color: #64748b;">Team/Unit</label>
-            <input v-model="newUser.team" placeholder="DPO" style="margin-bottom: 0;" />
+            <label style="font-size: 0.75rem; font-weight: bold; color: #64748b;">Display Name</label>
+            <input v-model="newUser.display_name" placeholder="(auto-generated)" style="margin-bottom:0;font-size:0.85rem;" />
           </div>
           <div>
-            <label style="font-size: 0.8rem; font-weight: bold; color: #64748b;">Role</label>
-            <select v-model="newUser.role" style="margin-bottom: 0;">
+            <label style="font-size: 0.75rem; font-weight: bold; color: #64748b;">Team</label>
+            <input v-model="newUser.team" placeholder="DPO" style="margin-bottom:0;font-size:0.85rem;" />
+          </div>
+          <div>
+            <label style="font-size: 0.75rem; font-weight: bold; color: #64748b;">Role</label>
+            <select v-model="newUser.role" style="margin-bottom:0;font-size:0.85rem;">
               <option value="Attendee">Attendee</option>
-              <option value="Trainer">Trainer (Admin)</option>
+              <option value="Trainer">Trainer</option>
             </select>
           </div>
-          <button @click="createUser" style="margin-bottom: 0; height: 100%;">Create</button>
+          <button @click="createUser" style="margin-bottom:0;">Create</button>
         </div>
         <div v-if="userMessage" style="margin-top: 0.5rem; font-size: 0.9rem; color: #10b981;">{{ userMessage }}</div>
       </div>
 
       <!-- Users Table -->
-      <table style="width: 100%; text-align: left; border-collapse: collapse; margin-top: 1rem; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;">
+      <table style="width: 100%; text-align: left; border-collapse: collapse; margin-top: 1rem; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; font-size:0.85rem;">
         <thead style="background: var(--primary); color: white;">
           <tr>
-            <th style="padding: 0.75rem 1rem;">ID</th>
-            <th style="padding: 0.75rem 1rem;">Username</th>
-            <th style="padding: 0.75rem 1rem;">Password</th>
-            <th style="padding: 0.75rem 1rem;">Team/Unit</th>
-            <th style="padding: 0.75rem 1rem;">Role</th>
-            <th style="padding: 0.75rem 1rem;">Actions</th>
+            <th style="padding:0.5rem 0.75rem;">Avatar</th>
+            <th style="padding:0.5rem 0.75rem;">Username</th>
+            <th style="padding:0.5rem 0.75rem;">Display Name</th>
+            <th style="padding:0.5rem 0.75rem;">PIN</th>
+            <th style="padding:0.5rem 0.75rem;">Team</th>
+            <th style="padding:0.5rem 0.75rem;">Role</th>
+            <th style="padding:0.5rem 0.75rem;">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="u in usersList" :key="u.id" style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 0.75rem 1rem;">{{ u.id }}</td>
-            <td style="padding: 0.5rem 1rem;">
+            <td style="padding:0.4rem 0.75rem;">
               <template v-if="editingUser && editingUser.id === u.id">
-                <input v-model="editingUser.username" style="margin-bottom:0;padding:0.3rem 0.5rem;font-size:0.85rem;width:100%;" />
+                <input v-model="editingUser.avatar" placeholder="/uploads/..." style="margin-bottom:0;padding:0.2rem;font-size:0.8rem;width:80px;" />
+              </template>
+              <template v-else>
+                <img v-if="u.avatar" :src="resolveUrl(u.avatar)" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" />
+                <span v-else style="font-size:1.2rem;">👤</span>
+              </template>
+            </td>
+            <td style="padding:0.4rem 0.75rem;">
+              <template v-if="editingUser && editingUser.id === u.id">
+                <input v-model="editingUser.username" style="margin-bottom:0;padding:0.2rem;font-size:0.8rem;width:90px;" />
               </template>
               <template v-else><strong>{{ u.username }}</strong></template>
             </td>
-            <td style="padding: 0.5rem 1rem;">
+            <td style="padding:0.4rem 0.75rem;">
               <template v-if="editingUser && editingUser.id === u.id">
-                <input v-model="editingUser.password" type="password" placeholder="(unchanged)" style="margin-bottom:0;padding:0.3rem 0.5rem;font-size:0.85rem;width:100%;" />
+                <input v-model="editingUser.display_name" style="margin-bottom:0;padding:0.2rem;font-size:0.8rem;width:110px;" />
               </template>
-              <template v-else><span style="color:#94a3b8;">••••••</span></template>
+              <template v-else>{{ u.display_name || '—' }}</template>
             </td>
-            <td style="padding: 0.5rem 1rem;">
+            <td style="padding:0.4rem 0.75rem;">
+              <span style="font-family:monospace;font-weight:bold;font-size:1rem;letter-spacing:2px;color:var(--edps-blue,#1b4293);">{{ u.pin || '—' }}</span>
+            </td>
+            <td style="padding:0.4rem 0.75rem;">
               <template v-if="editingUser && editingUser.id === u.id">
-                <input v-model="editingUser.team" style="margin-bottom:0;padding:0.3rem 0.5rem;font-size:0.85rem;width:100%;" />
+                <input v-model="editingUser.team" style="margin-bottom:0;padding:0.2rem;font-size:0.8rem;width:70px;" />
               </template>
               <template v-else>{{ u.team }}</template>
             </td>
-            <td style="padding: 0.5rem 1rem;">
+            <td style="padding:0.4rem 0.75rem;">
               <template v-if="editingUser && editingUser.id === u.id">
-                <select v-model="editingUser.role" style="margin-bottom:0;padding:0.3rem;font-size:0.85rem;">
+                <select v-model="editingUser.role" style="margin-bottom:0;padding:0.2rem;font-size:0.8rem;">
                   <option value="Attendee">Attendee</option>
-                  <option value="Trainer">Trainer (Admin)</option>
+                  <option value="Trainer">Trainer</option>
                 </select>
               </template>
               <template v-else>
-                <span :style="{ color: u.role === 'Trainer' ? 'var(--primary)' : '#64748b', fontWeight: u.role === 'Trainer' ? 'bold' : 'normal' }">{{ u.role }}</span>
+                <span :style="{color: u.role==='Trainer'?'var(--primary)':'#64748b',fontWeight:u.role==='Trainer'?'bold':'normal'}">{{ u.role }}</span>
               </template>
             </td>
-            <td style="padding: 0.5rem 1rem;">
+            <td style="padding:0.4rem 0.75rem;">
               <div style="display:flex;gap:0.3rem;">
                 <template v-if="editingUser && editingUser.id === u.id">
-                  <button @click="saveUser" style="width:auto;padding:0.2rem 0.5rem;font-size:0.8rem;background:#10b981;">Save</button>
-                  <button @click="editingUser=null" class="secondary" style="width:auto;padding:0.2rem 0.5rem;font-size:0.8rem;">Cancel</button>
+                  <button @click="saveUser" style="width:auto;padding:0.15rem 0.4rem;font-size:0.75rem;background:#10b981;">Save</button>
+                  <button @click="editingUser=null" class="secondary" style="width:auto;padding:0.15rem 0.4rem;font-size:0.75rem;">Cancel</button>
                 </template>
                 <template v-else>
-                  <button @click="startEditUser(u)" class="secondary" style="width:auto;padding:0.2rem 0.5rem;font-size:0.8rem;">✏️ Edit</button>
-                  <button class="danger" style="width:auto;padding:0.2rem 0.5rem;font-size:0.8rem;" @click="deleteUser(u.id)" :disabled="u.username === user?.username">Delete</button>
+                  <button @click="startEditUser(u)" class="secondary" style="width:auto;padding:0.15rem 0.4rem;font-size:0.75rem;">✏️</button>
+                  <button class="danger" style="width:auto;padding:0.15rem 0.4rem;font-size:0.75rem;" @click="deleteUser(u.id)" :disabled="u.username === user?.username">🗑</button>
                 </template>
               </div>
             </td>
@@ -423,10 +458,59 @@
       <SurveyResults :slides="slides" />
     </div>
 
+    <!-- Tab: Analytics -->
+    <div v-if="activeTab === 'analytics'">
+      <h3>📈 Session Analytics</h3>
+      <div v-if="!analytics" style="text-align:center;padding:2rem;color:#64748b;">Loading analytics...</div>
+      <div v-else>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:2rem;">
+          <div style="padding:1.5rem;background:#e0f2fe;border-radius:12px;text-align:center;">
+            <div style="font-size:2rem;font-weight:bold;color:var(--edps-blue,#1b4293);">{{ analytics.totalAttendees }}</div>
+            <div style="font-size:0.85rem;color:#64748b;">Attendees</div>
+          </div>
+          <div style="padding:1.5rem;background:#f0fdf4;border-radius:12px;text-align:center;">
+            <div style="font-size:2rem;font-weight:bold;color:#059669;">{{ analytics.totalResponses }}</div>
+            <div style="font-size:0.85rem;color:#64748b;">Total Responses</div>
+          </div>
+          <div style="padding:1.5rem;background:#fef3c7;border-radius:12px;text-align:center;">
+            <div style="font-size:2rem;font-weight:bold;color:#d97706;">{{ analytics.slidesWithAnswers }}</div>
+            <div style="font-size:0.85rem;color:#64748b;">Slides with Answers</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+          <div style="flex:1;min-width:300px;">
+            <h4>Responses per Slide</h4>
+            <div v-for="s in analytics.responsesPerSlide" :key="s.slide_id" style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
+              <span style="width:80px;font-size:0.85rem;color:#64748b;">Slide {{ s.slide_id }}</span>
+              <div style="flex:1;background:#e2e8f0;height:20px;border-radius:10px;overflow:hidden;">
+                <div :style="{width:Math.min(100,s.responses/analytics.totalAttendees*100)+'%',height:'100%',background:'var(--edps-blue,#1b4293)',borderRadius:'10px',transition:'width 0.5s'}"></div>
+              </div>
+              <span style="font-size:0.85rem;font-weight:bold;">{{ s.responses }}</span>
+            </div>
+          </div>
+          <div v-if="analytics.quizLeaderboard.length" style="flex:1;min-width:250px;">
+            <h4>🏆 Quiz Leaderboard</h4>
+            <div v-for="(q, i) in analytics.quizLeaderboard" :key="q.username" style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem;border-bottom:1px solid #f1f5f9;">
+              <span style="font-weight:bold;width:20px;">{{ i+1 }}.</span>
+              <span style="flex:1;">{{ q.username }}</span>
+              <span style="font-weight:bold;color:var(--edps-blue);">{{ q.total_points }} pts</span>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:1.5rem;text-align:center;">
+          <button @click="exportAnalyticsPDF" class="secondary" style="width:auto;padding:0.5rem 1.5rem;">📄 Export Report as PDF</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Tab: Media Library -->
     <div v-if="activeTab === 'media'">
       <MediaManager />
     </div>
+
+    <!-- Modals -->
+    <SpinningWheel :visible="showWheel" :attendees="wheelAttendees" @close="showWheel=false" @result="onWheelResult" />
+    <Leaderboard :visible="showLeaderboard" :entries="leaderboardEntries" @close="showLeaderboard=false" />
   </div>
 
   <!-- FULLSCREEN TRAINER VIEW (MIRRORS ATTENDEE EXACTLY) -->
@@ -622,9 +706,11 @@ import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 import SurveyResults from './SurveyResults.vue';
 import MediaManager from './MediaManager.vue';
 import SlideCanvas from './SlideCanvas.vue';
+import SpinningWheel from './SpinningWheel.vue';
+import Leaderboard from './Leaderboard.vue';
 
 export default {
-  components: { SurveyResults, MediaManager, SlideCanvas },
+  components: { SurveyResults, MediaManager, SlideCanvas, SpinningWheel, Leaderboard },
   data() {
     return {
       activeTab: 'live',
@@ -639,7 +725,7 @@ export default {
       pollProgress: { answered: 0, total: 0 },
       saveMessage: '',
       usersList: [],
-      newUser: { username: '', password: '', team: '', role: 'Attendee' },
+      newUser: { username: '', password: '', team: '', role: 'Attendee', display_name: '', avatar: '' },
       editingUser: null,
       userMessage: '',
       dragIdx: null,
@@ -653,6 +739,13 @@ export default {
       reactions: [],
       showQR: false,
       showTemplateMenu: false,
+      showWheel: false,
+      showLeaderboard: false,
+      wheelAttendees: [],
+      leaderboardEntries: [],
+      sessionCode: '',
+      analytics: null,
+      presenterWindow: null,
       slideTemplates: [
         { name: 'Title + Image', icon: '🖼', type: 'content', elements: [
           { id: 'tpl_t', kind: 'text', x: 50, y: 90, w: 450, h: 60, content: 'Your Title Here', fontSize: 32, fontFamily: 'Segoe UI', bold: true, italic: false, color: '#1b4293', textAlign: 'left' },
@@ -725,6 +818,7 @@ export default {
     
     await this.fetchSlides();
     this.fetchUsers();
+    this.loadSessionCode();
 
     // Apply dark mode if saved
     if (this.darkMode) document.documentElement.setAttribute('data-theme', 'dark');
@@ -900,7 +994,7 @@ export default {
         });
         if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed to create user'); }
           this.userMessage = 'User provisioned successfully!';
-          this.newUser = { username: '', password: '', team: '', role: 'Attendee' };
+          this.newUser = { username: '', password: '', team: '', role: 'Attendee', display_name: '', avatar: '' };
           this.fetchUsers();
           setTimeout(() => this.userMessage = '', 3000);
       } catch(e) { this.showError(e.message); }
@@ -914,7 +1008,7 @@ export default {
       } catch(e) { this.showError(e.message); }
     },
     startEditUser(u) {
-      this.editingUser = { id: u.id, username: u.username, password: '', team: u.team, role: u.role };
+      this.editingUser = { id: u.id, username: u.username, password: '', team: u.team, role: u.role, display_name: u.display_name || '', avatar: u.avatar || '' };
     },
     async saveUser() {
       if (!this.editingUser) return;
@@ -944,6 +1038,8 @@ export default {
         this.editSlides.push({ id, type: 'title', title: 'New Topic', subtitle: 'A new section', content: 'Details here', image: '', video: '' });
       } else if (type === 'timer') {
         this.editSlides.push({ id, type: 'timer', title: 'Countdown Timer', duration: 300 });
+      } else if (type === 'rating') {
+        this.editSlides.push({ id, type: 'rating', title: 'Rate this session', question: 'How would you rate this topic?', ratingType: 'emoji' });
       } else if (type === 'section') {
         this.editSlides.push({ id, type: 'section', title: 'Section Title', subtitle: '' });
       } else {
@@ -1038,11 +1134,11 @@ export default {
     },
     // Slide type visual helpers
     slideTypeColor(type) {
-      const colors = { title: '#1b4293', content: '#059669', section: '#d97706', poll: '#7c3aed', survey: '#e11d48', timer: '#0891b2' };
+      const colors = { title: '#1b4293', content: '#059669', section: '#d97706', poll: '#7c3aed', survey: '#e11d48', timer: '#0891b2', rating: '#f59e0b' };
       return colors[type] || '#64748b';
     },
     slideTypeIcon(type) {
-      const icons = { title: '📌', content: '📝', section: '📂', poll: '📊', survey: '📋', timer: '⏱' };
+      const icons = { title: '📌', content: '📝', section: '📂', poll: '📊', survey: '📋', timer: '⏱', rating: '😀' };
       return icons[type] || '📄';
     },
     // Bidirectional sync: textarea ↔ first text element in visual editor
@@ -1286,6 +1382,66 @@ export default {
       this.timerRunning = false;
       this.timerSeconds = this.currentSlide.duration || 300;
       clearInterval(this.timerInterval);
+    },
+    async openWheel() {
+      try {
+        const res = await authFetch(`${baseUrl}/api/attendees`);
+        if (res.ok) this.wheelAttendees = await res.json();
+      } catch (e) { /* ignore */ }
+      this.showWheel = true;
+    },
+    onWheelResult(winner) {
+      if (this.socket) this.socket.emit('wheel:result', winner.username);
+    },
+    async openLeaderboard() {
+      try {
+        const res = await authFetch(`${baseUrl}/api/quiz/leaderboard`);
+        if (res.ok) this.leaderboardEntries = await res.json();
+      } catch (e) { /* ignore */ }
+      this.showLeaderboard = true;
+    },
+    async loadAnalytics() {
+      try {
+        const res = await authFetch(`${baseUrl}/api/analytics`);
+        if (res.ok) this.analytics = await res.json();
+      } catch (e) { this.showError('Failed to load analytics'); }
+    },
+    exportAnalyticsPDF() {
+      if (!this.analytics) return;
+      const a = this.analytics;
+      const w = window.open('', '_blank');
+      let html = `<html><head><title>PEDRRA Analytics Report</title><style>body{font-family:'Segoe UI',sans-serif;padding:2rem;color:#333;}h1{color:#1b4293;}table{width:100%;border-collapse:collapse;margin:1rem 0;}th,td{padding:0.5rem;border:1px solid #e2e8f0;text-align:left;}th{background:#f1f5f9;}</style></head><body>`;
+      html += `<h1>📈 PEDRRA Session Analytics Report</h1>`;
+      html += `<p>Generated: ${new Date().toLocaleString()}</p>`;
+      html += `<h2>Summary</h2><table><tr><th>Metric</th><th>Value</th></tr>`;
+      html += `<tr><td>Total Attendees</td><td>${a.totalAttendees}</td></tr>`;
+      html += `<tr><td>Total Responses</td><td>${a.totalResponses}</td></tr>`;
+      html += `<tr><td>Slides with Answers</td><td>${a.slidesWithAnswers}</td></tr></table>`;
+      if (a.responsesPerSlide?.length) {
+        html += `<h2>Responses per Slide</h2><table><tr><th>Slide</th><th>Responses</th></tr>`;
+        a.responsesPerSlide.forEach(s => { html += `<tr><td>Slide ${s.slide_id}</td><td>${s.responses}</td></tr>`; });
+        html += `</table>`;
+      }
+      if (a.quizLeaderboard?.length) {
+        html += `<h2>Quiz Leaderboard</h2><table><tr><th>#</th><th>Username</th><th>Points</th><th>Correct</th></tr>`;
+        a.quizLeaderboard.forEach((q, i) => { html += `<tr><td>${i+1}</td><td>${q.username}</td><td>${q.total_points}</td><td>${q.correct}</td></tr>`; });
+        html += `</table>`;
+      }
+      html += `</body></html>`;
+      w.document.write(html);
+      w.document.close();
+      w.onload = () => w.print();
+    },
+    openPresenterMode() {
+      // Open a second window showing the attendee view
+      const url = window.location.origin + '/attendee';
+      this.presenterWindow = window.open(url, 'presenter', 'width=1024,height=576');
+    },
+    async loadSessionCode() {
+      try {
+        const res = await fetch(`${baseUrl}/api/session-code`);
+        if (res.ok) { const d = await res.json(); this.sessionCode = d.code; }
+      } catch (e) { /* ignore */ }
     },
     _playTimerEndSound() {
       try {
