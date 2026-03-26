@@ -740,26 +740,40 @@
     <!-- ═══ FULLSCREEN OVERLAYS (only trainer sees, projected to students) ═══ -->
 
     <!-- Spinning Wheel overlay (fullscreen) -->
-    <div v-if="showWheel && isFullscreen" class="pres-overlay" @click.self="showWheel=false">
-      <div style="text-align:center;">
-        <div style="position:relative;width:400px;height:400px;margin:0 auto;">
-          <div :style="{width:'100%',height:'100%',borderRadius:'50%',border:'6px solid white',overflow:'hidden',transition:wheelSpinState?'transform 4s cubic-bezier(0.17,0.67,0.12,0.99)':'none',transform:'rotate('+fullscreenWheelRotation+'deg)',boxShadow:'0 0 50px rgba(0,0,0,0.5)'}">
-            <div v-for="(att, i) in wheelAttendees" :key="i" :style="fsWedgeStyle(i)" style="display:flex;align-items:center;justify-content:center;overflow:hidden;">
-              <span :style="{transform:'rotate('+(90+360/Math.max(wheelAttendees.length,1)/2)+'deg)',display:'block',fontSize:wheelAttendees.length>10?'0.6rem':'0.8rem',fontWeight:'bold',color:'white',textShadow:'1px 1px 3px rgba(0,0,0,0.6)',maxWidth:'70px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}">{{ att.display_name || att.username }}</span>
-            </div>
+    <div v-if="showWheel && isFullscreen" style="position:absolute;inset:0;z-index:500;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;animation:overlayFadeIn 0.3s ease-out;">
+      <!-- Title -->
+      <div style="color:white;font-size:2rem;font-weight:bold;margin-bottom:2rem;text-shadow:0 2px 8px rgba(0,0,0,0.5);">🎲 Who's next?</div>
+
+      <!-- Slot machine display -->
+      <div style="position:relative;width:350px;height:200px;overflow:hidden;border-radius:20px;border:4px solid var(--edps-gold);box-shadow:0 0 60px rgba(241,192,100,0.3),inset 0 0 30px rgba(0,0,0,0.3);background:#1e293b;">
+        <!-- Selection indicator -->
+        <div style="position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);height:70px;border-top:3px solid var(--edps-gold);border-bottom:3px solid var(--edps-gold);background:rgba(241,192,100,0.1);z-index:5;pointer-events:none;"></div>
+        <!-- Scrolling names -->
+        <div style="position:absolute;left:0;right:0;display:flex;flex-direction:column;align-items:center;transition:transform 0.1s ease-out;" :style="{transform:'translateY('+slotOffset+'px)'}">
+          <div v-for="(att, i) in slotItems" :key="'slot-'+i" style="height:70px;display:flex;align-items:center;justify-content:center;gap:1rem;width:100%;padding:0 1.5rem;">
+            <img v-if="att.avatar" :src="resolveUrl(att.avatar)" style="width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);flex-shrink:0;" />
+            <div v-else style="width:50px;height:50px;border-radius:50%;background:var(--edps-blue);display:flex;align-items:center;justify-content:center;color:white;font-size:1.2rem;font-weight:bold;flex-shrink:0;">{{ (att.display_name || att.username || '?')[0] }}</div>
+            <span style="color:white;font-size:1.4rem;font-weight:bold;text-shadow:0 1px 4px rgba(0,0,0,0.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ att.display_name || att.username }}</span>
           </div>
-          <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:18px solid transparent;border-right:18px solid transparent;border-top:32px solid #e11d48;z-index:10;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.4));"></div>
         </div>
-        <div v-if="fullscreenWheelWinner" style="margin-top:2rem;padding:1.2rem 2.5rem;background:rgba(255,255,255,0.95);border-radius:20px;display:inline-flex;align-items:center;gap:1.2rem;animation:podiumRise 0.5s ease-out;">
-          <span style="font-size:3rem;">🎉</span>
-          <img v-if="fullscreenWheelWinner.avatar" :src="resolveUrl(fullscreenWheelWinner.avatar)" style="width:70px;height:70px;border-radius:50%;object-fit:cover;border:3px solid var(--edps-gold);" />
-          <span style="font-size:2.2rem;font-weight:bold;color:var(--edps-blue);">{{ fullscreenWheelWinner.display_name || fullscreenWheelWinner.username }}</span>
-          <span style="font-size:3rem;">🎉</span>
+      </div>
+
+      <!-- Winner reveal -->
+      <div v-if="fullscreenWheelWinner" style="margin-top:2rem;animation:podiumRise 0.5s ease-out;">
+        <div style="display:flex;align-items:center;gap:1.5rem;padding:1.5rem 3rem;background:linear-gradient(135deg,var(--edps-gold),#f59e0b);border-radius:24px;box-shadow:0 10px 40px rgba(241,192,100,0.4);">
+          <span style="font-size:3.5rem;">🎉</span>
+          <img v-if="fullscreenWheelWinner.avatar" :src="resolveUrl(fullscreenWheelWinner.avatar)" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:4px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.3);" />
+          <div style="text-align:left;">
+            <div style="font-size:2.5rem;font-weight:900;color:white;text-shadow:0 2px 4px rgba(0,0,0,0.3);">{{ fullscreenWheelWinner.display_name || fullscreenWheelWinner.username }}</div>
+          </div>
+          <span style="font-size:3.5rem;">🎉</span>
         </div>
-        <div style="margin-top:1.5rem;display:flex;gap:0.8rem;justify-content:center;">
-          <button @click.stop="spinFullscreenWheel" :disabled="wheelSpinState || wheelAttendees.length < 2" style="padding:0.8rem 2.5rem;font-size:1.1rem;border-radius:30px;">🎡 Spin!</button>
-          <button @click.stop="showWheel=false" class="secondary" style="width:auto;padding:0.8rem 1.5rem;border-radius:30px;">Close</button>
-        </div>
+      </div>
+
+      <!-- Controls -->
+      <div style="margin-top:2rem;display:flex;gap:1rem;">
+        <button @click.stop="spinSlotMachine" :disabled="wheelSpinState || wheelAttendees.length < 2" style="padding:1rem 3rem;font-size:1.2rem;border-radius:30px;background:var(--edps-gold);color:white;border:none;font-weight:bold;cursor:pointer;box-shadow:0 4px 20px rgba(241,192,100,0.4);">🎲 Pick Someone!</button>
+        <button @click.stop="showWheel=false" style="padding:1rem 2rem;font-size:1.1rem;border-radius:30px;background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);cursor:pointer;">✕ Close</button>
       </div>
     </div>
 
@@ -859,6 +873,9 @@ export default {
       fullscreenWheelRotation: 0,
       wheelSpinState: false,
       fullscreenWheelWinner: null,
+      slotOffset: 0,
+      slotItems: [],
+      slotAnimFrame: null,
       fullscreenHandNotifs: [],
       showTemplateMenu: false,
       showWheel: false,
@@ -1644,6 +1661,9 @@ export default {
         if (res.ok) this.wheelAttendees = await res.json();
       } catch (e) { /* ignore */ }
       this.showWheel = true;
+      this.slotItems = [...this.wheelAttendees];
+      this.slotOffset = 0;
+      this.fullscreenWheelWinner = null;
     },
     onWheelResult(winner) {
       if (this.socket) {
@@ -1661,29 +1681,49 @@ export default {
     showQROverlay() {
       this.showQR = !this.showQR;
     },
-    fsWedgeStyle(i) {
-      const COLORS = ['#254A9A','#F1C064','#e11d48','#059669','#7c3aed','#d97706','#0891b2','#be185d','#4f46e5','#ca8a04','#0d9488','#dc2626'];
-      const n = this.wheelAttendees.length || 1;
-      const angle = 360 / n;
-      return {
-        position:'absolute', width:'50%', height:'50%', top:'0', right:'0',
-        transformOrigin:'0% 100%',
-        transform:`rotate(${angle*i-90}deg) skewY(${-(90-angle)}deg)`,
-        background: COLORS[i % COLORS.length],
-      };
-    },
-    spinFullscreenWheel() {
+    spinSlotMachine() {
       if (this.wheelSpinState || this.wheelAttendees.length < 2) return;
       this.fullscreenWheelWinner = null;
       this.wheelSpinState = true;
-      const extraSpins = 5 + Math.floor(Math.random() * 5);
+
+      // Build a long list of shuffled items to scroll through
+      const items = [];
+      const totalCycles = 8 + Math.floor(Math.random() * 4); // 8-12 full cycles
+      for (let c = 0; c < totalCycles; c++) {
+        const shuffled = [...this.wheelAttendees].sort(() => Math.random() - 0.5);
+        items.push(...shuffled);
+      }
+      // Pick winner and put at the end
       const winnerIdx = Math.floor(Math.random() * this.wheelAttendees.length);
-      const angle = 360 / this.wheelAttendees.length;
-      this.fullscreenWheelRotation = 360 * extraSpins + (360 - angle * winnerIdx - angle / 2);
-      setTimeout(() => {
-        this.wheelSpinState = false;
-        this.fullscreenWheelWinner = this.wheelAttendees[winnerIdx];
-      }, 4200);
+      const winner = this.wheelAttendees[winnerIdx];
+      items.push(winner);
+      this.slotItems = items;
+
+      // Animate: start fast, decelerate to stop on the last item
+      const itemH = 70; // px per item
+      const totalItems = items.length;
+      const targetOffset = -((totalItems - 1) * itemH) + itemH; // center the last item
+      const duration = 4500; // total animation time ms
+      const startTime = performance.now();
+      const startOffset = 0;
+      this.slotOffset = startOffset;
+
+      const animate = (now) => {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        // Ease out cubic for dramatic slow-down
+        const eased = 1 - Math.pow(1 - progress, 3);
+        this.slotOffset = startOffset + (targetOffset - startOffset) * eased;
+
+        if (progress < 1) {
+          this.slotAnimFrame = requestAnimationFrame(animate);
+        } else {
+          this.slotOffset = targetOffset;
+          this.wheelSpinState = false;
+          this.fullscreenWheelWinner = winner;
+        }
+      };
+      this.slotAnimFrame = requestAnimationFrame(animate);
     },
     async loadAnalytics() {
       try {

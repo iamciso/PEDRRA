@@ -320,7 +320,7 @@ app.post('/api/upload', authMiddleware('Trainer'), upload.single('file'), (req, 
     res.json({ url: `/uploads/${req.file.filename}`, filename: req.file.filename });
 });
 
-// Import PPTX — extract slides from a PowerPoint file
+// Import PPTX — extract slides as images
 const JSZip = require('jszip');
 const xml2js = require('xml2js');
 
@@ -329,39 +329,29 @@ app.post('/api/import-pptx', authMiddleware('Trainer'), upload.single('file'), a
     try {
         const zipData = fs.readFileSync(req.file.path);
         const zip = await JSZip.loadAsync(zipData);
+        const parser = new xml2js.Parser({ explicitArray: false, ignoreAttrs: false });
 
-        // Find all slide XML files
+        // Find slide XML files
         const slideFiles = Object.keys(zip.files)
             .filter(f => f.match(/^ppt\/slides\/slide\d+\.xml$/))
-            .sort((a, b) => {
-                const na = parseInt(a.match(/slide(\d+)/)[1]);
-                const nb = parseInt(b.match(/slide(\d+)/)[1]);
-                return na - nb;
-            });
+            .sort((a, b) => parseInt(a.match(/slide(\d+)/)[1]) - parseInt(b.match(/slide(\d+)/)[1]));
 
-        const parser = new xml2js.Parser({ explicitArray: false, ignoreAttrs: false });
-        const slides = [];
-
-        // Extract images from pptx
-        const imageFiles = Object.keys(zip.files).filter(f => f.startsWith('ppt/media/'));
+        // Save ALL media files from pptx
+        const mediaFiles = Object.keys(zip.files).filter(f => f.startsWith('ppt/media/'));
         const imageMap = {};
-        for (const imgPath of imageFiles) {
+        for (const imgPath of mediaFiles) {
             const imgData = await zip.files[imgPath].async('base64');
-            const ext = path.extname(imgPath).replace('.', '');
-            const mimeType = ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
-            const fname = Date.now() + '_' + path.basename(imgPath);
+            const fname = Date.now() + '_' + path.basename(imgPath).replace(/[^a-zA-Z0-9._-]/g, '_');
             fs.writeFileSync(path.join(uploadsDir, fname), Buffer.from(imgData, 'base64'));
             imageMap[path.basename(imgPath)] = `/uploads/${fname}`;
         }
 
-        // Parse relationship files for image references
+        const slides = [];
         for (let i = 0; i < slideFiles.length; i++) {
+            // Extract title text only
             const slideXml = await zip.files[slideFiles[i]].async('string');
             const result = await parser.parseStringPromise(slideXml);
-
-            // Extract text from the slide
             let texts = [];
-            let title = '';
             const extractText = (obj) => {
                 if (!obj) return;
                 if (typeof obj === 'string') return;
@@ -373,14 +363,11 @@ app.post('/api/import-pptx', authMiddleware('Trainer'), upload.single('file'), a
                 else if (typeof obj === 'object') Object.values(obj).forEach(extractText);
             };
             extractText(result);
+            const title = texts[0] || `Slide ${i + 1}`;
 
-            // First text is usually the title
-            title = texts[0] || `Slide ${i + 1}`;
-            const content = texts.slice(1).join('\n');
-
-            // Find images referenced by this slide
+            // Find ALL images referenced by this slide (background + content)
             const relPath = slideFiles[i].replace('ppt/slides/', 'ppt/slides/_rels/') + '.rels';
-            let slideImage = '';
+            let slideImages = [];
             if (zip.files[relPath]) {
                 const relsXml = await zip.files[relPath].async('string');
                 const relsResult = await parser.parseStringPromise(relsXml);
@@ -388,27 +375,33 @@ app.post('/api/import-pptx', authMiddleware('Trainer'), upload.single('file'), a
                 const relArr = Array.isArray(rels) ? rels : (rels ? [rels] : []);
                 for (const rel of relArr) {
                     const target = rel?.$?.Target || '';
-                    if (target.match(/\.png|\.jpg|\.jpeg|\.gif|\.webp/i)) {
+                    if (target.match(/\.(png|jpg|jpeg|gif|webp|emf|wmf)$/i)) {
                         const imgName = path.basename(target);
-                        if (imageMap[imgName]) { slideImage = imageMap[imgName]; break; }
+                        if (imageMap[imgName]) slideImages.push(imageMap[imgName]);
                     }
                 }
             }
 
-            // Determine slide type
-            let type = 'content';
-            if (i === 0) type = 'title';
+            // Use the LARGEST image as the slide background (usually the full-slide image)
+            // This works best when PPTX has been exported with slide images
+            const mainImage = slideImages.length > 0 ? slideImages[0] : '';
 
             slides.push({
                 id: Date.now() + i,
-                type,
+                type: i === 0 ? 'title' : 'content',
                 title,
                 subtitle: '',
-                content,
-                image: slideImage,
+                content: '',
+                image: mainImage,
                 video: '',
                 ratingEnabled: false,
                 notes: '',
+                elements: mainImage ? [{
+                    id: 'img_' + Date.now() + '_' + i,
+                    kind: 'image',
+                    src: mainImage,
+                    x: 0, y: 0, w: 940, h: 500
+                }] : [],
             });
         }
 
