@@ -741,14 +741,7 @@ export default {
     };
     window.addEventListener('keydown', this._keyHandler);
 
-    // Reactions listener
-    this.socket.on('reaction:new', (r) => {
-      this.reactions.push(r);
-      if (this.reactions.length > 20) this.reactions.shift();
-      setTimeout(() => { this.reactions.shift(); }, 5000);
-    });
-
-    // #6 — Socket auth
+    // Create socket connection FIRST
     this.socket = io(baseUrl, { auth: { token: getToken() } });
 
     this.socket.on('connect', () => { this.connected = true; });
@@ -771,6 +764,12 @@ export default {
 
     this.socket.on('slide:visibility', (visible) => {
       this.isSlideVisible = visible;
+    });
+
+    this.socket.on('reaction:new', (r) => {
+      this.reactions.push(r);
+      if (this.reactions.length > 20) this.reactions.shift();
+      setTimeout(() => { this.reactions.shift(); }, 5000);
     });
 
     this.checkPollResults();
@@ -840,13 +839,26 @@ export default {
       });
     },
     toggleFullscreen() {
-      const elem = document.documentElement; // Enter full standard web fullscreen
-      if (!document.fullscreenElement) {
-        elem.requestFullscreen().catch((err) => {
-          console.error(`Error attempting to enable fullscreen: ${err.message}`);
-        });
+      if (!this.isFullscreen) {
+        // Try native fullscreen first, fall back to manual
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+          elem.requestFullscreen().catch(() => {
+            // Fullscreen API failed (e.g., iframe restrictions), use manual mode
+            this.isFullscreen = true;
+            this.$nextTick(() => this.resizeSlide());
+          });
+        } else {
+          // No Fullscreen API support, use manual mode
+          this.isFullscreen = true;
+          this.$nextTick(() => this.resizeSlide());
+        }
       } else {
-        document.exitFullscreen();
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else {
+          this.isFullscreen = false;
+        }
       }
     },
     migrateQuestions(slidesData) {
