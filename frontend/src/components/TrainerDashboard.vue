@@ -575,13 +575,13 @@
           <div style="position:absolute;top:3%;left:2%;z-index:3;">
             <img src="/template/edps_logo.png" style="height:55px;" alt="EDPS Logo" />
           </div>
-          <!-- Title in the right-side area (over the gold/white region of template) -->
-          <div style="position:absolute;top:6%;left:52%;width:44%;z-index:2;padding:1rem;">
+          <!-- Title in the white rectangle (center-left of cover bg) -->
+          <div style="position:absolute;top:30%;left:15%;width:33%;z-index:2;padding:1rem;">
             <h2 style="margin:0;font-size:1.6rem;line-height:1.3;color:var(--edps-blue);">{{ currentSlide.title }}</h2>
-            <div v-if="currentSlide.subtitle" style="margin-top:0.8rem;font-size:1rem;color:#555;">{{ currentSlide.subtitle }}</div>
+            <div v-if="currentSlide.subtitle" style="margin-top:0.8rem;font-size:1rem;color:#666;">{{ currentSlide.subtitle }}</div>
           </div>
-          <!-- Content in the white rectangle area -->
-          <div v-if="currentSlide.content" style="position:absolute;top:40%;left:18%;width:30%;z-index:2;color:#333;font-size:0.9rem;line-height:1.5;">{{ currentSlide.content }}</div>
+          <!-- Content in the gold rectangle area (right side) -->
+          <div v-if="currentSlide.content" style="position:absolute;top:55%;right:8%;width:35%;z-index:2;color:white;font-size:0.9rem;line-height:1.5;">{{ currentSlide.content }}</div>
         </div>
 
         <!-- #10 — SECTION SLIDE TEMPLATE (fullscreen) -->

@@ -47,14 +47,14 @@
           <img src="/template/edps_logo.png" style="height:55px;" onerror="this.style.display='none'" />
         </div>
 
-        <!-- Title + subtitle in the white rectangle area (center-left of cover) -->
-        <div style="position:absolute;top:7%;left:53%;width:43%;z-index:2;padding:0.8rem;">
-          <div style="color:var(--edps-blue);font-size:1.3rem;font-weight:900;line-height:1.3;">{{ currentSlide.title }}</div>
-          <div v-if="currentSlide.subtitle" style="color:#555;font-size:0.85rem;margin-top:0.6rem;">{{ currentSlide.subtitle }}</div>
+        <!-- Title + subtitle in the white rectangle (center-left of cover bg) -->
+        <div style="position:absolute;top:30%;left:15%;width:33%;z-index:2;padding:1rem;">
+          <div style="color:var(--edps-blue);font-size:1.5rem;font-weight:900;line-height:1.3;">{{ currentSlide.title }}</div>
+          <div v-if="currentSlide.subtitle" style="color:#666;font-size:0.9rem;margin-top:0.8rem;">{{ currentSlide.subtitle }}</div>
         </div>
 
-        <!-- Content text in the gold area (bottom-right of cover) -->
-        <div v-if="currentSlide.content" style="position:absolute;bottom:18%;right:5%;width:40%;color:white;font-size:0.8rem;z-index:2;text-align:right;">{{ currentSlide.content }}</div>
+        <!-- Content text in the gold rectangle area (right side) -->
+        <div v-if="currentSlide.content" style="position:absolute;top:55%;right:8%;width:35%;color:white;font-size:0.8rem;z-index:2;">{{ currentSlide.content }}</div>
       </div>
 
       <!-- ═══ SECTION TITLE SLIDE ═══ -->
