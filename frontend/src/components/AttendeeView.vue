@@ -41,46 +41,20 @@
     <div v-else class="edps-presentation" :style="slideTransform">
 
       <!-- ═══ TITLE SLIDE ═══ -->
-      <div v-if="currentSlide.type === 'title'" style="position:relative;width:100%;height:100%;background:#d0cdc8;overflow:hidden;">
-
-        <!-- Top-left white header box -->
-        <div style="position:absolute;top:0;left:0;width:38%;height:42%;background:white;display:flex;flex-direction:column;padding:1.2rem 1.4rem;z-index:2;">
-          <div style="display:flex;align-items:flex-start;gap:0.8rem;margin-bottom:0.6rem;">
-            <img src="/logo.png" style="height:48px;" onerror="this.style.display='none'" />
-            <div style="font-size:0.7rem;font-weight:900;color:var(--edps-blue,#1b4293);line-height:1.3;letter-spacing:0.5px;padding-top:2px;">EUROPEAN<br/>DATA PROTECTION<br/>SUPERVISOR</div>
-          </div>
-          <div style="font-size:0.65rem;color:#555;margin-top:0.3rem;font-style:italic;">The EU's independent data protection authority</div>
+      <div v-if="currentSlide.type === 'title'" style="position:relative;width:100%;height:100%;background-image:url('/template/cover_bg.jpg');background-size:cover;background-position:center;overflow:hidden;">
+        <!-- EDPS logo (top-left, matching template position) -->
+        <div style="position:absolute;top:0.5rem;left:0.5rem;z-index:3;">
+          <img src="/template/edps_logo.png" style="height:55px;" onerror="this.style.display='none'" />
         </div>
 
-        <!-- Top-right blue square + white circle decoration -->
-        <div style="position:absolute;top:0;right:0;width:62%;height:42%;background:white;z-index:1;">
-          <div style="position:absolute;top:0;right:0;width:70px;height:70px;background:var(--edps-blue,#1b4293);display:flex;align-items:center;justify-content:center;">
-            <div style="width:42px;height:42px;background:white;border-radius:50%;"></div>
-          </div>
+        <!-- Title text area (right side, over the gold rectangle area of template) -->
+        <div style="position:absolute;top:0.5rem;right:1rem;width:48%;z-index:2;padding:1rem;">
+          <div style="color:var(--edps-blue,#3B5998);font-size:1.4rem;font-weight:900;line-height:1.4;letter-spacing:0.5px;">{{ currentSlide.title }}</div>
+          <div v-if="currentSlide.subtitle" style="color:#555;font-size:0.9rem;margin-top:0.8rem;">{{ currentSlide.subtitle }}</div>
         </div>
 
-        <!-- Bottom-left GOLD section: training title -->
-        <div style="position:absolute;bottom:0;left:0;width:35%;height:58%;background:var(--edps-gold,#dea133);padding:1.5rem;display:flex;flex-direction:column;justify-content:center;">
-          <div style="color:white;font-size:1rem;font-weight:700;line-height:1.5;font-style:italic;letter-spacing:0.5px;white-space:pre-wrap;">{{ currentSlide.title }}</div>
-          <div style="color:rgba(255,255,255,0.9);font-size:0.78rem;margin-top:1rem;font-style:italic;">{{ currentSlide.subtitle }}</div>
-        </div>
-
-        <!-- Bottom-right BLUE section: code + binary pattern -->
-        <div style="position:absolute;bottom:0;right:0;width:65%;height:58%;background:var(--edps-blue,#1b4293);overflow:hidden;">
-          <!-- Binary pattern overlay -->
-          <div style="position:absolute;inset:0;font-size:9px;font-family:monospace;color:rgba(255,255,255,0.18);line-height:1.4;word-break:break-all;padding:0.5rem;overflow:hidden;user-select:none;pointer-events:none;">{{ binaryPattern }}</div>
-          <!-- Training code -->
-          <div style="position:absolute;bottom:2rem;right:1.5rem;left:1rem;display:flex;align-items:center;gap:0.8rem;">
-            <div style="width:48px;height:48px;border:2px solid rgba(255,255,255,0.4);border-radius:4px;display:flex;align-items:center;justify-content:center;color:white;font-size:0.6rem;font-weight:bold;text-align:center;">🛡</div>
-            <div style="font-size:2rem;font-weight:900;color:white;letter-spacing:3px;">PEDRRA</div>
-          </div>
-          <div v-if="currentSlide.content" style="position:absolute;top:1.2rem;left:1rem;right:1rem;color:rgba(255,255,255,0.8);font-size:0.75rem;">{{ currentSlide.content }}</div>
-        </div>
-
-        <!-- Bottom strip -->
-        <div style="position:absolute;bottom:0;left:35%;right:0;height:2.2rem;background:rgba(0,0,0,0.25);display:flex;align-items:center;padding:0 1rem;">
-          <span style="color:rgba(255,255,255,0.8);font-size:0.65rem;">Systems Oversight and Technology Audits Sector, and Privacy Unit</span>
-        </div>
+        <!-- Content text (bottom-left gold area) -->
+        <div v-if="currentSlide.content" style="position:absolute;bottom:6rem;left:2rem;width:30%;color:white;font-size:0.8rem;z-index:2;">{{ currentSlide.content }}</div>
 
         <!-- Overlaid image if present -->
         <div v-if="currentSlide.image" style="position:absolute;top:42%;left:38%;transform:translate(-50%,-50%);max-width:150px;z-index:5;">
@@ -89,33 +63,22 @@
       </div>
 
       <!-- ═══ SECTION TITLE SLIDE ═══ -->
-      <div v-else-if="currentSlide.type === 'section'" style="position:relative;width:100%;height:100%;background:#d0cdc8;overflow:hidden;">
-        <div style="position:absolute;inset:0;font-size:9px;font-family:monospace;color:rgba(100,100,100,0.2);line-height:1.4;word-break:break-all;padding:0.5rem;overflow:hidden;user-select:none;pointer-events:none;">{{ binaryPattern }}</div>
-        <!-- Blue square + white circle - top left -->
-        <div style="position:absolute;top:0;left:0;width:90px;height:90px;background:var(--edps-blue,#1b4293);display:flex;align-items:center;justify-content:center;">
-          <div style="width:55px;height:55px;background:white;border-radius:50%;"></div>
-        </div>
-        <!-- Gold arc top-center -->
-        <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:180px;height:90px;background:var(--edps-gold,#dea133);border-radius:0 0 90px 90px;"></div>
-        <!-- White box with empty space top-right -->
-        <div style="position:absolute;top:0;right:0;width:35%;height:40%;background:white;opacity:0.85;"></div>
-        <!-- Main title box center-left -->
-        <div style="position:absolute;top:35%;left:8%;width:42%;padding:1.5rem 2rem;background:var(--edps-blue,#1b4293);">
+      <div v-else-if="currentSlide.type === 'section'" style="position:relative;width:100%;height:100%;background-image:url('/template/section_bg.png');background-size:cover;background-position:center;overflow:hidden;">
+        <!-- Main title box center-left (overlaid on template background) -->
+        <div style="position:absolute;top:35%;left:8%;width:42%;padding:1.5rem 2rem;background:var(--edps-blue,#3B5998);">
           <div style="color:white;font-weight:bold;font-size:1.6rem;line-height:1.3;">{{ currentSlide.title }}</div>
           <div v-if="currentSlide.subtitle" style="color:rgba(255,255,255,0.8);font-size:0.95rem;margin-top:0.5rem;">{{ currentSlide.subtitle }}</div>
         </div>
-        <!-- Gold bottom-left rectangle -->
-        <div style="position:absolute;bottom:0;left:0;width:28%;height:30%;background:var(--edps-gold,#dea133);opacity:0.85;"></div>
         <!-- Slide number -->
-        <div style="position:absolute;bottom:1rem;right:1rem;color:var(--edps-blue,#1b4293);font-size:0.8rem;font-weight:bold;">{{ currentSlideNumber }}</div>
+        <div style="position:absolute;bottom:1rem;right:1rem;color:var(--edps-blue,#3B5998);font-size:0.8rem;font-weight:bold;">{{ currentSlideNumber }}</div>
       </div>
 
       <!-- ═══ CONTENT / POLL / SURVEY ═══ -->
       <template v-else>
-        <!-- Header: logo + title (matches EDPS reference) -->
-        <div style="display:flex;align-items:center;padding:0.9rem 2rem 0.7rem;border-bottom:1px solid #e8e8e8;flex-shrink:0;">
-          <img src="/logo.png" style="height:42px;margin-right:1.1rem;" onerror="this.style.display='none'" />
-          <h2 style="margin:0;font-size:1.6rem;font-weight:900;color:var(--edps-blue,#1b4293);">{{ currentSlide.title }}</h2>
+        <!-- Header: EDPS logo + title (matches official template) -->
+        <div style="display:flex;align-items:center;padding:0.9rem 2rem 0.7rem;flex-shrink:0;">
+          <img src="/template/edps_logo.png" style="height:46px;margin-right:1rem;" onerror="this.style.display='none'" />
+          <h2 style="margin:0;font-size:1.5rem;font-weight:900;color:var(--edps-blue,#3B5998);">{{ currentSlide.title }}</h2>
         </div>
 
         <div style="padding:1rem 2rem 4rem;flex:1;overflow-y:auto;position:relative;">

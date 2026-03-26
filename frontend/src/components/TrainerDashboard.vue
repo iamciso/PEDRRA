@@ -570,10 +570,7 @@
         <!-- TITLE SLIDE TEMPLATE -->
         <div v-if="currentSlide.type === 'title'" class="edps-title-slide">
           <div class="edps-title-top">
-             <img src="/logo.png" style="height: 60px; margin-right: 1.5rem;" alt="EDPS Logo" />
-             <div style="color: var(--edps-blue); font-weight: bold; line-height: 1.2;">
-               EUROPEAN<br/>DATA PROTECTION<br/>SUPERVISOR
-             </div>
+             <img src="/template/edps_logo.png" style="height: 55px;" alt="EDPS Logo" />
           </div>
           <div class="edps-title-middle">
              <div class="edps-title-gold">
@@ -602,30 +599,20 @@
         </div>
 
         <!-- #10 — SECTION SLIDE TEMPLATE (fullscreen) -->
-        <div v-else-if="currentSlide.type === 'section'" style="position:relative;width:100%;height:100%;background:#d0cdc8;overflow:hidden;">
-          <!-- Blue square + white circle - top left -->
-          <div style="position:absolute;top:0;left:0;width:90px;height:90px;background:var(--edps-blue,#1b4293);display:flex;align-items:center;justify-content:center;">
-            <div style="width:55px;height:55px;background:white;border-radius:50%;"></div>
-          </div>
-          <!-- Gold arc top-center -->
-          <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:180px;height:90px;background:var(--edps-gold,#dea133);border-radius:0 0 90px 90px;"></div>
-          <!-- White box top-right -->
-          <div style="position:absolute;top:0;right:0;width:35%;height:40%;background:white;opacity:0.85;"></div>
-          <!-- Main title box center-left -->
-          <div style="position:absolute;top:35%;left:8%;width:42%;padding:1.5rem 2rem;background:var(--edps-blue,#1b4293);">
+        <div v-else-if="currentSlide.type === 'section'" style="position:relative;width:100%;height:100%;background-image:url('/template/section_bg.png');background-size:cover;background-position:center;overflow:hidden;">
+          <!-- Main title box center-left (overlaid on the template background) -->
+          <div style="position:absolute;top:35%;left:8%;width:42%;padding:1.5rem 2rem;background:var(--edps-blue,#3B5998);">
             <div style="color:white;font-weight:bold;font-size:1.6rem;line-height:1.3;">{{ currentSlide.title }}</div>
             <div v-if="currentSlide.subtitle" style="color:rgba(255,255,255,0.8);font-size:0.95rem;margin-top:0.5rem;">{{ currentSlide.subtitle }}</div>
           </div>
-          <!-- Gold bottom-left rectangle -->
-          <div style="position:absolute;bottom:0;left:0;width:28%;height:30%;background:var(--edps-gold,#dea133);opacity:0.85;"></div>
           <!-- Slide number -->
-          <div style="position:absolute;bottom:1rem;right:1rem;color:var(--edps-blue,#1b4293);font-size:0.8rem;font-weight:bold;">{{ currentSlide.id }}</div>
+          <div style="position:absolute;bottom:1rem;right:1rem;color:var(--edps-blue,#3B5998);font-size:0.8rem;font-weight:bold;">{{ currentSlide.id }}</div>
         </div>
 
         <!-- CONTENT / POLL / SURVEY TEMPLATES -->
         <template v-else>
           <div class="edps-header">
-             <img src="/logo.png" style="height: 48px; margin-right: 1.5rem;" alt="EDPS Logo" />
+             <img src="/template/edps_logo.png" class="edps-header-logo" alt="EDPS Logo" />
              <h2 class="edps-header-title">{{ currentSlide.title }}</h2>
           </div>
 
