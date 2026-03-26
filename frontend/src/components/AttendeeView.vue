@@ -239,11 +239,10 @@ import { getToken, clearAuth } from '../auth.js';
 import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 
 const W = 1024, H = 576;
-let _prevResultsSlideId = null;
-
 export default {
   data() {
     return {
+      _prevResultsSlideId: null,
       slides: [],
       currentSlideId: null,
       isSlideVisible: false,
@@ -342,9 +341,9 @@ export default {
 
     this.socket.on('slide:current', (id) => {
       if (this.currentSlideId !== id) {
-        if (_prevResultsSlideId) {
-          this.socket.off(`poll:results:${_prevResultsSlideId}`);
-          this.socket.off(`timer:update:${_prevResultsSlideId}`);
+        if (this._prevResultsSlideId) {
+          this.socket.off(`poll:results:${this._prevResultsSlideId}`);
+          this.socket.off(`timer:update:${this._prevResultsSlideId}`);
         }
         this.surveyForm = {};
         this.publishedResults = null;
@@ -352,7 +351,7 @@ export default {
         this.timerRunning = false;
       }
       this.currentSlideId = id;
-      _prevResultsSlideId = id;
+      this._prevResultsSlideId = id;
       this.socket.on(`poll:results:${id}`, rows => { this.publishedResults = rows; });
       // Listen for timer updates
       this.socket.on(`timer:update:${id}`, state => { this._handleTimerUpdate(state); });

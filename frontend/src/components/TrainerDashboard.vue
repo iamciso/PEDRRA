@@ -755,6 +755,7 @@ export default {
       sessionCode: '',
       analytics: null,
       presenterWindow: null,
+      _prevPollSlideId: null,
       slideTemplates: [
         { name: 'Title + Image', icon: '🖼', type: 'content', elements: [
           { id: 'tpl_t', kind: 'text', x: 50, y: 90, w: 450, h: 60, content: 'Your Title Here', fontSize: 32, fontFamily: 'Segoe UI', bold: true, italic: false, color: '#1b4293', textAlign: 'left' },
@@ -1196,17 +1197,6 @@ export default {
         slide.elements.push(textEl);
       }
       slide._showCanvas = true;
-    },
-    insertFormat(slide, prefix, suffix) {
-      const ref = this.$refs['content_' + slide.id];
-      const textarea = Array.isArray(ref) ? ref[0] : ref;
-      if (!textarea) { slide.content = (slide.content || '') + prefix + suffix; return; }
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const text = slide.content || '';
-      const selected = text.substring(start, end) || 'text';
-      slide.content = text.substring(0, start) + prefix + selected + suffix + text.substring(end);
-      this.$nextTick(() => { textarea.focus(); textarea.setSelectionRange(start + prefix.length, start + prefix.length + selected.length); });
     },
     openVisualEditor(slide) {
       slide._showCanvas = !slide._showCanvas;

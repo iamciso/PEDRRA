@@ -480,7 +480,7 @@ io.on('connection', (socket) => {
 });
 
 // Quiz scores
-app.post('/api/quiz/score', authMiddleware(), (req, res) => {
+app.post('/api/quiz/score', authMiddleware('Attendee'), (req, res) => {
     const { slide_id, correct, time_ms, points } = req.body;
     const username = req.user.username;
     db.run('INSERT OR REPLACE INTO quiz_scores (username, slide_id, correct, time_ms, points) VALUES (?, ?, ?, ?, ?)',
@@ -539,8 +539,8 @@ app.get('/api/analytics', authMiddleware('Trainer'), (req, res) => {
     });
 });
 
-// Attendee list for spinning wheel
-app.get('/api/attendees', (req, res) => {
+// Attendee list for spinning wheel — Trainer only
+app.get('/api/attendees', authMiddleware('Trainer'), (req, res) => {
     db.all("SELECT username, display_name, avatar FROM users WHERE role = 'Attendee'", (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
