@@ -4,7 +4,8 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
       <h2 style="margin: 0;">Trainer Dashboard</h2>
       <div style="color: #64748b;">
-        {{ user?.username }} ({{ user?.team }}) | 
+        <span :style="{display:'inline-block',width:'8px',height:'8px',borderRadius:'50%',marginRight:'6px',background:connected?'#10b981':'#ef4444'}" :title="connected?'Connected':'Disconnected'"></span>
+        {{ user?.username }} ({{ user?.team }}) |
         <a href="#" @click.prevent="logout" style="color: var(--primary);">Log Out</a>
       </div>
     </div>
@@ -15,6 +16,12 @@
       <button :class="['tab-link', { active: activeTab === 'users' }]" @click="activeTab = 'users'">Manage Users</button>
       <button :class="['tab-link', { active: activeTab === 'results' }]" @click="activeTab = 'results'">📊 Survey Results</button>
       <button :class="['tab-link', { active: activeTab === 'media' }]" @click="activeTab = 'media'">🖼 Media Library</button>
+    </div>
+
+    <!-- Error banner -->
+    <div v-if="errorMessage" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;">
+      <span>{{ errorMessage }}</span>
+      <button @click="errorMessage=''" style="background:none;border:none;color:#dc2626;font-size:1.2rem;cursor:pointer;padding:0 0.5rem;">✕</button>
     </div>
 
     <!-- Tab: Live -->
@@ -90,6 +97,17 @@
               </tbody>
             </table>
             <div v-else style="color: #64748b; font-style: italic; margin-top: 1rem;">Waiting for everyone to submit...</div>
+          </div>
+
+          <!-- Live Timer Controls -->
+          <div v-if="currentSlide.type === 'timer'" style="width: 100%; margin-top: 2rem; text-align: center;">
+            <div style="font-size: 4rem; font-weight: bold; font-variant-numeric: tabular-nums; color: var(--primary); letter-spacing: 4px;">{{ timerDisplay }}</div>
+            <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1.5rem;">
+              <button @click="startTimer" style="width: auto; padding: 0.5rem 1.5rem;">Start</button>
+              <button @click="pauseTimer" class="secondary" style="width: auto; padding: 0.5rem 1.5rem;">Pause</button>
+              <button @click="resumeTimer" class="secondary" style="width: auto; padding: 0.5rem 1.5rem;">Resume</button>
+              <button @click="resetTimer" class="danger" style="width: auto; padding: 0.5rem 1.5rem;">Reset</button>
+            </div>
           </div>
         </div>
 
@@ -207,6 +225,20 @@
             </div>
             <button class="secondary" style="width: auto; margin-top: 0.5rem; font-size: 0.8rem;" @click="slide.questions.push({text: '', type: 'text', options: []})">+ Add Question</button>
           </div>
+        </template>
+
+        <!-- Timer Slide Edit -->
+        <template v-if="slide.type === 'timer'">
+          <div style="display: flex; align-items: center; gap: 1rem; margin-top: 0.5rem;">
+            <label style="font-size: 0.85rem; font-weight: bold; color: #64748b;">Duration (seconds):</label>
+            <input type="number" v-model.number="slide.duration" min="10" max="3600" style="width: 120px; margin-bottom: 0;" />
+            <span style="font-size: 0.85rem; color: #94a3b8;">{{ Math.floor((slide.duration || 0) / 60) }}m {{ (slide.duration || 0) % 60 }}s</span>
+          </div>
+        </template>
+
+        <!-- Section Slide Edit -->
+        <template v-if="slide.type === 'section'">
+          <input v-model="slide.subtitle" placeholder="Subtitle (Optional)" />
         </template>
       </div>
     </div>
@@ -435,6 +467,14 @@
                   </div>
               </div>
             </template>
+
+            <!-- Timer (fullscreen) -->
+            <template v-if="currentSlide.type === 'timer'">
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;min-height:300px;">
+                <div style="font-size:6rem;font-weight:bold;font-variant-numeric:tabular-nums;color:var(--edps-blue);letter-spacing:6px;">{{ timerDisplay }}</div>
+                <div style="margin-top:1rem;font-size:1.1rem;color:#64748b;">{{ timerRunning ? 'Running...' : (timerSeconds > 0 ? 'Paused' : 'Ready') }}</div>
+              </div>
+            </template>
           </div>
 
           <div class="edps-bottom-bar"></div>
@@ -481,7 +521,12 @@ export default {
       newUser: { username: '', password: '', team: '', role: 'Attendee' },
       userMessage: '',
       currentTime: '',
-      clockInterval: null
+      clockInterval: null,
+      connected: false,
+      errorMessage: '',
+      timerSeconds: 0,
+      timerRunning: false,
+      timerInterval: null
     }
   },
   computed: {
@@ -498,6 +543,12 @@ export default {
     },
     totalPollAnswers() {
       return Array.isArray(this.pollResults) ? this.pollResults.length : 0;
+    },
+    timerDisplay() {
+      const s = Math.max(0, this.timerSeconds);
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
     },
     parsedSurveyResults() {
       if (!Array.isArray(this.pollResults)) return [];
@@ -520,7 +571,10 @@ export default {
 
     // #6 — Socket auth
     this.socket = io(baseUrl, { auth: { user: JSON.stringify(this.user) } });
-    
+
+    this.socket.on('connect', () => { this.connected = true; });
+    this.socket.on('disconnect', () => { this.connected = false; });
+
     this.socket.on('slide:current', (id) => {
       const idx = this.slides.findIndex(s => s.id === id);
       if (idx !== -1) {
@@ -618,19 +672,25 @@ export default {
             return s;
         });
     },
+    showError(msg) {
+      this.errorMessage = msg;
+      setTimeout(() => { if (this.errorMessage === msg) this.errorMessage = ''; }, 8000);
+    },
     async fetchSlides() {
       try {
         const res = await fetch(`${baseUrl}/api/slides`);
+        if (!res.ok) throw new Error(`Failed to load slides (${res.status})`);
         const data = await res.json();
         this.slides = this.migrateQuestions(data);
         this.editSlides = JSON.parse(JSON.stringify(this.slides));
-      } catch (e) { console.error(e); }
+      } catch (e) { this.showError(e.message); }
     },
     async fetchUsers() {
       try {
         const res = await authFetch(`${baseUrl}/api/users`);
+        if (!res.ok) throw new Error(`Failed to load users (${res.status})`);
         this.usersList = await res.json();
-      } catch (e) { console.error(e); }
+      } catch (e) { this.showError(e.message); }
     },
     async createUser() {
       if (!this.newUser.username || !this.newUser.password) return;
@@ -640,20 +700,20 @@ export default {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.newUser)
         });
-        if(res.ok) {
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed to create user'); }
           this.userMessage = 'User provisioned successfully!';
           this.newUser = { username: '', password: '', team: '', role: 'Attendee' };
           this.fetchUsers();
           setTimeout(() => this.userMessage = '', 3000);
-        }
-      } catch(e) { console.error(e); }
+      } catch(e) { this.showError(e.message); }
     },
     async deleteUser(id) {
       if(!confirm('Are you sure you want to delete this user?')) return;
       try {
         const res = await authFetch(`${baseUrl}/api/users/${id}`, { method: 'DELETE' });
-        if(res.ok) this.fetchUsers();
-      } catch(e) { console.error(e); }
+        if (!res.ok) throw new Error('Failed to delete user');
+        this.fetchUsers();
+      } catch(e) { this.showError(e.message); }
     },
     addSlide(type) {
       const id = Date.now();
@@ -666,6 +726,10 @@ export default {
         ] });
       } else if (type === 'title') {
         this.editSlides.push({ id, type: 'title', title: 'New Topic', subtitle: 'A new section', content: 'Details here', image: '', video: '' });
+      } else if (type === 'timer') {
+        this.editSlides.push({ id, type: 'timer', title: 'Countdown Timer', duration: 300 });
+      } else if (type === 'section') {
+        this.editSlides.push({ id, type: 'section', title: 'Section Title', subtitle: '' });
       } else {
         this.editSlides.push({ id, type: 'content', title: 'Content Slide', subtitle: '', content: '', image: '', video: '' });
       }
@@ -696,7 +760,7 @@ export default {
         this.editSlides = JSON.parse(JSON.stringify(this.slides));
         this.saveMessage = 'Successfully saved!';
         setTimeout(() => this.saveMessage = '', 3000);
-      } catch (e) { this.saveMessage = 'Error saving changes.'; }
+      } catch (e) { this.saveMessage = ''; this.showError('Error saving changes: ' + e.message); }
     },
     prevSlide() { if (this.currentIndex > 0) this.currentIndex--; },
     nextSlide() { if (this.currentIndex < this.slides.length - 1) this.currentIndex++; },
@@ -708,17 +772,19 @@ export default {
         this.socket.emit('poll:forcePublish', this.currentSlide.id);
       }
     },
-    // #9 — Clean up previous slide listeners before attaching new ones
     checkPollResults() {
       // Clean up any previous listeners
       if (this._prevPollSlideId) {
         this.socket.off(`poll:results:trainer:${this._prevPollSlideId}`);
         this.socket.off(`poll:progress:trainer:${this._prevPollSlideId}`);
+        this.socket.off(`timer:update:${this._prevPollSlideId}`);
       }
+      clearInterval(this.timerInterval);
+      this._prevPollSlideId = this.currentSlide.id;
+
       if (this.currentSlide.type === 'poll' || this.currentSlide.type === 'survey') {
         this.pollResults = [];
         this.pollProgress = { answered: 0, total: 0 };
-        this._prevPollSlideId = this.currentSlide.id;
 
         this.socket.on(`poll:results:trainer:${this.currentSlide.id}`, (results) => {
           this.pollResults = results;
@@ -729,8 +795,11 @@ export default {
         });
 
         this.socket.emit('poll:getResults', this.currentSlide.id);
-      } else {
-        this._prevPollSlideId = null;
+      } else if (this.currentSlide.type === 'timer') {
+        this.timerSeconds = this.currentSlide.duration || 300;
+        this.timerRunning = false;
+        this.socket.on(`timer:update:${this.currentSlide.id}`, (state) => this._handleTimerUpdate(state));
+        this.socket.emit('timer:get', this.currentSlide.id);
       }
     },
     getPercentage(count) {
@@ -761,6 +830,55 @@ export default {
     resolveUrl(url) {
       if (!url) return '';
       return url.startsWith('http') ? url : `${baseUrl}${url}`;
+    },
+    // Timer methods
+    startTimer() {
+      const dur = this.currentSlide.duration || 300;
+      this.socket.emit('timer:start', { slideId: this.currentSlide.id, duration: dur });
+      this.timerSeconds = dur;
+      this.timerRunning = true;
+      this._startTimerTick();
+    },
+    pauseTimer() {
+      this.socket.emit('timer:pause', this.currentSlide.id);
+      this.timerRunning = false;
+      clearInterval(this.timerInterval);
+    },
+    resumeTimer() {
+      this.socket.emit('timer:resume', this.currentSlide.id);
+      this.timerRunning = true;
+      this._startTimerTick();
+    },
+    resetTimer() {
+      this.socket.emit('timer:reset', this.currentSlide.id);
+      this.timerRunning = false;
+      this.timerSeconds = this.currentSlide.duration || 300;
+      clearInterval(this.timerInterval);
+    },
+    _startTimerTick() {
+      clearInterval(this.timerInterval);
+      this.timerInterval = setInterval(() => {
+        if (this.timerSeconds > 0) {
+          this.timerSeconds--;
+        } else {
+          this.timerRunning = false;
+          clearInterval(this.timerInterval);
+        }
+      }, 1000);
+    },
+    _handleTimerUpdate(state) {
+      clearInterval(this.timerInterval);
+      if (!state) { this.timerSeconds = this.currentSlide.duration || 300; this.timerRunning = false; return; }
+      if (state.paused) {
+        const elapsed = Math.floor((state.pausedAt - state.startTime) / 1000);
+        this.timerSeconds = Math.max(0, state.duration - elapsed);
+        this.timerRunning = false;
+      } else {
+        const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+        this.timerSeconds = Math.max(0, state.duration - elapsed);
+        this.timerRunning = this.timerSeconds > 0;
+        if (this.timerRunning) this._startTimerTick();
+      }
     },
     logout() {
       localStorage.removeItem('user');

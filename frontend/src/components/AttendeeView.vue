@@ -3,7 +3,10 @@
 
     <!-- Top bar -->
     <div style="position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:0.4rem 1.2rem;background:rgba(0,0,0,0.45);">
-      <span style="color:rgba(255,255,255,0.7);font-size:0.8rem;">PEDRRA • {{ user?.username }}</span>
+      <span style="color:rgba(255,255,255,0.7);font-size:0.8rem;">
+        <span :style="{display:'inline-block',width:'8px',height:'8px',borderRadius:'50%',marginRight:'6px',background:connected?'#10b981':'#ef4444'}" :title="connected?'Connected':'Disconnected'"></span>
+        PEDRRA • {{ user?.username }}
+      </span>
       <a href="#" @click.prevent="logout" style="color:var(--edps-gold,#dea133);font-weight:bold;text-decoration:none;font-size:0.8rem;">Log Out</a>
     </div>
 
@@ -136,7 +139,7 @@
             </div>
             <div v-else-if="hasAnswered" style="padding:1.2rem;background:#e0f2fe;color:var(--edps-blue,#1b4293);font-weight:bold;border-left:4px solid var(--edps-blue,#1b4293);border-radius:0 6px 6px 0;">✅ Your answer was recorded. Waiting for all participants...</div>
             <div v-else style="display:flex;flex-direction:column;gap:0.6rem;">
-              <button v-for="opt in currentSlide.options" :key="opt" @click="submitPollAnswer(opt)"
+              <button v-for="opt in currentSlide.options" :key="opt" @click="submitPollAnswer(opt)" :aria-label="'Vote for: ' + opt"
                 style="background:white;color:var(--edps-blue,#1b4293);border:2px solid var(--edps-blue,#1b4293);padding:0.85rem 1.2rem;border-radius:6px;font-weight:bold;font-size:0.95rem;cursor:pointer;text-align:left;transition:all 0.18s;"
                 @mouseover="$event.target.style.cssText='background:var(--edps-blue,#1b4293);color:white;border:2px solid var(--edps-blue,#1b4293);padding:0.85rem 1.2rem;border-radius:6px;font-weight:bold;font-size:0.95rem;cursor:pointer;text-align:left;transition:all 0.18s;'"
                 @mouseout="$event.target.style.cssText='background:white;color:var(--edps-blue,#1b4293);border:2px solid var(--edps-blue,#1b4293);padding:0.85rem 1.2rem;border-radius:6px;font-weight:bold;font-size:0.95rem;cursor:pointer;text-align:left;transition:all 0.18s;'"
@@ -163,8 +166,16 @@
                   <option v-for="opt in q.options" :key="opt" :value="opt">{{ opt }}</option>
                 </select>
               </div>
-              <button type="submit" style="background:var(--edps-blue,#1b4293);color:white;border:none;padding:0.75rem;font-size:0.95rem;border-radius:6px;cursor:pointer;font-weight:bold;">Submit Response</button>
+              <button type="submit" aria-label="Submit survey response" style="background:var(--edps-blue,#1b4293);color:white;border:none;padding:0.75rem;font-size:0.95rem;border-radius:6px;cursor:pointer;font-weight:bold;">Submit Response</button>
             </form>
+          </template>
+
+          <!-- Timer -->
+          <template v-if="currentSlide.type === 'timer'">
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;min-height:280px;">
+              <div style="font-size:5rem;font-weight:bold;font-variant-numeric:tabular-nums;color:var(--edps-blue,#1b4293);letter-spacing:6px;">{{ timerDisplay }}</div>
+              <div style="margin-top:0.8rem;font-size:1rem;color:#64748b;">{{ timerRunning ? 'Time remaining...' : (timerSeconds > 0 ? 'Paused' : 'Ready') }}</div>
+            </div>
           </template>
         </div>
 
@@ -202,6 +213,10 @@ export default {
       clockInterval: null,
       scale: 1,
       binaryPattern: '',
+      connected: false,
+      timerSeconds: 0,
+      timerRunning: false,
+      timerInterval: null,
     };
   },
   computed: {
@@ -234,6 +249,12 @@ export default {
     totalPublicAnswers() {
       return Array.isArray(this.publishedResults) ? this.publishedResults.length : 0;
     },
+    timerDisplay() {
+      const s = Math.max(0, this.timerSeconds);
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    },
     slideTransform() {
       return {
         transform: `translate(-50%, -50%) scale(${this.scale})`,
@@ -257,21 +278,28 @@ export default {
       this.slides = await r.json();
     } catch(e) { console.error(e); }
 
-    // #6 — Socket auth
     this.socket = io(baseUrl, { auth: { user: JSON.stringify(this.user) } });
 
-    // #7 — Fix memory leak: properly clean up previous slide listeners
+    this.socket.on('connect', () => { this.connected = true; });
+    this.socket.on('disconnect', () => { this.connected = false; });
+
     this.socket.on('slide:current', (id) => {
       if (this.currentSlideId !== id) {
         if (_prevResultsSlideId) {
           this.socket.off(`poll:results:${_prevResultsSlideId}`);
+          this.socket.off(`timer:update:${_prevResultsSlideId}`);
         }
         this.surveyForm = {};
         this.publishedResults = null;
+        clearInterval(this.timerInterval);
+        this.timerRunning = false;
       }
       this.currentSlideId = id;
       _prevResultsSlideId = id;
       this.socket.on(`poll:results:${id}`, rows => { this.publishedResults = rows; });
+      // Listen for timer updates
+      this.socket.on(`timer:update:${id}`, state => { this._handleTimerUpdate(state); });
+      this.socket.emit('timer:get', id);
     });
 
     this.socket.on('slide:visibility', v => { this.isSlideVisible = v; });
@@ -297,6 +325,7 @@ export default {
     if (this.socket) this.socket.disconnect();
     window.removeEventListener('resize', this.computeScale);
     clearInterval(this.clockInterval);
+    clearInterval(this.timerInterval);
   },
   methods: {
     computeScale() {
@@ -325,6 +354,25 @@ export default {
     getPct(count) {
       if (!count || !this.totalPublicAnswers) return 0;
       return (count / this.totalPublicAnswers) * 100;
+    },
+    _handleTimerUpdate(state) {
+      clearInterval(this.timerInterval);
+      if (!state) { this.timerSeconds = 0; this.timerRunning = false; return; }
+      if (state.paused) {
+        const elapsed = Math.floor((state.pausedAt - state.startTime) / 1000);
+        this.timerSeconds = Math.max(0, state.duration - elapsed);
+        this.timerRunning = false;
+      } else {
+        const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+        this.timerSeconds = Math.max(0, state.duration - elapsed);
+        this.timerRunning = this.timerSeconds > 0;
+        if (this.timerRunning) {
+          this.timerInterval = setInterval(() => {
+            if (this.timerSeconds > 0) this.timerSeconds--;
+            else { this.timerRunning = false; clearInterval(this.timerInterval); }
+          }, 1000);
+        }
+      }
     },
     logout() { localStorage.removeItem('user'); this.$router.push('/'); },
   },

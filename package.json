@@ -4,11 +4,9 @@
   "description": "PEDRRA Training Application",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "NODE_ENV=production node server.js",
     "dev": "node server.js",
-    "install-frontend": "cd frontend && npm install",
-    "build-frontend": "cd frontend && npm run build",
-    "build": "npm run install-frontend && npm run build-frontend"
+    "build": "cd frontend && npm ci && npm run build"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

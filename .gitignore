@@ -4,3 +4,4 @@ frontend/dist/
 pedrra.sqlite
 uploads/
 .env
+state.json

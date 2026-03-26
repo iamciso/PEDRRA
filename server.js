@@ -66,8 +66,21 @@ try {
     console.error("Could not load content.json");
 }
 
-let currentSlideId = 1;
-let presentationActive = false;
+// #3 — Persist presentation state across server restarts
+const statePath = path.join(__dirname, 'state.json');
+let serverState = { currentSlideId: 1, presentationActive: false };
+try {
+    serverState = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    console.log('Restored presentation state from state.json');
+} catch (e) { /* first run or missing file */ }
+let currentSlideId = serverState.currentSlideId || 1;
+let presentationActive = serverState.presentationActive || false;
+
+function saveState() {
+    try {
+        fs.writeFileSync(statePath, JSON.stringify({ currentSlideId, presentationActive }, null, 2));
+    } catch (e) { console.error('Failed to save state:', e.message); }
+}
 
 // #2 — Authentication middleware
 function authMiddleware(requiredRole) {
@@ -180,8 +193,28 @@ app.get('/api/slides', (req, res) => {
     res.json(presentationData.slides);
 });
 
-// #14 — Safe write for content.json (write to temp file first)
-app.post('/api/slides', authMiddleware('Trainer'), (req, res) => {
+// #2 — Slide data validation
+const VALID_SLIDE_TYPES = ['title', 'content', 'section', 'poll', 'survey', 'timer'];
+function validateSlides(req, res, next) {
+    if (!Array.isArray(req.body)) {
+        return res.status(400).json({ error: 'Slides must be an array.' });
+    }
+    for (const slide of req.body) {
+        if (!slide || typeof slide !== 'object') {
+            return res.status(400).json({ error: 'Each slide must be an object.' });
+        }
+        if (!slide.id || !slide.type || !slide.title) {
+            return res.status(400).json({ error: 'Each slide requires id, type, and title.' });
+        }
+        if (!VALID_SLIDE_TYPES.includes(slide.type)) {
+            return res.status(400).json({ error: `Invalid slide type: ${slide.type}` });
+        }
+    }
+    next();
+}
+
+// Safe write for content.json (write to temp file first)
+app.post('/api/slides', authMiddleware('Trainer'), validateSlides, (req, res) => {
     try {
         const newData = { slides: req.body };
         const tmpPath = contentFilePath + '.tmp';
@@ -263,12 +296,14 @@ io.on('connection', (socket) => {
         if (socket.user.role !== 'Trainer') return;
         presentationActive = active;
         io.emit('slide:visibility', presentationActive);
+        saveState();
     });
 
     socket.on('slide:change', (newSlideId) => {
         if (socket.user.role !== 'Trainer') return;
         currentSlideId = newSlideId;
         io.emit('slide:current', currentSlideId);
+        saveState();
     });
 
     socket.on('poll:answer', ({ slideId, username, answer }) => {

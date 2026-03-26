@@ -2,10 +2,10 @@
   <div class="glass-panel" style="max-width: 400px; margin: 0 auto;">
     <h2 class="text-gradient" style="text-align: center; margin-bottom: 2rem;">PEDRRA Training</h2>
     <form @submit.prevent="handleSubmit">
-      <input v-model="form.username" type="text" placeholder="Username" required />
-      <input v-model="form.password" type="password" placeholder="Password" required />
-      
-      <button type="submit">Log In</button>
+      <input v-model="form.username" type="text" placeholder="Username" required aria-label="Username" />
+      <input v-model="form.password" type="password" placeholder="Password" required aria-label="Password" />
+
+      <button type="submit" aria-label="Log in">Log In</button>
       
       <p style="text-align: center; margin-top: 1rem; font-size: 0.9rem; color: #64748b;">
         Contact the Administrator if you do not have an account.
