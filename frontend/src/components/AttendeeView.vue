@@ -179,8 +179,16 @@
           <!-- Timer -->
           <template v-if="currentSlide.type === 'timer'">
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;min-height:280px;">
-              <div style="font-size:5rem;font-weight:bold;font-variant-numeric:tabular-nums;color:var(--edps-blue,#1b4293);letter-spacing:6px;">{{ timerDisplay }}</div>
-              <div style="margin-top:0.8rem;font-size:1rem;color:#64748b;">{{ timerRunning ? 'Time remaining...' : (timerSeconds > 0 ? 'Paused' : 'Ready') }}</div>
+              <div style="position:relative; width:300px; height:300px;">
+                <svg viewBox="0 0 200 200" style="width:100%; height:100%; transform:rotate(-90deg);">
+                  <circle cx="100" cy="100" r="88" fill="none" stroke="#e2e8f0" stroke-width="8" />
+                  <circle cx="100" cy="100" r="88" fill="none" :stroke="timerSeconds <= 10 && timerRunning ? '#ef4444' : timerSeconds <= 30 && timerRunning ? '#f59e0b' : 'var(--edps-blue,#1b4293)'" stroke-width="8" stroke-linecap="round" :stroke-dasharray="553" :stroke-dashoffset="553 - (553 * timerProgress)" style="transition: stroke-dashoffset 1s linear, stroke 0.5s ease; filter: drop-shadow(0 0 6px currentColor);" />
+                </svg>
+                <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center;">
+                  <div :style="{fontSize:'4.5rem', fontWeight:'bold', fontVariantNumeric:'tabular-nums', color: timerSeconds <= 10 && timerRunning ? '#ef4444' : 'var(--edps-blue,#1b4293)', letterSpacing:'3px', lineHeight:'1', transition:'color 0.5s'}">{{ timerDisplay }}</div>
+                  <div style="font-size:0.9rem; color:#94a3b8; margin-top:6px; text-transform:uppercase; letter-spacing:1px;">{{ timerRunning ? '⏱ Time remaining' : (timerSeconds > 0 ? '⏸ Paused' : '⏱ Ready') }}</div>
+                </div>
+              </div>
             </div>
           </template>
 
@@ -298,6 +306,11 @@ export default {
       const m = Math.floor(s / 60);
       const sec = s % 60;
       return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    },
+    timerProgress() {
+      const dur = this.currentSlide?.duration || 300;
+      if (dur <= 0) return 1;
+      return Math.max(0, Math.min(1, this.timerSeconds / dur));
     },
     slideProgress() {
       if (!this.currentSlide || !this.isSlideVisible || this.slides.length === 0) return '';

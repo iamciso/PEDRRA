@@ -123,13 +123,22 @@
           </div>
 
           <!-- Live Timer Controls -->
-          <div v-if="currentSlide.type === 'timer'" style="width: 100%; margin-top: 2rem; text-align: center;">
-            <div style="font-size: 4rem; font-weight: bold; font-variant-numeric: tabular-nums; color: var(--primary); letter-spacing: 4px;">{{ timerDisplay }}</div>
-            <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1.5rem;">
-              <button @click="startTimer" style="width: auto; padding: 0.5rem 1.5rem;">Start</button>
-              <button @click="pauseTimer" class="secondary" style="width: auto; padding: 0.5rem 1.5rem;">Pause</button>
-              <button @click="resumeTimer" class="secondary" style="width: auto; padding: 0.5rem 1.5rem;">Resume</button>
-              <button @click="resetTimer" class="danger" style="width: auto; padding: 0.5rem 1.5rem;">Reset</button>
+          <div v-if="currentSlide.type === 'timer'" style="width: 100%; margin-top: 1rem; text-align: center; display:flex; flex-direction:column; align-items:center;">
+            <div class="timer-ring-container" style="position:relative; width:220px; height:220px;">
+              <svg viewBox="0 0 200 200" style="width:100%; height:100%; transform:rotate(-90deg);">
+                <circle cx="100" cy="100" r="88" fill="none" stroke="#e2e8f0" stroke-width="10" />
+                <circle cx="100" cy="100" r="88" fill="none" :stroke="timerSeconds <= 10 && timerRunning ? '#ef4444' : timerSeconds <= 30 && timerRunning ? '#f59e0b' : 'var(--primary)'" stroke-width="10" stroke-linecap="round" :stroke-dasharray="553" :stroke-dashoffset="553 - (553 * timerProgress)" style="transition: stroke-dashoffset 1s linear, stroke 0.5s ease;" />
+              </svg>
+              <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center;">
+                <div :style="{fontSize: '2.8rem', fontWeight:'bold', fontVariantNumeric:'tabular-nums', color: timerSeconds <= 10 && timerRunning ? '#ef4444' : 'var(--primary)', letterSpacing:'2px', lineHeight:'1', transition:'color 0.5s'}">{{ timerDisplay }}</div>
+                <div style="font-size:0.75rem; color:#94a3b8; margin-top:4px; text-transform:uppercase; letter-spacing:1px;">{{ timerRunning ? '⏱ Running' : (timerSeconds > 0 && timerSeconds < (currentSlide.duration||300) ? '⏸ Paused' : '⏱ Ready') }}</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1rem;">
+              <button @click="startTimer" style="width: auto; padding: 0.5rem 1.2rem; font-size:0.85rem; border-radius:20px;">▶ Start</button>
+              <button @click="pauseTimer" class="secondary" style="width: auto; padding: 0.5rem 1.2rem; font-size:0.85rem; border-radius:20px;">⏸ Pause</button>
+              <button @click="resumeTimer" class="secondary" style="width: auto; padding: 0.5rem 1.2rem; font-size:0.85rem; border-radius:20px;">▶ Resume</button>
+              <button @click="resetTimer" class="danger" style="width: auto; padding: 0.5rem 1.2rem; font-size:0.85rem; border-radius:20px;">↺ Reset</button>
             </div>
           </div>
         </div>
@@ -680,8 +689,16 @@
             <!-- Timer (fullscreen) -->
             <template v-if="currentSlide.type === 'timer'">
               <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;min-height:300px;">
-                <div style="font-size:6rem;font-weight:bold;font-variant-numeric:tabular-nums;color:var(--edps-blue);letter-spacing:6px;">{{ timerDisplay }}</div>
-                <div style="margin-top:1rem;font-size:1.1rem;color:#64748b;">{{ timerRunning ? 'Running...' : (timerSeconds > 0 ? 'Paused' : 'Ready') }}</div>
+                <div style="position:relative; width:340px; height:340px;">
+                  <svg viewBox="0 0 200 200" style="width:100%; height:100%; transform:rotate(-90deg);">
+                    <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="8" />
+                    <circle cx="100" cy="100" r="88" fill="none" :stroke="timerSeconds <= 10 && timerRunning ? '#ef4444' : timerSeconds <= 30 && timerRunning ? '#f59e0b' : 'var(--edps-gold)'" stroke-width="8" stroke-linecap="round" :stroke-dasharray="553" :stroke-dashoffset="553 - (553 * timerProgress)" style="transition: stroke-dashoffset 1s linear, stroke 0.5s ease; filter: drop-shadow(0 0 8px currentColor);" />
+                  </svg>
+                  <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center;">
+                    <div :style="{fontSize:'5rem', fontWeight:'bold', fontVariantNumeric:'tabular-nums', color: timerSeconds <= 10 && timerRunning ? '#ef4444' : 'var(--edps-blue)', letterSpacing:'4px', lineHeight:'1', transition:'color 0.5s'}">{{ timerDisplay }}</div>
+                    <div style="font-size:1rem; color:#94a3b8; margin-top:8px; text-transform:uppercase; letter-spacing:2px;">{{ timerRunning ? '⏱ Running' : (timerSeconds > 0 && timerSeconds < (currentSlide.duration||300) ? '⏸ Paused' : '⏱ Ready') }}</div>
+                  </div>
+                </div>
               </div>
             </template>
           </div>
@@ -809,6 +826,11 @@ export default {
       const m = Math.floor(s / 60);
       const sec = s % 60;
       return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    },
+    timerProgress() {
+      const dur = this.currentSlide?.duration || 300;
+      if (dur <= 0) return 1;
+      return Math.max(0, Math.min(1, this.timerSeconds / dur));
     },
     parsedSurveyResults() {
       if (!Array.isArray(this.pollResults)) return [];
@@ -965,10 +987,12 @@ export default {
     migrateQuestions(slidesData) {
         return slidesData.map(s => {
             if (s.type === 'survey' && Array.isArray(s.questions)) {
-                s.questions = s.questions.map(q => 
+                s.questions = s.questions.map(q =>
                    typeof q === 'string' ? { text: q, type: 'text', options: [] } : q
                 );
             }
+            // Ensure ratingEnabled defaults to false if not set
+            if (s.ratingEnabled === undefined) s.ratingEnabled = false;
             return s;
         });
     },
