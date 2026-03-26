@@ -81,8 +81,11 @@
 
           <!-- Content: always show text content + media -->
           <template v-if="currentSlide.type === 'content'">
-            <!-- Text content (markdown rendered) -->
+            <!-- Text content (markdown rendered) — check both content field and text elements -->
             <div v-if="currentSlide.content" style="line-height:1.8;font-size:1.05rem;color:#333;margin-bottom:1rem;" v-html="renderMd(currentSlide.content)"></div>
+            <template v-else-if="currentSlide.elements && currentSlide.elements.length">
+              <div v-for="el in currentSlide.elements.filter(e => e.kind==='text' && e.content)" :key="'t'+el.id" style="line-height:1.8;font-size:1.05rem;color:#333;margin-bottom:0.5rem;" v-html="renderMd(el.content)"></div>
+            </template>
 
             <!-- Images from elements or legacy field -->
             <template v-if="currentSlide.elements && currentSlide.elements.length">

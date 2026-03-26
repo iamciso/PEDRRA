@@ -571,33 +571,17 @@
         
         <!-- TITLE SLIDE TEMPLATE -->
         <div v-if="currentSlide.type === 'title'" class="edps-title-slide">
-          <div class="edps-title-top">
-             <img src="/template/edps_logo.png" style="height: 55px;" alt="EDPS Logo" />
+          <!-- Logo top-left -->
+          <div style="position:absolute;top:3%;left:2%;z-index:3;">
+            <img src="/template/edps_logo.png" style="height:55px;" alt="EDPS Logo" />
           </div>
-          <div class="edps-title-middle">
-             <div class="edps-title-gold">
-                <h2 style="margin: 0; font-size: 1.8rem; line-height: 1.2;">{{ currentSlide.title }}</h2>
-                <div style="margin-top: 1rem; font-size: 1.1rem; opacity: 0.9;">{{ currentSlide.subtitle }}</div>
-                <div style="margin-top: 2rem; font-size: 0.9rem;">{{ currentSlide.content }}</div>
-             </div>
-             <div class="edps-title-blue">
-                <h1>PEDRRA</h1>
-                <div style="position: absolute; top: 1rem; right: 1rem; width: 60px; height: 60px; background: white; border-radius: 50%;"></div>
-             </div>
+          <!-- Title in the right-side area (over the gold/white region of template) -->
+          <div style="position:absolute;top:6%;left:52%;width:44%;z-index:2;padding:1rem;">
+            <h2 style="margin:0;font-size:1.6rem;line-height:1.3;color:var(--edps-blue);">{{ currentSlide.title }}</h2>
+            <div v-if="currentSlide.subtitle" style="margin-top:0.8rem;font-size:1rem;color:#555;">{{ currentSlide.subtitle }}</div>
           </div>
-          <div v-if="currentSlide.image" style="position:absolute; bottom: 100px; right: 5%; width: 300px; z-index: 5;">
-               <img :src="currentSlide.image" style="max-width: 100%; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" />
-          </div>
-          <div v-if="currentSlide.video" style="position:absolute; bottom: 100px; right: 5%; width: 400px; height: 225px; z-index: 5;">
-               <video v-if="isLocalVideoCheck(currentSlide.video)" :src="resolveUrl(currentSlide.video)" controls style="width: 100%; height: 100%; border-radius: 8px;"></video>
-               <iframe v-else :src="toEmbedUrlCheck(currentSlide.video)" style="width: 100%; height: 100%; border-radius: 8px;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-          </div>
-          <div class="edps-title-bottom">
-             <div style="width: 35%;"></div>
-             <div class="edps-title-bottom-blue">
-               Systems Oversight and Technology Audits Sector,<br/>and Privacy Unit
-             </div>
-          </div>
+          <!-- Content in the white rectangle area -->
+          <div v-if="currentSlide.content" style="position:absolute;top:40%;left:18%;width:30%;z-index:2;color:#333;font-size:0.9rem;line-height:1.5;">{{ currentSlide.content }}</div>
         </div>
 
         <!-- #10 — SECTION SLIDE TEMPLATE (fullscreen) -->
@@ -740,7 +724,7 @@
     <!-- ═══ FULLSCREEN OVERLAYS (only trainer sees, projected to students) ═══ -->
 
     <!-- Spinning Wheel overlay (fullscreen) -->
-    <div v-if="showWheel && isFullscreen" style="position:absolute;inset:0;z-index:500;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;animation:overlayFadeIn 0.3s ease-out;">
+    <div v-if="showWheel && isFullscreen" style="position:fixed;inset:0;z-index:10000;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;animation:overlayFadeIn 0.3s ease-out;">
       <!-- Title -->
       <div style="color:white;font-size:2rem;font-weight:bold;margin-bottom:2rem;text-shadow:0 2px 8px rgba(0,0,0,0.5);">🎲 Who's next?</div>
 
@@ -778,7 +762,7 @@
     </div>
 
     <!-- Leaderboard overlay (fullscreen) -->
-    <div v-if="showLeaderboard && isFullscreen" class="pres-overlay" @click.self="showLeaderboard=false">
+    <div v-if="showLeaderboard && isFullscreen" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);animation:overlayFadeIn 0.3s ease-out;" @click.self="showLeaderboard=false">
       <div style="background:white;border-radius:24px;padding:2.5rem;width:85%;max-width:600px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
         <h2 style="margin:0 0 1.5rem;text-align:center;color:var(--edps-blue);font-size:2.2rem;">🏆 Leaderboard</h2>
         <div v-if="leaderboardEntries.length >= 1" class="podium-container">
@@ -798,12 +782,14 @@
     </div>
 
     <!-- QR Code sidebar overlay (fullscreen) -->
-    <div v-if="showQR && isFullscreen" class="qr-overlay" @click.self="showQR=false">
-      <div style="font-size:1.5rem;font-weight:bold;color:var(--edps-blue);margin-bottom:1.5rem;">📱 Join the Session</div>
-      <img v-if="qrCodeUrl" :src="qrCodeUrl" style="width:300px;height:300px;border:3px solid #e2e8f0;border-radius:16px;" />
-      <div v-if="sessionCode" style="margin-top:1.5rem;font-size:3rem;font-weight:900;color:var(--edps-blue);letter-spacing:10px;">{{ sessionCode }}</div>
-      <div style="margin-top:0.8rem;color:#94a3b8;font-size:1rem;">Scan QR code or enter PIN above</div>
-      <button @click.stop="showQR=false" class="secondary" style="margin-top:1.5rem;width:auto;padding:0.6rem 1.5rem;border-radius:20px;">Close</button>
+    <div v-if="showQR && isFullscreen" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);animation:overlayFadeIn 0.3s ease-out;" @click.self="showQR=false">
+      <div style="background:white;border-radius:24px;padding:3rem;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+        <div style="font-size:2rem;font-weight:bold;color:var(--edps-blue);margin-bottom:2rem;">📱 Join the Session</div>
+        <img v-if="qrCodeUrl" :src="qrCodeUrl" style="width:400px;height:400px;border:3px solid #e2e8f0;border-radius:16px;" />
+        <div v-if="sessionCode" style="margin-top:2rem;font-size:4rem;font-weight:900;color:var(--edps-blue);letter-spacing:12px;">{{ sessionCode }}</div>
+        <div style="margin-top:1rem;color:#94a3b8;font-size:1.2rem;">Scan QR code or enter the PIN above</div>
+        <button @click.stop="showQR=false" style="margin-top:2rem;padding:0.8rem 2rem;font-size:1.1rem;border-radius:24px;background:rgba(0,0,0,0.1);border:1px solid #e2e8f0;cursor:pointer;">✕ Close</button>
+      </div>
     </div>
 
     <!-- Hand raise flying notifications (fullscreen) -->

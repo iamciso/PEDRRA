@@ -46,6 +46,7 @@ const ALLOWED_MIMETYPES = [
     'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml',
     'video/mp4', 'video/webm',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+    'application/octet-stream', // fallback for some browsers
 ];
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadsDir),
@@ -59,9 +60,11 @@ const upload = multer({
     limits: { fileSize: 50 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         if (ALLOWED_MIMETYPES.includes(file.mimetype)) return cb(null, true);
-        cb(new Error('File type not allowed. Only images and videos are accepted.'));
+        cb(new Error('File type not allowed. Allowed: images, videos, and .pptx files.'));
     }
 });
+// Separate upload for PPTX only (no MIME filter — browsers are inconsistent)
+const uploadPptx = multer({ storage, limits: { fileSize: 100 * 1024 * 1024 } });
 
 // Load content
 const contentFilePath = path.join(__dirname, 'content.json');
@@ -324,7 +327,7 @@ app.post('/api/upload', authMiddleware('Trainer'), upload.single('file'), (req, 
 const JSZip = require('jszip');
 const xml2js = require('xml2js');
 
-app.post('/api/import-pptx', authMiddleware('Trainer'), upload.single('file'), async (req, res) => {
+app.post('/api/import-pptx', authMiddleware('Trainer'), uploadPptx.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     try {
         const zipData = fs.readFileSync(req.file.path);

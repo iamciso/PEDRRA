@@ -607,7 +607,7 @@ a:focus-visible {
   100% { transform: translateY(-200px) scale(0.8); opacity: 0; }
 }
 .hand-notification {
-  position: absolute; top: 50%; left: 50%;
+  position: fixed; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   animation: handFlyUp 3s ease-out forwards;
   z-index: 600; pointer-events: none;
