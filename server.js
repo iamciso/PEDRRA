@@ -356,6 +356,8 @@ io.use((socket, next) => {
 });
 
 const timerState = {}; // { [slideId]: { startTime, duration, paused, pausedAt } }
+let freezeMode = false;
+let handRaisedUsers = new Set();
 
 function sendPollResults(slideId) {
     db.all('SELECT username, answer FROM answers WHERE slide_id = ?', [slideId], (err, rows) => {
@@ -478,6 +480,33 @@ io.on('connection', (socket) => {
         const allowed = ['👍', '❓', '🐌', '👏', '🎉'];
         if (!allowed.includes(emoji)) return;
         io.emit('reaction:new', { emoji, username: socket.user.username });
+    });
+
+    // ── FREEZE MODE ──────────────────────────────────────────
+    socket.emit('slide:freeze', freezeMode);
+    socket.on('slide:freeze', (frozen) => {
+        if (socket.user.role !== 'Trainer') return;
+        freezeMode = !!frozen;
+        io.emit('slide:freeze', freezeMode);
+    });
+
+    // ── HAND RAISE ───────────────────────────────────────────
+    socket.emit('hand:state', Array.from(handRaisedUsers));
+    socket.on('hand:raise', () => {
+        handRaisedUsers.add(socket.user.username);
+        io.emit('hand:raised', { username: socket.user.username, display_name: socket.user.display_name || socket.user.username });
+        io.emit('hand:count', handRaisedUsers.size);
+    });
+    socket.on('hand:lower', () => {
+        handRaisedUsers.delete(socket.user.username);
+        io.emit('hand:lowered', socket.user.username);
+        io.emit('hand:count', handRaisedUsers.size);
+    });
+    socket.on('hand:clearAll', () => {
+        if (socket.user.role !== 'Trainer') return;
+        handRaisedUsers.clear();
+        io.emit('hand:cleared');
+        io.emit('hand:count', 0);
     });
 });
 

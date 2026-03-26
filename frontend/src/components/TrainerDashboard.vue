@@ -40,7 +40,8 @@
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div class="slide-title" style="margin: 0;">{{ currentSlide.title }}</div>
             <div style="display:flex;gap:0.3rem;">
-              <button class="secondary" @click="exportPDF" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem;">📄 Export PDF</button>
+              <button class="secondary" @click="exportPDF" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem;">📄 PDF</button>
+              <button class="secondary" @click="exportPPTX" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem;">📊 PPTX</button>
               <button class="secondary" @click="toggleFullscreen" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem;">⛶ Fullscreen</button>
             </div>
           </div>
@@ -154,6 +155,16 @@
         <div v-if="currentSlide.notes" style="margin-top:1rem;padding:0.75rem 1rem;background:#fffef5;border:1px solid #e2e0c8;border-radius:6px;font-size:0.85rem;color:#64748b;">
           <strong style="color:#334155;">📝 Notes:</strong> {{ currentSlide.notes }}
         </div>
+        <!-- Freeze & hand raise controls -->
+        <div style="display:flex;justify-content:center;gap:0.5rem;margin-top:0.5rem;">
+          <button @click="toggleFreeze" :class="frozen ? 'danger' : 'secondary'" style="width:auto;padding:0.4rem 1rem;font-size:0.8rem;border-radius:20px;">
+            {{ frozen ? '❄️ Unfreeze Screens' : '🧊 Freeze Attendees' }}
+          </button>
+          <button v-if="handRaisedCount > 0" @click="clearHands" class="secondary" style="width:auto;padding:0.4rem 1rem;font-size:0.8rem;border-radius:20px;position:relative;">
+            ✋ {{ handRaisedCount }} hand{{ handRaisedCount > 1 ? 's' : '' }} raised
+            <span style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;background:#ef4444;border-radius:50%;font-size:0.65rem;color:white;display:flex;align-items:center;justify-content:center;">{{ handRaisedCount }}</span>
+          </button>
+        </div>
         <!-- Slide counter + live info -->
         <div style="display:flex;justify-content:center;gap:2rem;margin-top:0.5rem;font-size:0.8rem;color:#94a3b8;">
           <span>Slide {{ currentIndex + 1 }} / {{ slides.length }}</span>
@@ -220,6 +231,10 @@
           <button class="secondary" @click="exportSlides" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;" title="Export slides to JSON file">📤 Export</button>
           <button class="secondary" @click="toggleAllCollapsed" style="width:auto;padding:0.5rem 0.8rem;font-size:0.82rem;">{{ allCollapsed ? '▼ Expand All' : '▲ Collapse All' }}</button>
           <button @click="saveSlides" style="width: auto; padding: 0.5rem 1rem;">Save Changes</button>
+          <label style="font-size:0.8rem;color:#64748b;cursor:pointer;display:flex;align-items:center;gap:0.3rem;margin-left:0.5rem;">
+            <input type="checkbox" v-model="autoSaveEnabled" style="width:14px;height:14px;margin:0;" /> Auto-save
+          </label>
+          <span :class="['autosave-indicator', autoSaveStatus]">{{ autoSaveLabel }}</span>
         </div>
       </div>
       <input type="file" ref="importFileInput" accept=".json" style="display:none;" @change="onImportFile" />
@@ -728,6 +743,7 @@
 import { io } from 'socket.io-client';
 import { baseUrl } from '../config.js';
 import { authFetch, authHeaders, getToken, clearAuth } from '../auth.js';
+import PptxGenJS from 'pptxgenjs';
 import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 import SurveyResults from './SurveyResults.vue';
 import MediaManager from './MediaManager.vue';
@@ -763,6 +779,13 @@ export default {
       undoStack: [],
       redoStack: [],
       reactions: [],
+      frozen: false,
+      handRaisedCount: 0,
+      autoSaveEnabled: false,
+      autoSaveInterval: null,
+      autoSaveStatus: '',
+      autoSaveLabel: '',
+      hasUnsavedChanges: false,
       showQR: false,
       showTemplateMenu: false,
       showWheel: false,
@@ -798,6 +821,10 @@ export default {
       timerRunning: false,
       timerInterval: null
     }
+  },
+  watch: {
+    autoSaveEnabled() { this._setupAutoSave(); },
+    editSlides: { handler() { this.hasUnsavedChanges = true; }, deep: true },
   },
   computed: {
     currentSlide() {
@@ -895,6 +922,13 @@ export default {
       setTimeout(() => { this.reactions.shift(); }, 5000);
     });
 
+    // Freeze mode
+    this.socket.on('slide:freeze', (frozen) => { this.frozen = frozen; });
+    // Hand raise
+    this.socket.on('hand:count', (count) => { this.handRaisedCount = count; });
+    this.socket.on('hand:raised', (data) => { this.handRaisedCount++; });
+    this.socket.on('hand:cleared', () => { this.handRaisedCount = 0; });
+
     this.checkPollResults();
 
     // Fullscreen Listeners
@@ -916,6 +950,8 @@ export default {
     window.removeEventListener('keydown', this.handleKeydown);
     if (this._keyHandler) window.removeEventListener('keydown', this._keyHandler);
     clearInterval(this.clockInterval);
+    clearInterval(this.autoSaveInterval);
+    clearInterval(this.timerInterval);
   },
   watch: {
     currentIndex() {
@@ -1361,6 +1397,43 @@ export default {
       printWin.document.close();
       printWin.onload = () => { printWin.print(); };
     },
+    async exportPPTX() {
+      try {
+        const pptx = new PptxGenJS();
+        pptx.defineLayout({ name: 'WIDE', width: 13.33, height: 7.5 });
+        pptx.layout = 'WIDE';
+        for (const s of this.slides) {
+          const slide = pptx.addSlide();
+          // Blue bar at top
+          slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: '100%', h: 0.6, fill: { color: '1b4293' } });
+          slide.addText(s.title || '', { x: 0.5, y: 0.08, w: 10, h: 0.45, fontSize: 18, color: 'FFFFFF', bold: true });
+          if (s.type === 'title') {
+            slide.addShape(pptx.ShapeType.rect, { x: 0, y: 1.5, w: '35%', h: 4.5, fill: { color: 'dea133' } });
+            slide.addShape(pptx.ShapeType.rect, { x: '35%', y: 1.5, w: '65%', h: 4.5, fill: { color: '1b4293' } });
+            slide.addText(s.title || '', { x: 5, y: 2.5, w: 7, h: 1.5, fontSize: 36, color: 'FFFFFF', bold: true, align: 'center' });
+            if (s.subtitle) slide.addText(s.subtitle, { x: 5, y: 4, w: 7, h: 0.8, fontSize: 16, color: 'CCCCCC', align: 'center' });
+          } else if (s.type === 'poll') {
+            slide.addText(s.question || '', { x: 0.5, y: 1.2, w: 12, h: 0.6, fontSize: 22, bold: true, color: '1b4293' });
+            (s.options || []).forEach((opt, i) => {
+              slide.addShape(pptx.ShapeType.rect, { x: 1, y: 2.2 + i * 0.8, w: 10, h: 0.6, fill: { color: 'f1f5f9' }, line: { color: 'cbd5e1' } });
+              slide.addText(opt, { x: 1.2, y: 2.2 + i * 0.8, w: 9.5, h: 0.6, fontSize: 14, color: '334155' });
+            });
+          } else {
+            if (s.subtitle) slide.addText(s.subtitle, { x: 0.5, y: 0.8, w: 12, h: 0.4, fontSize: 14, color: '64748b' });
+            if (s.content) slide.addText(s.content, { x: 0.5, y: 1.5, w: 12, h: 4.5, fontSize: 14, color: '333333', valign: 'top', wrap: true });
+            if (s.image) {
+              try {
+                slide.addImage({ path: this.resolveUrl(s.image), x: 7, y: 2, w: 5, h: 3.5, sizing: { type: 'contain' } });
+              } catch(e) { /* skip failed images */ }
+            }
+          }
+          // Gold corner
+          slide.addShape(pptx.ShapeType.rect, { x: 0, y: 7, w: '100%', h: 0.5, fill: { color: 'e6e6e6' } });
+          slide.addText(String(this.slides.indexOf(s) + 1), { x: 12.2, y: 6.5, w: 0.5, h: 0.5, fontSize: 10, color: 'FFFFFF', fill: { color: '1b4293' }, align: 'center', valign: 'middle' });
+        }
+        await pptx.writeFile({ fileName: 'PEDRRA_Presentation.pptx' });
+      } catch (e) { this.showError('PPTX export failed: ' + e.message); }
+    },
     escHtml(str) {
       const div = document.createElement('div');
       div.textContent = str;
@@ -1381,6 +1454,33 @@ export default {
         this.pollProgress = { answered: 0, total: 0 };
         setTimeout(() => this.userMessage = '', 3000);
       } catch (e) { this.showError(e.message); }
+    },
+    // Freeze mode
+    toggleFreeze() {
+      this.frozen = !this.frozen;
+      this.socket.emit('slide:freeze', this.frozen);
+    },
+    // Hand raise
+    clearHands() {
+      this.socket.emit('hand:clearAll');
+    },
+    // Auto-save
+    _setupAutoSave() {
+      clearInterval(this.autoSaveInterval);
+      if (this.autoSaveEnabled) {
+        this.autoSaveInterval = setInterval(() => {
+          if (this.hasUnsavedChanges && this.activeTab === 'content') {
+            this.autoSaveStatus = 'saving';
+            this.autoSaveLabel = 'Saving...';
+            this.saveSlides().then(() => {
+              this.hasUnsavedChanges = false;
+              this.autoSaveStatus = 'saved';
+              this.autoSaveLabel = '✓ Saved';
+              setTimeout(() => { this.autoSaveStatus = ''; this.autoSaveLabel = ''; }, 3000);
+            });
+          }
+        }, 30000);
+      }
     },
     // Timer methods
     startTimer() {

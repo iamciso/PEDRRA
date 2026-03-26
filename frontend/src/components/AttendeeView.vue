@@ -1,8 +1,20 @@
 <template>
   <div ref="wrapper" style="position:fixed;inset:0;background:#1a1a2e;display:flex;align-items:center;justify-content:center;overflow:hidden;">
 
+    <!-- #7 — Freeze overlay -->
+    <div v-if="frozen" class="freeze-overlay">
+      <div class="edps-wait-icon" style="width:60px;height:60px;border-width:4px;margin-bottom:1.5rem;"></div>
+      <h2>Please Wait</h2>
+      <p>The trainer has paused the session. Content will resume shortly.</p>
+    </div>
+
+    <!-- #4 — Progress bar -->
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" :style="{width: slideProgressPct + '%'}"></div>
+    </div>
+
     <!-- Top bar -->
-    <div style="position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:0.4rem 1.2rem;background:rgba(0,0,0,0.45);">
+    <div style="position:fixed;top:4px;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:0.4rem 1.2rem;background:rgba(0,0,0,0.45);">
       <span style="color:rgba(255,255,255,0.7);font-size:0.8rem;">
         <span :style="{display:'inline-block',width:'8px',height:'8px',borderRadius:'50%',marginRight:'6px',background:connected?'#10b981':'#ef4444'}" :title="connected?'Connected':'Disconnected'"></span>
         <img v-if="user?.avatar" :src="resolveUrl(user.avatar)" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;" />
@@ -233,6 +245,11 @@
       <button v-for="emoji in reactionEmojis" :key="emoji" @click="sendReaction(emoji)" style="background:none;border:none;font-size:1.4rem;cursor:pointer;padding:0.2rem 0.4rem;transition:transform 0.15s;" @mouseenter="$event.target.style.transform='scale(1.3)'" @mouseleave="$event.target.style.transform='scale(1)'" :title="reactionLabel(emoji)">{{ emoji }}</button>
     </div>
 
+    <!-- #13 — Hand raise button -->
+    <button v-if="isSlideVisible" :class="['hand-raise-btn', {raised: handRaised}]" @click="toggleHandRaise" :title="handRaised ? 'Lower hand' : 'Raise hand'">
+      {{ handRaised ? '🙋' : '✋' }}
+    </button>
+
     <!-- Floating reactions animation -->
     <div style="position:fixed;bottom:3rem;left:50%;transform:translateX(-50%);z-index:199;pointer-events:none;">
       <span v-for="(r, i) in floatingReactions" :key="r.id" style="position:absolute;font-size:2rem;animation:floatUp 2s ease-out forwards;" :style="{left:(r.x)+'px'}">{{ r.emoji }}</span>
@@ -269,6 +286,9 @@ export default {
       timerInterval: null,
       reactionEmojis: ['👍', '❓', '🐌', '👏', '🎉'],
       floatingReactions: [],
+      frozen: false,
+      handRaised: false,
+      slideTransitionName: 'slide-fade',
     };
   },
   computed: {
@@ -317,6 +337,12 @@ export default {
       const idx = this.slides.findIndex(s => s.id === this.currentSlideId);
       if (idx < 0) return '';
       return `Slide ${idx + 1} / ${this.slides.length}`;
+    },
+    slideProgressPct() {
+      if (this.slides.length <= 1) return 0;
+      const idx = this.slides.findIndex(s => s.id === this.currentSlideId);
+      if (idx < 0) return 0;
+      return ((idx + 1) / this.slides.length) * 100;
     },
     slideTransform() {
       return {
@@ -393,6 +419,11 @@ export default {
       this.surveyForm = {};
     });
 
+    // Freeze mode
+    this.socket.on('slide:freeze', (frozen) => { this.frozen = frozen; });
+    // Hand raise cleared by trainer
+    this.socket.on('hand:cleared', () => { this.handRaised = false; });
+
     window.addEventListener('resize', this.computeScale);
     this.computeScale();
     const tick = () => { this.currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
@@ -439,6 +470,10 @@ export default {
       const ratingKey = 'rating_' + this.currentSlide.id;
       this.socket.emit('poll:answer', { slideId: ratingKey, username: this.user.username, answer: String(value) });
       this.answeredPolls = { ...this.answeredPolls, [ratingKey]: true };
+    },
+    toggleHandRaise() {
+      this.handRaised = !this.handRaised;
+      if (this.socket) this.socket.emit(this.handRaised ? 'hand:raise' : 'hand:lower');
     },
     sendReaction(emoji) {
       if (this.socket) this.socket.emit('reaction:send', emoji);
