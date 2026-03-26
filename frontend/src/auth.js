@@ -1,4 +1,5 @@
-// Helper to get stored user and build auth headers for API calls
+// JWT-based auth helpers for API calls
+
 export function getUser() {
     try {
         return JSON.parse(localStorage.getItem('user'));
@@ -7,9 +8,23 @@ export function getUser() {
     }
 }
 
+export function getToken() {
+    return localStorage.getItem('token');
+}
+
+export function setAuth(user, token) {
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('token', token);
+}
+
+export function clearAuth() {
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+}
+
 export function authHeaders() {
-    const user = getUser();
-    return user ? { 'X-Auth-User': JSON.stringify(user) } : {};
+    const token = getToken();
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
 export function authFetch(url, options = {}) {

@@ -193,12 +193,23 @@
       </template>
 
     </div>
+
+    <!-- Reaction buttons (floating bottom) -->
+    <div v-if="isSlideVisible" style="position:fixed;bottom:0.8rem;left:50%;transform:translateX(-50%);z-index:200;display:flex;gap:0.4rem;background:rgba(0,0,0,0.6);padding:0.4rem 0.8rem;border-radius:24px;">
+      <button v-for="emoji in reactionEmojis" :key="emoji" @click="sendReaction(emoji)" style="background:none;border:none;font-size:1.4rem;cursor:pointer;padding:0.2rem 0.4rem;transition:transform 0.15s;" @mouseenter="$event.target.style.transform='scale(1.3)'" @mouseleave="$event.target.style.transform='scale(1)'" :title="reactionLabel(emoji)">{{ emoji }}</button>
+    </div>
+
+    <!-- Floating reactions animation -->
+    <div style="position:fixed;bottom:3rem;left:50%;transform:translateX(-50%);z-index:199;pointer-events:none;">
+      <span v-for="(r, i) in floatingReactions" :key="r.id" style="position:absolute;font-size:2rem;animation:floatUp 2s ease-out forwards;" :style="{left:(r.x)+'px'}">{{ r.emoji }}</span>
+    </div>
   </div>
 </template>
 
 <script>
 import { io } from 'socket.io-client';
 import { baseUrl } from '../config.js';
+import { getToken, clearAuth } from '../auth.js';
 import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 
 const W = 1024, H = 576;
@@ -223,6 +234,8 @@ export default {
       timerSeconds: 0,
       timerRunning: false,
       timerInterval: null,
+      reactionEmojis: ['👍', '❓', '🐌', '👏', '🎉'],
+      floatingReactions: [],
     };
   },
   computed: {
@@ -290,7 +303,7 @@ export default {
       this.slides = await r.json();
     } catch(e) { console.error(e); }
 
-    this.socket = io(baseUrl, { auth: { user: JSON.stringify(this.user) } });
+    this.socket = io(baseUrl, { auth: { token: getToken() } });
 
     this.socket.on('connect', () => { this.connected = true; });
     this.socket.on('disconnect', () => { this.connected = false; });
@@ -326,6 +339,9 @@ export default {
         this.publishedResults = null;
         this.surveyForm = {};
       }
+    });
+    this.socket.on('reaction:new', (r) => {
+      if (r.username !== this.user?.username) this._showFloatingReaction(r.emoji);
     });
     this.socket.on('poll:resetAll', () => {
       this.answeredPolls = {};
@@ -374,6 +390,38 @@ export default {
       if (!count || !this.totalPublicAnswers) return 0;
       return (count / this.totalPublicAnswers) * 100;
     },
+    sendReaction(emoji) {
+      if (this.socket) this.socket.emit('reaction:send', emoji);
+      this._showFloatingReaction(emoji);
+    },
+    _showFloatingReaction(emoji) {
+      const r = { id: Date.now() + Math.random(), emoji, x: Math.random() * 60 - 30 };
+      this.floatingReactions.push(r);
+      setTimeout(() => { this.floatingReactions = this.floatingReactions.filter(f => f.id !== r.id); }, 2000);
+    },
+    reactionLabel(emoji) {
+      const labels = { '👍': 'Like', '❓': 'Question', '🐌': 'Slow down', '👏': 'Applause', '🎉': 'Celebrate' };
+      return labels[emoji] || '';
+    },
+    _playTimerEndSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const playTone = (freq, start, dur) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.3, ctx.currentTime + start);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + start + dur);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(ctx.currentTime + start);
+          osc.stop(ctx.currentTime + start + dur);
+        };
+        playTone(523, 0, 0.2);
+        playTone(659, 0.25, 0.2);
+        playTone(784, 0.5, 0.4);
+      } catch (e) { /* audio not supported */ }
+    },
     _handleTimerUpdate(state) {
       clearInterval(this.timerInterval);
       if (!state) { this.timerSeconds = 0; this.timerRunning = false; return; }
@@ -387,13 +435,15 @@ export default {
         this.timerRunning = this.timerSeconds > 0;
         if (this.timerRunning) {
           this.timerInterval = setInterval(() => {
-            if (this.timerSeconds > 0) this.timerSeconds--;
-            else { this.timerRunning = false; clearInterval(this.timerInterval); }
+            if (this.timerSeconds > 0) {
+              this.timerSeconds--;
+              if (this.timerSeconds === 0) { this._playTimerEndSound(); this.timerRunning = false; clearInterval(this.timerInterval); }
+            } else { this.timerRunning = false; clearInterval(this.timerInterval); }
           }, 1000);
         }
       }
     },
-    logout() { localStorage.removeItem('user'); this.$router.push('/'); },
+    logout() { clearAuth(); this.$router.push('/'); },
   },
 };
 </script>

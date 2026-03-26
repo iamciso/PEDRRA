@@ -29,7 +29,11 @@
     <div v-if="activeTab === 'live'" class="dash-layout">
       <!-- Live Presenter view (Left) -->
       <div style="display: flex; flex-direction: column;">
-        <div v-if="slides.length === 0">Loading slides...</div>
+        <div v-if="loading" style="padding:2rem;text-align:center;">
+          <div class="edps-wait-icon" style="width:40px;height:40px;border-width:3px;margin:0 auto 1rem;"></div>
+          <span style="color:#64748b;">Loading slides...</span>
+        </div>
+        <div v-else-if="slides.length === 0" style="padding:2rem;text-align:center;color:#94a3b8;">No slides yet. Go to "Manage Content" to create some.</div>
         
         <div v-else class="slide-container" style="flex: 1; border: 1px solid var(--border-color); border-radius: 8px; padding: 2rem; background: #fff;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -152,11 +156,23 @@
       <div>
         <h3>Instructions</h3>
         <ul style="padding-left: 1.2rem; color: #64748b; font-size: 0.9rem; margin-top: 1rem;">
-          <li style="margin-bottom: 0.5rem">Click <strong>Start Presentation</strong> to lock the presentation active for the entire session. Students will see what you see.</li>
-          <li style="margin-bottom: 0.5rem">When finished, click <strong>Stop Presentation</strong> to force all attendees back to the Wait Screen.</li>
-          <li style="margin-bottom: 0.5rem">Click the Fullscreen icon to expand the view to your entire projector. It will look exactly like what the students see!</li>
-          <li>In Polls, correctly marked answers will highlight in green dynamically for students. Results are hidden from both of you until all attendees complete the poll.</li>
+          <li style="margin-bottom: 0.5rem">Click <strong>Start Presentation</strong> to lock the presentation active for the entire session.</li>
+          <li style="margin-bottom: 0.5rem">Click the Fullscreen icon to expand the view to your entire projector.</li>
+          <li style="margin-bottom: 0.5rem">Poll results are hidden until all attendees complete them.</li>
         </ul>
+        <button class="secondary" @click="showQR=!showQR" style="width:auto;padding:0.4rem 0.8rem;font-size:0.85rem;margin-top:0.5rem;">📱 {{ showQR ? 'Hide' : 'Show' }} QR Code</button>
+        <div v-if="showQR" style="margin-top:0.75rem;text-align:center;">
+          <img :src="qrCodeUrl" style="width:180px;height:180px;border:1px solid #e2e8f0;border-radius:8px;" alt="QR Code" />
+          <div style="font-size:0.75rem;color:#94a3b8;margin-top:0.3rem;">Scan to join the session</div>
+        </div>
+
+        <!-- Live Reactions -->
+        <div v-if="reactions.length" style="margin-top:1rem;">
+          <h4 style="margin:0 0 0.5rem;font-size:0.9rem;color:#64748b;">Live Reactions</h4>
+          <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">
+            <span v-for="(r, i) in reactions" :key="i" style="font-size:1.5rem;animation:reactionPop 2s ease-out forwards;" :title="r.username">{{ r.emoji }}</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -172,7 +188,15 @@
           <button class="secondary" @click="addSlide('poll')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">+ Poll</button>
           <button class="secondary" @click="addSlide('survey')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">+ Survey</button>
           <button class="secondary" @click="addSlide('timer')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">⏱ Timer</button>
+          <div style="position:relative;" ref="templateMenuRef">
+            <button class="secondary" @click="showTemplateMenu=!showTemplateMenu" style="width:auto;padding:0.5rem 0.8rem;font-size:0.82rem;">📐 Template ▾</button>
+            <div v-if="showTemplateMenu" style="position:absolute;top:100%;left:0;z-index:200;background:white;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:200px;margin-top:4px;">
+              <button v-for="t in slideTemplates" :key="t.name" @click="addFromTemplate(t); showTemplateMenu=false" style="display:block;width:100%;text-align:left;padding:0.5rem 0.75rem;border:none;background:none;cursor:pointer;font-size:0.85rem;color:#334155;" @mouseenter="$event.target.style.background='#f1f5f9'" @mouseleave="$event.target.style.background='none'">{{ t.icon }} {{ t.name }}</button>
+            </div>
+          </div>
           <span style="width:1px;height:28px;background:#cbd5e1;align-self:center;"></span>
+          <button class="secondary" @click="undo" :disabled="undoStack.length===0" style="width:auto;padding:0.5rem 0.6rem;font-size:0.82rem;" title="Undo (Ctrl+Z)">↩️</button>
+          <button class="secondary" @click="redo" :disabled="redoStack.length===0" style="width:auto;padding:0.5rem 0.6rem;font-size:0.82rem;" title="Redo (Ctrl+Y)">↪️</button>
           <button class="secondary" @click="importSlides" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;" title="Import slides from JSON file">📥 Import</button>
           <button class="secondary" @click="exportSlides" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;" title="Export slides to JSON file">📤 Export</button>
           <button @click="saveSlides" style="width: auto; padding: 0.5rem 1rem;">Save Changes</button>
@@ -183,7 +207,10 @@
 
       <div v-for="(slide, index) in editSlides" :key="slide.id" style="border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; background: #fff;" draggable="true" @dragstart="onDragStart(index, $event)" @dragover.prevent="onDragOver(index, $event)" @drop="onDrop(index)" @dragend="dragIdx=null" :style="{opacity: dragIdx===index ? 0.4 : 1, borderTop: dragOverIdx===index ? '3px solid var(--primary)' : '1px solid var(--border-color)'}">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-          <strong style="font-size: 1.1rem; color: var(--primary);">Slide {{ index + 1 }} ({{ String(slide.type).toUpperCase() }})</strong>
+          <div style="display:flex;align-items:center;gap:0.75rem;">
+            <div :style="{width:'50px',height:'30px',background:slideTypeColor(slide.type),borderRadius:'4px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.65rem',color:'white',fontWeight:'bold',flexShrink:0}">{{ slideTypeIcon(slide.type) }}</div>
+            <strong style="font-size: 1.1rem; color: var(--primary);">Slide {{ index + 1 }} — {{ slide.title || '(untitled)' }}</strong>
+          </div>
           <div>
              <button class="secondary" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem; margin-right: 0.5rem;" @click="moveSlide(index, -1)" :disabled="index === 0">↑</button>
              <button class="secondary" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem; margin-right: 0.5rem;" @click="moveSlide(index, 1)" :disabled="index === editSlides.length - 1">↓</button>
@@ -198,7 +225,15 @@
         <!-- Content/Title Slide Edit -->
         <template v-if="slide.type === 'content' || slide.type === 'title'">
           <input v-model="slide.subtitle" placeholder="Subtitle (Optional)" />
-          <textarea v-model="slide.content" placeholder="Slide Content Text (used in legacy mode)" rows="3"></textarea>
+          <div style="border:1px solid var(--border-color);border-radius:4px;overflow:hidden;margin-bottom:1rem;">
+            <div style="display:flex;gap:0.3rem;padding:0.3rem 0.5rem;background:#f8fafc;border-bottom:1px solid var(--border-color);">
+              <button type="button" @click="insertFormat(slide, '**', '**')" class="secondary" style="width:auto;padding:0.15rem 0.5rem;font-size:0.8rem;font-weight:bold;margin-bottom:0;">B</button>
+              <button type="button" @click="insertFormat(slide, '*', '*')" class="secondary" style="width:auto;padding:0.15rem 0.5rem;font-size:0.8rem;font-style:italic;margin-bottom:0;">I</button>
+              <button type="button" @click="insertFormat(slide, '\n• ', '')" class="secondary" style="width:auto;padding:0.15rem 0.5rem;font-size:0.8rem;margin-bottom:0;">• List</button>
+              <button type="button" @click="insertFormat(slide, '\n## ', '')" class="secondary" style="width:auto;padding:0.15rem 0.5rem;font-size:0.8rem;margin-bottom:0;">H2</button>
+            </div>
+            <textarea v-model="slide.content" :ref="'content_' + slide.id" placeholder="Slide content text..." rows="3" style="border:none;border-radius:0;margin-bottom:0;"></textarea>
+          </div>
           
           <div style="display: flex; gap: 1rem;">
              <input v-model="slide.image" placeholder="Image URL (legacy, or use Visual Editor)" style="flex: 1;" />
@@ -602,7 +637,7 @@
 <script>
 import { io } from 'socket.io-client';
 import { baseUrl } from '../config.js';
-import { authFetch, authHeaders } from '../auth.js';
+import { authFetch, authHeaders, getToken, clearAuth } from '../auth.js';
 import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 import SurveyResults from './SurveyResults.vue';
 import MediaManager from './MediaManager.vue';
@@ -632,6 +667,29 @@ export default {
       darkMode: localStorage.getItem('darkMode') === 'true',
       previewSlide: null,
       connectedUsers: 0,
+      loading: true,
+      undoStack: [],
+      redoStack: [],
+      reactions: [],
+      showQR: false,
+      showTemplateMenu: false,
+      slideTemplates: [
+        { name: 'Title + Image', icon: '🖼', type: 'content', elements: [
+          { id: 'tpl_t', kind: 'text', x: 50, y: 90, w: 450, h: 60, content: 'Your Title Here', fontSize: 32, fontFamily: 'Segoe UI', bold: true, italic: false, color: '#1b4293', textAlign: 'left' },
+          { id: 'tpl_i', kind: 'image', x: 520, y: 90, w: 460, h: 400, src: '' }
+        ]},
+        { name: 'Two Columns', icon: '📰', type: 'content', elements: [
+          { id: 'tpl_l', kind: 'text', x: 40, y: 90, w: 470, h: 380, content: 'Left column content...', fontSize: 18, fontFamily: 'Segoe UI', bold: false, italic: false, color: '#333', textAlign: 'left' },
+          { id: 'tpl_r', kind: 'text', x: 530, y: 90, w: 470, h: 380, content: 'Right column content...', fontSize: 18, fontFamily: 'Segoe UI', bold: false, italic: false, color: '#333', textAlign: 'left' }
+        ]},
+        { name: 'Full Image', icon: '🌄', type: 'content', elements: [
+          { id: 'tpl_fi', kind: 'image', x: 0, y: 0, w: 1024, h: 576, src: '' }
+        ]},
+        { name: 'Quote', icon: '💬', type: 'content', elements: [
+          { id: 'tpl_q', kind: 'text', x: 100, y: 150, w: 824, h: 200, content: '"Your inspiring quote goes here."', fontSize: 28, fontFamily: 'Georgia', bold: false, italic: true, color: '#1b4293', textAlign: 'center' },
+          { id: 'tpl_a', kind: 'text', x: 300, y: 370, w: 424, h: 40, content: '— Author Name', fontSize: 18, fontFamily: 'Segoe UI', bold: false, italic: false, color: '#64748b', textAlign: 'center' }
+        ]},
+      ],
       currentTime: '',
       clockInterval: null,
       connected: false,
@@ -655,6 +713,10 @@ export default {
     },
     totalPollAnswers() {
       return Array.isArray(this.pollResults) ? this.pollResults.length : 0;
+    },
+    qrCodeUrl() {
+      const url = encodeURIComponent(window.location.origin);
+      return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${url}`;
     },
     timerDisplay() {
       const s = Math.max(0, this.timerSeconds);
@@ -684,8 +746,24 @@ export default {
     // Apply dark mode if saved
     if (this.darkMode) document.documentElement.setAttribute('data-theme', 'dark');
 
+    // Keyboard shortcuts
+    this._keyHandler = (e) => {
+      if (e.ctrlKey && e.key === 'z' && !e.shiftKey) { e.preventDefault(); this.undo(); }
+      if (e.ctrlKey && e.key === 'z' && e.shiftKey) { e.preventDefault(); this.redo(); }
+      if (e.ctrlKey && e.key === 'y') { e.preventDefault(); this.redo(); }
+      if (e.ctrlKey && e.key === 's') { e.preventDefault(); this.saveSlides(); }
+    };
+    window.addEventListener('keydown', this._keyHandler);
+
+    // Reactions listener
+    this.socket.on('reaction:new', (r) => {
+      this.reactions.push(r);
+      if (this.reactions.length > 20) this.reactions.shift();
+      setTimeout(() => { this.reactions.shift(); }, 5000);
+    });
+
     // #6 — Socket auth
-    this.socket = io(baseUrl, { auth: { user: JSON.stringify(this.user) } });
+    this.socket = io(baseUrl, { auth: { token: getToken() } });
 
     this.socket.on('connect', () => { this.connected = true; });
     this.socket.on('disconnect', () => { this.connected = false; });
@@ -722,6 +800,7 @@ export default {
     document.removeEventListener('fullscreenchange', this.onFullscreenChange);
     window.removeEventListener('resize', this.resizeSlide);
     window.removeEventListener('keydown', this.handleKeydown);
+    if (this._keyHandler) window.removeEventListener('keydown', this._keyHandler);
     clearInterval(this.clockInterval);
   },
   watch: {
@@ -793,6 +872,7 @@ export default {
       setTimeout(() => { if (this.errorMessage === msg) this.errorMessage = ''; }, 8000);
     },
     async fetchSlides() {
+      this.loading = true;
       try {
         const res = await fetch(`${baseUrl}/api/slides`);
         if (!res.ok) throw new Error(`Failed to load slides (${res.status})`);
@@ -800,6 +880,7 @@ export default {
         this.slides = this.migrateQuestions(data);
         this.editSlides = JSON.parse(JSON.stringify(this.slides));
       } catch (e) { this.showError(e.message); }
+      finally { this.loading = false; }
     },
     async fetchUsers() {
       try {
@@ -869,6 +950,7 @@ export default {
       }
     },
     removeSlide(index) {
+      this.saveUndoState();
       this.editSlides.splice(index, 1);
     },
     duplicateSlide(index) {
@@ -930,6 +1012,48 @@ export default {
         } catch (err) { this.showError('Invalid JSON file: ' + err.message); }
       };
       reader.readAsText(file);
+    },
+    // Slide templates
+    addFromTemplate(tpl) {
+      const id = Date.now();
+      const elements = JSON.parse(JSON.stringify(tpl.elements)).map((el, i) => ({ ...el, id: 'el_' + id + '_' + i }));
+      this.editSlides.push({ id, type: tpl.type, title: tpl.name, subtitle: '', content: '', image: '', video: '', elements, _showCanvas: true });
+    },
+    // Undo/Redo
+    saveUndoState() {
+      this.undoStack.push(JSON.stringify(this.editSlides));
+      if (this.undoStack.length > 30) this.undoStack.shift();
+      this.redoStack = [];
+    },
+    undo() {
+      if (this.undoStack.length === 0) return;
+      this.redoStack.push(JSON.stringify(this.editSlides));
+      this.editSlides = JSON.parse(this.undoStack.pop());
+    },
+    redo() {
+      if (this.redoStack.length === 0) return;
+      this.undoStack.push(JSON.stringify(this.editSlides));
+      this.editSlides = JSON.parse(this.redoStack.pop());
+    },
+    // Slide type visual helpers
+    slideTypeColor(type) {
+      const colors = { title: '#1b4293', content: '#059669', section: '#d97706', poll: '#7c3aed', survey: '#e11d48', timer: '#0891b2' };
+      return colors[type] || '#64748b';
+    },
+    slideTypeIcon(type) {
+      const icons = { title: '📌', content: '📝', section: '📂', poll: '📊', survey: '📋', timer: '⏱' };
+      return icons[type] || '📄';
+    },
+    insertFormat(slide, prefix, suffix) {
+      const ref = this.$refs['content_' + slide.id];
+      const textarea = Array.isArray(ref) ? ref[0] : ref;
+      if (!textarea) { slide.content = (slide.content || '') + prefix + suffix; return; }
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const text = slide.content || '';
+      const selected = text.substring(start, end) || 'text';
+      slide.content = text.substring(0, start) + prefix + selected + suffix + text.substring(end);
+      this.$nextTick(() => { textarea.focus(); textarea.setSelectionRange(start + prefix.length, start + prefix.length + selected.length); });
     },
     openVisualEditor(slide) {
       slide._showCanvas = !slide._showCanvas;
@@ -1112,11 +1236,27 @@ export default {
       this.timerSeconds = this.currentSlide.duration || 300;
       clearInterval(this.timerInterval);
     },
+    _playTimerEndSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const playTone = (freq, start, dur) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine'; osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.3, ctx.currentTime + start);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + start + dur);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(ctx.currentTime + start); osc.stop(ctx.currentTime + start + dur);
+        };
+        playTone(523, 0, 0.2); playTone(659, 0.25, 0.2); playTone(784, 0.5, 0.4);
+      } catch (e) { /* audio not supported */ }
+    },
     _startTimerTick() {
       clearInterval(this.timerInterval);
       this.timerInterval = setInterval(() => {
         if (this.timerSeconds > 0) {
           this.timerSeconds--;
+          if (this.timerSeconds === 0) { this._playTimerEndSound(); this.timerRunning = false; clearInterval(this.timerInterval); }
         } else {
           this.timerRunning = false;
           clearInterval(this.timerInterval);
@@ -1138,7 +1278,7 @@ export default {
       }
     },
     logout() {
-      localStorage.removeItem('user');
+      clearAuth();
       this.$router.push('/');
     }
   }

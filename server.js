@@ -7,8 +7,11 @@ const fs = require('fs');
 const multer = require('multer');
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
 const db = require('./db.js');
 require('dotenv').config();
+
+const JWT_SECRET = process.env.JWT_SECRET || 'pedrra-default-secret-change-in-production-' + Date.now();
 
 const app = express();
 const server = http.createServer(app);
@@ -82,15 +85,18 @@ function saveState() {
     } catch (e) { console.error('Failed to save state:', e.message); }
 }
 
-// #2 — Authentication middleware
+// JWT Authentication middleware
 function authMiddleware(requiredRole) {
     return (req, res, next) => {
-        const authHeader = req.headers['x-auth-user'];
-        if (!authHeader) return res.status(401).json({ error: 'Authentication required.' });
+        const authHeader = req.headers['authorization'];
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ error: 'Authentication required.' });
+        }
         try {
-            const user = JSON.parse(authHeader);
+            const token = authHeader.split(' ')[1];
+            const user = jwt.verify(token, JWT_SECRET);
             if (!user || !user.username || !user.role) {
-                return res.status(401).json({ error: 'Invalid auth header.' });
+                return res.status(401).json({ error: 'Invalid token.' });
             }
             if (requiredRole && user.role !== requiredRole) {
                 return res.status(403).json({ error: 'Insufficient permissions.' });
@@ -98,7 +104,7 @@ function authMiddleware(requiredRole) {
             req.user = user;
             next();
         } catch (e) {
-            return res.status(401).json({ error: 'Malformed auth header.' });
+            return res.status(401).json({ error: 'Invalid or expired token.' });
         }
     };
 }
@@ -124,7 +130,9 @@ app.post('/api/login', loginLimiter, (req, res) => {
         bcrypt.compare(password, row.password, (bcryptErr, match) => {
             if (bcryptErr) return res.status(500).json({ error: 'Auth error.' });
             if (!match) return res.status(401).json({ error: 'Invalid credentials.' });
-            res.json({ user: { id: row.id, username: row.username, team: row.team, role: row.role } });
+            const userData = { id: row.id, username: row.username, team: row.team, role: row.role };
+            const token = jwt.sign(userData, JWT_SECRET, { expiresIn: '24h' });
+            res.json({ user: userData, token });
         });
     });
 });
@@ -296,10 +304,10 @@ app.delete('/api/uploads/:filename', authMiddleware('Trainer'), (req, res) => {
 // #6 — Socket.io authentication
 io.use((socket, next) => {
     try {
-        const userStr = socket.handshake.auth.user;
-        if (!userStr) return next(new Error('Authentication required'));
-        const user = typeof userStr === 'string' ? JSON.parse(userStr) : userStr;
-        if (!user || !user.username || !user.role) return next(new Error('Invalid user data'));
+        const token = socket.handshake.auth.token;
+        if (!token) return next(new Error('Authentication required'));
+        const user = jwt.verify(token, JWT_SECRET);
+        if (!user || !user.username || !user.role) return next(new Error('Invalid token'));
         socket.user = user;
         next();
     } catch (e) {
@@ -402,6 +410,14 @@ io.on('connection', (socket) => {
     });
     socket.on('timer:get', (slideId) => {
         socket.emit(`timer:update:${slideId}`, timerState[slideId] || null);
+    });
+
+    // ── REACTIONS ─────────────────────────────────────────────
+    socket.on('reaction:send', (emoji) => {
+        if (!emoji || typeof emoji !== 'string') return;
+        const allowed = ['👍', '❓', '🐌', '👏', '🎉'];
+        if (!allowed.includes(emoji)) return;
+        io.emit('reaction:new', { emoji, username: socket.user.username });
     });
 });
 

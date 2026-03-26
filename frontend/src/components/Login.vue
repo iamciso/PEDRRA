@@ -18,6 +18,7 @@
 
 <script>
 import { baseUrl } from '../config.js';
+import { setAuth } from '../auth.js';
 
 export default {
   data() {
@@ -37,9 +38,9 @@ export default {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Request failed');
-        
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
+
+        setAuth(data.user, data.token);
+
         if (data.user.role === 'Trainer') {
           this.$router.push('/trainer');
         } else {
