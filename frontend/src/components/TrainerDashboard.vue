@@ -6,6 +6,7 @@
       <div style="color: #64748b;">
         <span :style="{display:'inline-block',width:'8px',height:'8px',borderRadius:'50%',marginRight:'6px',background:connected?'#10b981':'#ef4444'}" :title="connected?'Connected':'Disconnected'"></span>
         {{ user?.username }} ({{ user?.team }}) |
+        <a href="#" @click.prevent="toggleDarkMode" style="text-decoration:none;margin:0 0.5rem;" :title="darkMode?'Switch to light mode':'Switch to dark mode'">{{ darkMode ? '☀️' : '🌙' }}</a> |
         <a href="#" @click.prevent="logout" style="color: var(--primary);">Log Out</a>
       </div>
     </div>
@@ -33,7 +34,10 @@
         <div v-else class="slide-container" style="flex: 1; border: 1px solid var(--border-color); border-radius: 8px; padding: 2rem; background: #fff;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div class="slide-title" style="margin: 0;">{{ currentSlide.title }}</div>
-            <button class="secondary" @click="toggleFullscreen" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem;">⛶ Enter Fullscreen Mode</button>
+            <div style="display:flex;gap:0.3rem;">
+              <button class="secondary" @click="exportPDF" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem;">📄 Export PDF</button>
+              <button class="secondary" @click="toggleFullscreen" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem;">⛶ Fullscreen</button>
+            </div>
           </div>
           <div v-if="currentSlide.subtitle" class="slide-subtitle" style="margin-top: 0.5rem;">{{ currentSlide.subtitle }}</div>
           <div class="slide-content">{{ currentSlide.content || currentSlide.question || currentSlide.description }}</div>
@@ -128,11 +132,19 @@
 
         <div class="controls" v-if="slides.length > 0" style="display: flex; align-items: center; justify-content: center; margin-top: 1.5rem;">
           <button class="secondary" @click="prevSlide" :disabled="currentIndex === 0">Previous Slide</button>
-          <!-- Global Presentation Toggle -->
           <button :class="isSlideVisible ? 'danger' : 'primary'" @click="toggleVisibility" style="margin: 0 1rem; font-weight: bold; padding: 0.75rem 2rem;">
              {{ isSlideVisible ? '🔴 Stop Presentation (Show Wait Screen)' : '🟢 Start Presentation (Live for Attendees)' }}
           </button>
           <button class="secondary" @click="nextSlide" :disabled="currentIndex === slides.length - 1">Next Slide</button>
+        </div>
+        <!-- Speaker Notes (visible only to trainer) -->
+        <div v-if="currentSlide.notes" style="margin-top:1rem;padding:0.75rem 1rem;background:#fffef5;border:1px solid #e2e0c8;border-radius:6px;font-size:0.85rem;color:#64748b;">
+          <strong style="color:#334155;">📝 Notes:</strong> {{ currentSlide.notes }}
+        </div>
+        <!-- Slide counter + live info -->
+        <div style="display:flex;justify-content:center;gap:2rem;margin-top:0.5rem;font-size:0.8rem;color:#94a3b8;">
+          <span>Slide {{ currentIndex + 1 }} / {{ slides.length }}</span>
+          <span v-if="connectedUsers > 0">👥 {{ connectedUsers }} connected</span>
         </div>
       </div>
       
@@ -151,26 +163,32 @@
     <!-- Tab: Content Management (Rest remains identical) -->
     <!-- Content Editor Start -->
     <div v-if="activeTab === 'content'">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h3>Slides Editor</h3>
-        <div>
-          <button class="secondary" @click="addSlide('title')" style="width: auto; padding: 0.5rem 1rem; margin-right: 0.5rem;">+ Title Slide</button>
-          <button class="secondary" @click="addSlide('content')" style="width: auto; padding: 0.5rem 1rem; margin-right: 0.5rem;">+ Content</button>
-          <button class="secondary" @click="addSlide('section')" style="width: auto; padding: 0.5rem 1rem; margin-right: 0.5rem;">+ Section</button>
-          <button class="secondary" @click="addSlide('poll')" style="width: auto; padding: 0.5rem 1rem; margin-right: 0.5rem;">+ Live Poll</button>
-          <button class="secondary" @click="addSlide('survey')" style="width: auto; padding: 0.5rem 1rem; margin-right: 0.5rem;">+ Survey</button>
-          <button class="secondary" @click="addSlide('timer')" style="width: auto; padding: 0.5rem 1rem; margin-right: 0.5rem;">⏱ Timer</button>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+        <h3 style="margin:0;">Slides Editor</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:0.4rem;">
+          <button class="secondary" @click="addSlide('title')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">+ Title</button>
+          <button class="secondary" @click="addSlide('content')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">+ Content</button>
+          <button class="secondary" @click="addSlide('section')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">+ Section</button>
+          <button class="secondary" @click="addSlide('poll')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">+ Poll</button>
+          <button class="secondary" @click="addSlide('survey')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">+ Survey</button>
+          <button class="secondary" @click="addSlide('timer')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">⏱ Timer</button>
+          <span style="width:1px;height:28px;background:#cbd5e1;align-self:center;"></span>
+          <button class="secondary" @click="importSlides" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;" title="Import slides from JSON file">📥 Import</button>
+          <button class="secondary" @click="exportSlides" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;" title="Export slides to JSON file">📤 Export</button>
           <button @click="saveSlides" style="width: auto; padding: 0.5rem 1rem;">Save Changes</button>
         </div>
       </div>
+      <input type="file" ref="importFileInput" accept=".json" style="display:none;" @change="onImportFile" />
       <div v-if="saveMessage" style="color: #10b981; font-weight: bold; margin-bottom: 1rem;">{{ saveMessage }}</div>
 
-      <div v-for="(slide, index) in editSlides" :key="slide.id" style="border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; background: #fff;">
+      <div v-for="(slide, index) in editSlides" :key="slide.id" style="border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; background: #fff;" draggable="true" @dragstart="onDragStart(index, $event)" @dragover.prevent="onDragOver(index, $event)" @drop="onDrop(index)" @dragend="dragIdx=null" :style="{opacity: dragIdx===index ? 0.4 : 1, borderTop: dragOverIdx===index ? '3px solid var(--primary)' : '1px solid var(--border-color)'}">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
           <strong style="font-size: 1.1rem; color: var(--primary);">Slide {{ index + 1 }} ({{ String(slide.type).toUpperCase() }})</strong>
           <div>
              <button class="secondary" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem; margin-right: 0.5rem;" @click="moveSlide(index, -1)" :disabled="index === 0">↑</button>
              <button class="secondary" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem; margin-right: 0.5rem;" @click="moveSlide(index, 1)" :disabled="index === editSlides.length - 1">↓</button>
+             <button class="secondary" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem; margin-right: 0.5rem;" @click="duplicateSlide(index)" title="Duplicate this slide">📋 Duplicate</button>
+             <button class="secondary" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem; margin-right: 0.5rem;" @click="slide._showPreview = !slide._showPreview">{{ slide._showPreview ? '🔽 Hide Preview' : '👁 Preview' }}</button>
              <button class="danger" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem;" @click="removeSlide(index)">Delete</button>
           </div>
         </div>
@@ -255,6 +273,33 @@
         <template v-if="slide.type === 'section'">
           <input v-model="slide.subtitle" placeholder="Subtitle (Optional)" />
         </template>
+
+        <!-- Speaker Notes (all slide types) -->
+        <details style="margin-top: 1rem;">
+          <summary style="cursor:pointer;font-size:0.85rem;color:#64748b;font-weight:bold;">📝 Speaker Notes</summary>
+          <textarea v-model="slide.notes" placeholder="Private notes for the presenter (not visible to attendees)..." rows="2" style="margin-top:0.5rem;font-size:0.85rem;background:#fffef5;border-color:#e2e0c8;"></textarea>
+        </details>
+
+        <!-- Inline Preview -->
+        <div v-if="slide._showPreview" style="margin-top:1rem;border:2px solid var(--primary);border-radius:8px;overflow:hidden;">
+          <div style="background:var(--primary);color:white;padding:0.3rem 0.75rem;font-size:0.8rem;font-weight:bold;">Preview — as seen by attendees</div>
+          <div style="background:white;padding:1.5rem;min-height:120px;">
+            <h3 style="color:var(--edps-blue);margin:0 0 0.3rem;">{{ slide.title }}</h3>
+            <div v-if="slide.subtitle" style="color:#64748b;margin-bottom:0.75rem;">{{ slide.subtitle }}</div>
+            <div v-if="slide.elements && slide.elements.length" style="position:relative;min-height:150px;">
+              <div v-for="el in slide.elements" :key="el.id" :style="{position:'absolute',left:(el.x*0.45)+'px',top:(el.y*0.4)+'px',width:(el.w*0.45)+'px',height:(el.h*0.4)+'px',overflow:'hidden'}">
+                <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize*0.45)+'px',fontFamily:el.fontFamily,fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',color:el.color,whiteSpace:'pre-wrap',display:'block'}">{{ el.content }}</span>
+                <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
+              </div>
+            </div>
+            <div v-else-if="slide.content" style="white-space:pre-wrap;font-size:0.9rem;">{{ slide.content }}</div>
+            <div v-if="slide.type==='poll'" style="margin-top:0.5rem;">
+              <div style="font-weight:bold;margin-bottom:0.5rem;">{{ slide.question }}</div>
+              <div v-for="opt in (slide.options||[])" :key="opt" style="padding:0.3rem 0.75rem;margin:0.2rem 0;background:#f1f5f9;border-radius:4px;font-size:0.85rem;">{{ opt }}</div>
+            </div>
+            <img v-if="slide.image && !(slide.elements && slide.elements.length)" :src="resolveUrl(slide.image)" style="max-width:50%;max-height:150px;margin-top:0.5rem;" />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -356,6 +401,10 @@
 
     <!-- Tab: Survey Results -->
     <div v-if="activeTab === 'results'">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <h3 style="margin:0;">Survey & Poll Results</h3>
+        <button class="danger" @click="resetAllAnswers" style="width:auto;padding:0.5rem 1rem;font-size:0.85rem;">🗑 Reset All Answers</button>
+      </div>
       <SurveyResults :slides="slides" />
     </div>
 
@@ -537,9 +586,13 @@
         </template>
       </div>
 
+    <!-- Speaker notes overlay for fullscreen (only trainer sees this) -->
+    <div v-if="currentSlide.notes" style="position:absolute;bottom:3rem;left:1rem;right:50%;background:rgba(0,0,0,0.7);color:#e2e8f0;padding:0.75rem 1rem;border-radius:6px;font-size:0.85rem;z-index:100;max-height:120px;overflow-y:auto;line-height:1.4;">
+      📝 {{ currentSlide.notes }}
+    </div>
     <!-- Instructor Help overlay for fullscreen -->
     <div style="position: absolute; bottom: 1rem; left: 1rem; color: #94a3b8; font-size: 0.8rem; z-index: 100; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">
-      Press LEFT/RIGHT ARROWS to control slides. ESC to exit.
+      Slide {{ currentIndex + 1 }}/{{ slides.length }} · LEFT/RIGHT to navigate · ESC to exit
     </div>
 
   </div>
@@ -574,6 +627,11 @@ export default {
       newUser: { username: '', password: '', team: '', role: 'Attendee' },
       editingUser: null,
       userMessage: '',
+      dragIdx: null,
+      dragOverIdx: null,
+      darkMode: localStorage.getItem('darkMode') === 'true',
+      previewSlide: null,
+      connectedUsers: 0,
       currentTime: '',
       clockInterval: null,
       connected: false,
@@ -623,11 +681,15 @@ export default {
     await this.fetchSlides();
     this.fetchUsers();
 
+    // Apply dark mode if saved
+    if (this.darkMode) document.documentElement.setAttribute('data-theme', 'dark');
+
     // #6 — Socket auth
     this.socket = io(baseUrl, { auth: { user: JSON.stringify(this.user) } });
 
     this.socket.on('connect', () => { this.connected = true; });
     this.socket.on('disconnect', () => { this.connected = false; });
+    this.socket.on('users:count', (count) => { this.connectedUsers = count; });
 
     this.socket.on('slide:current', (id) => {
       const idx = this.slides.findIndex(s => s.id === id);
@@ -809,13 +871,66 @@ export default {
     removeSlide(index) {
       this.editSlides.splice(index, 1);
     },
+    duplicateSlide(index) {
+      const original = this.editSlides[index];
+      const clone = JSON.parse(JSON.stringify(original));
+      clone.id = Date.now();
+      clone.title = clone.title + ' (Copy)';
+      if (clone.elements) clone.elements.forEach(el => { el.id = 'el_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5); });
+      this.editSlides.splice(index + 1, 0, clone);
+    },
     moveSlide(index, direction) {
       const targetIndex = index + direction;
       if (targetIndex < 0 || targetIndex >= this.editSlides.length) return;
       const slide = this.editSlides.splice(index, 1)[0];
       this.editSlides.splice(targetIndex, 0, slide);
     },
-    // #16 — openVisualEditor method
+    // Drag & drop reordering
+    onDragStart(index, e) {
+      this.dragIdx = index;
+      e.dataTransfer.effectAllowed = 'move';
+    },
+    onDragOver(index) {
+      if (this.dragIdx === null || this.dragIdx === index) return;
+      this.dragOverIdx = index;
+    },
+    onDrop(index) {
+      if (this.dragIdx === null || this.dragIdx === index) { this.dragOverIdx = null; return; }
+      const slide = this.editSlides.splice(this.dragIdx, 1)[0];
+      this.editSlides.splice(index, 0, slide);
+      this.dragIdx = null;
+      this.dragOverIdx = null;
+    },
+    // Import/Export slides
+    exportSlides() {
+      const data = JSON.stringify(this.editSlides, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'pedrra-slides.json';
+      link.click();
+    },
+    importSlides() {
+      this.$refs.importFileInput.value = '';
+      this.$refs.importFileInput.click();
+    },
+    onImportFile(e) {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const slides = JSON.parse(ev.target.result);
+          if (!Array.isArray(slides)) throw new Error('File must contain an array of slides');
+          if (confirm(`Import ${slides.length} slides? This will REPLACE all current slides.`)) {
+            this.editSlides = slides;
+            this.saveMessage = `Imported ${slides.length} slides. Click "Save Changes" to persist.`;
+            setTimeout(() => this.saveMessage = '', 5000);
+          }
+        } catch (err) { this.showError('Invalid JSON file: ' + err.message); }
+      };
+      reader.readAsText(file);
+    },
     openVisualEditor(slide) {
       slide._showCanvas = !slide._showCanvas;
     },
@@ -908,6 +1023,70 @@ export default {
     },
     isLocalVideoCheck(url) {
       return isLocalVideo(url);
+    },
+    exportPDF() {
+      // Open a printable view of all slides in a new window
+      const printWin = window.open('', '_blank');
+      let html = `<html><head><title>PEDRRA Presentation</title>
+        <style>
+          body{font-family:'Segoe UI',sans-serif;margin:0;padding:0;}
+          .slide{page-break-after:always;padding:3rem;min-height:90vh;position:relative;border-bottom:2px solid #e2e8f0;}
+          .slide:last-child{page-break-after:avoid;}
+          h1{color:#1b4293;margin:0 0 0.5rem;}
+          h2{color:#64748b;margin:0 0 1.5rem;font-weight:normal;}
+          .content{font-size:1.1rem;line-height:1.8;white-space:pre-wrap;}
+          .footer{position:absolute;bottom:1rem;right:1rem;color:#94a3b8;font-size:0.8rem;}
+          img{max-width:80%;max-height:300px;display:block;margin:1rem auto;}
+          .poll-q{font-weight:bold;font-size:1.2rem;margin:1rem 0;}
+          .poll-opt{padding:0.5rem 1rem;margin:0.3rem 0;background:#f1f5f9;border-radius:4px;}
+        </style></head><body>`;
+      this.slides.forEach((s, i) => {
+        html += `<div class="slide">`;
+        html += `<h1>${this.escHtml(s.title)}</h1>`;
+        if (s.subtitle) html += `<h2>${this.escHtml(s.subtitle)}</h2>`;
+        if (s.content) html += `<div class="content">${this.escHtml(s.content)}</div>`;
+        if (s.image) html += `<img src="${this.resolveUrl(s.image)}" />`;
+        if (s.type === 'poll') {
+          html += `<div class="poll-q">${this.escHtml(s.question || '')}</div>`;
+          (s.options || []).forEach(o => { html += `<div class="poll-opt">${this.escHtml(o)}</div>`; });
+        }
+        if (s.type === 'survey' && s.questions) {
+          s.questions.forEach((q, qi) => { html += `<div class="poll-q">Q${qi+1}: ${this.escHtml(q.text || '')}</div>`; });
+        }
+        if (s.elements && s.elements.length) {
+          s.elements.forEach(el => {
+            if (el.kind === 'text') html += `<div style="font-size:${el.fontSize||16}px;color:${el.color||'#333'};font-weight:${el.bold?'bold':'normal'};white-space:pre-wrap;margin:0.5rem 0;">${this.escHtml(el.content||'')}</div>`;
+            if (el.kind === 'image') html += `<img src="${this.resolveUrl(el.src)}" />`;
+          });
+        }
+        html += `<div class="footer">Slide ${i+1} / ${this.slides.length}</div>`;
+        html += `</div>`;
+      });
+      html += `</body></html>`;
+      printWin.document.write(html);
+      printWin.document.close();
+      printWin.onload = () => { printWin.print(); };
+    },
+    escHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    },
+    toggleDarkMode() {
+      this.darkMode = !this.darkMode;
+      localStorage.setItem('darkMode', this.darkMode);
+      document.documentElement.setAttribute('data-theme', this.darkMode ? 'dark' : 'light');
+    },
+    async resetAllAnswers() {
+      if (!confirm('This will delete ALL poll and survey answers for ALL slides. Are you sure?')) return;
+      try {
+        const res = await authFetch(`${baseUrl}/api/answers`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Failed to reset answers');
+        this.userMessage = 'All answers have been reset.';
+        this.pollResults = [];
+        this.pollProgress = { answered: 0, total: 0 };
+        setTimeout(() => this.userMessage = '', 3000);
+      } catch (e) { this.showError(e.message); }
     },
     // Timer methods
     startTimer() {

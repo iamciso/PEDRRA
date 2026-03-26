@@ -186,6 +186,15 @@ app.delete('/api/users/:id', authMiddleware('Trainer'), (req, res) => {
     });
 });
 
+// Reset ALL answers across all slides — Trainer only
+app.delete('/api/answers', authMiddleware('Trainer'), (req, res) => {
+    db.run('DELETE FROM answers', function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        io.emit('poll:resetAll');
+        res.json({ success: true, changes: this.changes });
+    });
+});
+
 // Reset ALL votes for a specific slide — Trainer only
 app.delete('/api/answers/:slideId', authMiddleware('Trainer'), (req, res) => {
     const { slideId } = req.params;
@@ -315,9 +324,15 @@ function sendPollResults(slideId) {
     });
 }
 
+function broadcastUserCount() {
+    io.emit('users:count', io.engine.clientsCount);
+}
+
 io.on('connection', (socket) => {
     socket.emit('slide:current', currentSlideId);
     socket.emit('slide:visibility', presentationActive);
+    broadcastUserCount();
+    socket.on('disconnect', () => { setTimeout(broadcastUserCount, 500); });
 
     // Only trainers can control slides and visibility
     socket.on('slide:toggleVisibility', (active) => {

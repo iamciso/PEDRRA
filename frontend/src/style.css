@@ -389,3 +389,66 @@ a:focus-visible {
   color: white;
   z-index: 10000;
 }
+
+/* #3 — Dark mode */
+[data-theme="dark"] {
+  --edps-light-gray: #1e1e2e;
+  --edps-text: #e2e8f0;
+  --border-color: #334155;
+}
+[data-theme="dark"] body {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+[data-theme="dark"] .glass-panel {
+  background: #1e293b;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+}
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background: #334155;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+[data-theme="dark"] button.secondary {
+  background: #334155;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+[data-theme="dark"] .tab-link {
+  color: #94a3b8;
+}
+[data-theme="dark"] .tab-link.active {
+  color: #60a5fa;
+  border-bottom-color: #60a5fa;
+}
+[data-theme="dark"] table {
+  background: #1e293b;
+}
+[data-theme="dark"] thead {
+  background: #1e3a5f;
+}
+[data-theme="dark"] tr {
+  border-bottom-color: #334155;
+}
+[data-theme="dark"] td, [data-theme="dark"] th {
+  color: #e2e8f0;
+}
+[data-theme="dark"] details summary {
+  color: #94a3b8;
+}
+
+/* #1 — Print styles for PDF export */
+@media print {
+  body { background: white; }
+  .glass-panel { box-shadow: none; max-width: 100%; }
+  .tabs, .controls, button, .tab-link, details, [style*="error"] { display: none !important; }
+  .print-slide {
+    page-break-after: always;
+    padding: 2rem;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 1rem;
+  }
+  .print-slide:last-child { page-break-after: avoid; }
+}

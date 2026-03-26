@@ -7,6 +7,7 @@
         <span :style="{display:'inline-block',width:'8px',height:'8px',borderRadius:'50%',marginRight:'6px',background:connected?'#10b981':'#ef4444'}" :title="connected?'Connected':'Disconnected'"></span>
         PEDRRA • {{ user?.username }}
       </span>
+      <span v-if="slideProgress" style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-right:0.5rem;">{{ slideProgress }}</span>
       <a href="#" @click.prevent="logout" style="color:var(--edps-gold,#dea133);font-weight:bold;text-decoration:none;font-size:0.8rem;">Log Out</a>
     </div>
 
@@ -260,6 +261,12 @@ export default {
       const sec = s % 60;
       return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
     },
+    slideProgress() {
+      if (!this.currentSlide || !this.isSlideVisible || this.slides.length === 0) return '';
+      const idx = this.slides.findIndex(s => s.id === this.currentSlideId);
+      if (idx < 0) return '';
+      return `Slide ${idx + 1} / ${this.slides.length}`;
+    },
     slideTransform() {
       return {
         transform: `translate(-50%, -50%) scale(${this.scale})`,
@@ -319,6 +326,11 @@ export default {
         this.publishedResults = null;
         this.surveyForm = {};
       }
+    });
+    this.socket.on('poll:resetAll', () => {
+      this.answeredPolls = {};
+      this.publishedResults = null;
+      this.surveyForm = {};
     });
 
     window.addEventListener('resize', this.computeScale);
