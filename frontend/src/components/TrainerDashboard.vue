@@ -544,8 +544,8 @@
     </div>
 
     <!-- Modals -->
-    <SpinningWheel :visible="showWheel" :attendees="wheelAttendees" @close="showWheel=false" @result="onWheelResult" />
-    <Leaderboard :visible="showLeaderboard" :entries="leaderboardEntries" @close="showLeaderboard=false" />
+    <!-- Old SpinningWheel removed — replaced by fullscreen slot-machine picker -->
+    <!-- Old Leaderboard modal removed — replaced by fullscreen overlay above -->
   </div>
 
   <!-- FULLSCREEN TRAINER VIEW (MIRRORS ATTENDEE EXACTLY) -->
@@ -723,46 +723,8 @@
     </div>
     <!-- ═══ FULLSCREEN OVERLAYS (only trainer sees, projected to students) ═══ -->
 
-    <!-- Spinning Wheel overlay (fullscreen) -->
-    <div v-if="showWheel && isFullscreen" style="position:fixed;inset:0;z-index:10000;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;animation:overlayFadeIn 0.3s ease-out;">
-      <!-- Title -->
-      <div style="color:white;font-size:2rem;font-weight:bold;margin-bottom:2rem;text-shadow:0 2px 8px rgba(0,0,0,0.5);">🎲 Who's next?</div>
-
-      <!-- Slot machine display -->
-      <div style="position:relative;width:350px;height:200px;overflow:hidden;border-radius:20px;border:4px solid var(--edps-gold);box-shadow:0 0 60px rgba(241,192,100,0.3),inset 0 0 30px rgba(0,0,0,0.3);background:#1e293b;">
-        <!-- Selection indicator -->
-        <div style="position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);height:70px;border-top:3px solid var(--edps-gold);border-bottom:3px solid var(--edps-gold);background:rgba(241,192,100,0.1);z-index:5;pointer-events:none;"></div>
-        <!-- Scrolling names -->
-        <div style="position:absolute;left:0;right:0;display:flex;flex-direction:column;align-items:center;transition:transform 0.1s ease-out;" :style="{transform:'translateY('+slotOffset+'px)'}">
-          <div v-for="(att, i) in slotItems" :key="'slot-'+i" style="height:70px;display:flex;align-items:center;justify-content:center;gap:1rem;width:100%;padding:0 1.5rem;">
-            <img v-if="att.avatar" :src="resolveUrl(att.avatar)" style="width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);flex-shrink:0;" />
-            <div v-else style="width:50px;height:50px;border-radius:50%;background:var(--edps-blue);display:flex;align-items:center;justify-content:center;color:white;font-size:1.2rem;font-weight:bold;flex-shrink:0;">{{ (att.display_name || att.username || '?')[0] }}</div>
-            <span style="color:white;font-size:1.4rem;font-weight:bold;text-shadow:0 1px 4px rgba(0,0,0,0.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ att.display_name || att.username }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Winner reveal -->
-      <div v-if="fullscreenWheelWinner" style="margin-top:2rem;animation:podiumRise 0.5s ease-out;">
-        <div style="display:flex;align-items:center;gap:1.5rem;padding:1.5rem 3rem;background:linear-gradient(135deg,var(--edps-gold),#f59e0b);border-radius:24px;box-shadow:0 10px 40px rgba(241,192,100,0.4);">
-          <span style="font-size:3.5rem;">🎉</span>
-          <img v-if="fullscreenWheelWinner.avatar" :src="resolveUrl(fullscreenWheelWinner.avatar)" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:4px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.3);" />
-          <div style="text-align:left;">
-            <div style="font-size:2.5rem;font-weight:900;color:white;text-shadow:0 2px 4px rgba(0,0,0,0.3);">{{ fullscreenWheelWinner.display_name || fullscreenWheelWinner.username }}</div>
-          </div>
-          <span style="font-size:3.5rem;">🎉</span>
-        </div>
-      </div>
-
-      <!-- Controls -->
-      <div style="margin-top:2rem;display:flex;gap:1rem;">
-        <button @click.stop="spinSlotMachine" :disabled="wheelSpinState || wheelAttendees.length < 2" style="padding:1rem 3rem;font-size:1.2rem;border-radius:30px;background:var(--edps-gold);color:white;border:none;font-weight:bold;cursor:pointer;box-shadow:0 4px 20px rgba(241,192,100,0.4);">🎲 Pick Someone!</button>
-        <button @click.stop="showWheel=false" style="padding:1rem 2rem;font-size:1.1rem;border-radius:30px;background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);cursor:pointer;">✕ Close</button>
-      </div>
-    </div>
-
     <!-- Leaderboard overlay (fullscreen) -->
-    <div v-if="showLeaderboard && isFullscreen" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);animation:overlayFadeIn 0.3s ease-out;" @click.self="showLeaderboard=false">
+    <div v-if="showLeaderboard" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);animation:overlayFadeIn 0.3s ease-out;" @click.self="showLeaderboard=false">
       <div style="background:white;border-radius:24px;padding:2.5rem;width:85%;max-width:600px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
         <h2 style="margin:0 0 1.5rem;text-align:center;color:var(--edps-blue);font-size:2.2rem;">🏆 Leaderboard</h2>
         <div v-if="leaderboardEntries.length >= 1" class="podium-container">
@@ -782,7 +744,7 @@
     </div>
 
     <!-- QR Code sidebar overlay (fullscreen) -->
-    <div v-if="showQR && isFullscreen" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);animation:overlayFadeIn 0.3s ease-out;" @click.self="showQR=false">
+    <div v-if="showQR" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);animation:overlayFadeIn 0.3s ease-out;" @click.self="showQR=false">
       <div style="background:white;border-radius:24px;padding:3rem;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
         <div style="font-size:2rem;font-weight:bold;color:var(--edps-blue);margin-bottom:2rem;">📱 Join the Session</div>
         <img v-if="qrCodeUrl" :src="qrCodeUrl" style="width:400px;height:400px;border:3px solid #e2e8f0;border-radius:16px;" />
@@ -805,6 +767,36 @@
 
   </div>
 
+  <!-- ═══ RANDOM PICKER (works in both fullscreen and normal mode) ═══ -->
+  <div v-if="showWheel" style="position:fixed;inset:0;z-index:10000;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;animation:overlayFadeIn 0.3s ease-out;">
+    <div style="color:white;font-size:2.5rem;font-weight:bold;margin-bottom:2rem;text-shadow:0 2px 8px rgba(0,0,0,0.5);">🎲 Who's next?</div>
+
+    <div style="position:relative;width:400px;height:210px;overflow:hidden;border-radius:20px;border:4px solid var(--edps-gold);box-shadow:0 0 60px rgba(241,192,100,0.3),inset 0 0 30px rgba(0,0,0,0.3);background:#1e293b;">
+      <div style="position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);height:70px;border-top:3px solid var(--edps-gold);border-bottom:3px solid var(--edps-gold);background:rgba(241,192,100,0.1);z-index:5;pointer-events:none;"></div>
+      <div style="position:absolute;left:0;right:0;display:flex;flex-direction:column;align-items:center;" :style="{transform:'translateY('+slotOffset+'px)'}">
+        <div v-for="(att, i) in slotItems" :key="'slot-'+i" style="height:70px;display:flex;align-items:center;justify-content:center;gap:1rem;width:100%;padding:0 1.5rem;">
+          <img v-if="att.avatar" :src="resolveUrl(att.avatar)" style="width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);flex-shrink:0;" />
+          <div v-else style="width:50px;height:50px;border-radius:50%;background:var(--edps-blue);display:flex;align-items:center;justify-content:center;color:white;font-size:1.2rem;font-weight:bold;flex-shrink:0;">{{ (att.display_name || att.username || '?')[0] }}</div>
+          <span style="color:white;font-size:1.4rem;font-weight:bold;text-shadow:0 1px 4px rgba(0,0,0,0.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ att.display_name || att.username }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="fullscreenWheelWinner" style="margin-top:2rem;animation:podiumRise 0.5s ease-out;">
+      <div style="display:flex;align-items:center;gap:1.5rem;padding:1.5rem 3rem;background:linear-gradient(135deg,var(--edps-gold),#f59e0b);border-radius:24px;box-shadow:0 10px 40px rgba(241,192,100,0.4);">
+        <span style="font-size:3.5rem;">🎉</span>
+        <img v-if="fullscreenWheelWinner.avatar" :src="resolveUrl(fullscreenWheelWinner.avatar)" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:4px solid white;" />
+        <div style="font-size:2.5rem;font-weight:900;color:white;text-shadow:0 2px 4px rgba(0,0,0,0.3);">{{ fullscreenWheelWinner.display_name || fullscreenWheelWinner.username }}</div>
+        <span style="font-size:3.5rem;">🎉</span>
+      </div>
+    </div>
+
+    <div style="margin-top:2rem;display:flex;gap:1rem;">
+      <button @click.stop="spinSlotMachine" :disabled="wheelSpinState || wheelAttendees.length < 2" style="padding:1rem 3rem;font-size:1.2rem;border-radius:30px;background:var(--edps-gold);color:white;border:none;font-weight:bold;cursor:pointer;box-shadow:0 4px 20px rgba(241,192,100,0.4);">🎲 Pick Someone!</button>
+      <button @click.stop="showWheel=false" style="padding:1rem 2rem;font-size:1.1rem;border-radius:30px;background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);cursor:pointer;">✕ Close</button>
+    </div>
+  </div>
+
 </template>
 
 <script>
@@ -817,11 +809,11 @@ import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 import SurveyResults from './SurveyResults.vue';
 import MediaManager from './MediaManager.vue';
 import SlideCanvas from './SlideCanvas.vue';
-import SpinningWheel from './SpinningWheel.vue';
-import Leaderboard from './Leaderboard.vue';
+// SpinningWheel removed — replaced by inline slot-machine picker
+// Leaderboard component replaced by inline overlay
 
 export default {
-  components: { SurveyResults, MediaManager, SlideCanvas, SpinningWheel, Leaderboard },
+  components: { SurveyResults, MediaManager, SlideCanvas },
   data() {
     return {
       activeTab: 'live',
