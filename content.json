@@ -1,0 +1,181 @@
+{
+  "slides": [
+    {
+      "id": 1,
+      "type": "title",
+      "title": "PEDRRA Training Exercise",
+      "subtitle": "PErsonal Data bReach Risk Assessment",
+      "content": "Welcome to the training. Please follow along closely as we begin our interactive scenarios on Data Breach Risk Management.",
+      "_showCanvas": true
+    },
+    {
+      "id": 2,
+      "type": "content",
+      "title": "Welcome & Context",
+      "subtitle": "Learning Objectives",
+      "content": "Not every security incident is a data breach, but every data breach is a security incident. Today we enhance practical skills in Risk Assessment and inter-disciplinary communication between IT, DPOs, and Management.",
+      "image": "/uploads/1774522144796_LINUX.png"
+    },
+    {
+      "id": 3,
+      "type": "content",
+      "title": "Scenario 1: The Encrypted Gateway",
+      "subtitle": "Stolen Laptop",
+      "content": "An external consultant's laptop holding 150 expert contacts was stolen from a locked home office overnight. It has full-disk encryption and a strong passphrase. A remote wipe was initiated, but remains pending connection."
+    },
+    {
+      "id": 4,
+      "type": "poll",
+      "title": "Scenario 1 Assessment",
+      "question": "What is the initial risk assessment for the 150 experts?",
+      "options": [
+        "Unlikely Risk (No EDPS Notification)",
+        "Risk (EDPS Notification Required)",
+        "High Risk (Notify EDPS & Data Subjects)"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "content",
+      "title": "Lecture: Data Breach Essentials",
+      "subtitle": "EDPS Perspective",
+      "content": "A personal data breach is a security breach leading to the accidental or unlawful destruction, loss, alteration, unauthorized disclosure or access to personal data. Note the strict 72-hour EDPS notification deadline!",
+      "_showCanvas": true,
+      "elements": [
+        {
+          "id": "el_1774524076371",
+          "kind": "image",
+          "x": 394,
+          "y": 125,
+          "w": 614,
+          "h": 425,
+          "src": "/uploads/1774522144796_LINUX.png"
+        },
+        {
+          "id": "el_1774524126487",
+          "kind": "video",
+          "x": 45,
+          "y": 88,
+          "w": 653,
+          "h": 389,
+          "src": "https://youtu.be/-m3WiB4wd-g?si=GxwKBnW9jNs295w3"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "poll",
+      "title": "Knowledge Check",
+      "question": "Your agency must notify the EDPS...",
+      "options": [
+        "Immediately, without exception.",
+        "Within 24 hours.",
+        "Without undue delay, max 72 hours.",
+        "Only if the breach is High Risk."
+      ]
+    },
+    {
+      "id": 7,
+      "type": "content",
+      "title": "Scenario 2: Inter-Agency Data Leak",
+      "subtitle": "Cloud Service Compromise",
+      "content": "CloudVault was breached via phishing. 750,000 pseudonymized records were accessed containing demographic data and a 'health status indicator'. Data was NOT encrypted at rest, a severe violation of the processor's DPA."
+    },
+    {
+      "id": 8,
+      "type": "poll",
+      "title": "Scenario 2 Assesssment",
+      "question": "Which specific factor most strongly elevates this leak to 'High Risk' status?",
+      "options": [
+        "The volume (750,000 records)",
+        "The Health Status Indicator (Sensitive)",
+        "The inter-agency cross-border scope",
+        "The missing encryption at rest"
+      ]
+    },
+    {
+      "id": 9,
+      "type": "title",
+      "title": "Final Debrief & Feedback",
+      "subtitle": "End of PEDRRA Exercise",
+      "content": "Thank you for participating. We will now reflect on inter-disciplinary collaboration, strategic decision-making, and fill out our evaluation forms."
+    },
+    {
+      "id": 1774519177211,
+      "type": "poll",
+      "title": "New Poll",
+      "question": "What is your question?",
+      "options": [
+        "Option 1",
+        "Option 2"
+      ]
+    },
+    {
+      "id": 1774519182258,
+      "type": "survey",
+      "title": "Satisfaction Survey",
+      "description": "Please answer the following questions:",
+      "questions": [
+        {
+          "text": "How would you rate the training? (1-5)",
+          "type": "text",
+          "options": []
+        },
+        {
+          "text": "Any feedback?",
+          "type": "text",
+          "options": []
+        }
+      ]
+    },
+    {
+      "id": 1774519890837,
+      "type": "survey",
+      "title": "Survey",
+      "description": "Please answer the following:",
+      "questions": [
+        {
+          "text": "How do you rate this? (1-5)",
+          "type": "rating",
+          "options": []
+        },
+        {
+          "text": "Feedback",
+          "type": "choice",
+          "options": [
+            "a",
+            "b",
+            "c"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 1774522133799,
+      "type": "content",
+      "title": "Content Slide",
+      "subtitle": "asdfasd",
+      "content": "asdfasdf",
+      "image": "https://academy.hackthebox.com/storage/modules/18/logo.png",
+      "video": "",
+      "_showCanvas": true,
+      "elements": [
+        {
+          "id": "el_1774523846831",
+          "kind": "text",
+          "x": 80,
+          "y": 125,
+          "w": 476,
+          "h": 72,
+          "content": "Esto es una prueba.",
+          "fontSize": 22,
+          "fontFamily": "Segoe UI",
+          "bold": false,
+          "italic": false,
+          "color": "#333333",
+          "textAlign": "left"
+        }
+      ]
+    }
+  ]
+}
