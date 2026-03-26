@@ -1102,6 +1102,7 @@ export default {
       }
     },
     migrateQuestions(slidesData) {
+        if (!Array.isArray(slidesData)) return [];
         return slidesData.map(s => {
             if (s.type === 'survey' && Array.isArray(s.questions)) {
                 s.questions = s.questions.map(q =>
@@ -1397,10 +1398,12 @@ export default {
             return clean;
           }))
         });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Server error'); }
         const data = await res.json();
-        this.slides = this.migrateQuestions(data.slides);
+        this.slides = this.migrateQuestions(data.slides || []);
         this.editSlides = JSON.parse(JSON.stringify(this.slides)).map(s => ({ ...s, _collapsed: true }));
         this.saveMessage = 'Successfully saved!';
+        this.hasUnsavedChanges = false;
         setTimeout(() => this.saveMessage = '', 3000);
       } catch (e) { this.saveMessage = ''; this.showError('Error saving changes: ' + e.message); }
     },

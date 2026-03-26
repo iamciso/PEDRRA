@@ -42,24 +42,19 @@
 
       <!-- ═══ TITLE SLIDE ═══ -->
       <div v-if="currentSlide.type === 'title'" style="position:relative;width:100%;height:100%;background-image:url('/template/cover_bg.jpg');background-size:cover;background-position:center;overflow:hidden;">
-        <!-- EDPS logo (top-left, matching template position) -->
-        <div style="position:absolute;top:0.5rem;left:0.5rem;z-index:3;">
+        <!-- EDPS logo (top-left, matching template: 0.31in from left, 0.33in from top) -->
+        <div style="position:absolute;top:3.5%;left:2%;z-index:3;">
           <img src="/template/edps_logo.png" style="height:55px;" onerror="this.style.display='none'" />
         </div>
 
-        <!-- Title text area (right side, over the gold rectangle area of template) -->
-        <div style="position:absolute;top:0.5rem;right:1rem;width:48%;z-index:2;padding:1rem;">
-          <div style="color:var(--edps-blue,#3B5998);font-size:1.4rem;font-weight:900;line-height:1.4;letter-spacing:0.5px;">{{ currentSlide.title }}</div>
-          <div v-if="currentSlide.subtitle" style="color:#555;font-size:0.9rem;margin-top:0.8rem;">{{ currentSlide.subtitle }}</div>
+        <!-- Title + subtitle in the white rectangle area (center-left of cover) -->
+        <div style="position:absolute;top:7%;left:53%;width:43%;z-index:2;padding:0.8rem;">
+          <div style="color:var(--edps-blue);font-size:1.3rem;font-weight:900;line-height:1.3;">{{ currentSlide.title }}</div>
+          <div v-if="currentSlide.subtitle" style="color:#555;font-size:0.85rem;margin-top:0.6rem;">{{ currentSlide.subtitle }}</div>
         </div>
 
-        <!-- Content text (bottom-left gold area) -->
-        <div v-if="currentSlide.content" style="position:absolute;bottom:6rem;left:2rem;width:30%;color:white;font-size:0.8rem;z-index:2;">{{ currentSlide.content }}</div>
-
-        <!-- Overlaid image if present -->
-        <div v-if="currentSlide.image" style="position:absolute;top:42%;left:38%;transform:translate(-50%,-50%);max-width:150px;z-index:5;">
-          <img :src="resolveUrl(currentSlide.image)" style="max-width:100%;border-radius:4px;" />
-        </div>
+        <!-- Content text in the gold area (bottom-right of cover) -->
+        <div v-if="currentSlide.content" style="position:absolute;bottom:18%;right:5%;width:40%;color:white;font-size:0.8rem;z-index:2;text-align:right;">{{ currentSlide.content }}</div>
       </div>
 
       <!-- ═══ SECTION TITLE SLIDE ═══ -->
@@ -84,19 +79,25 @@
         <div style="padding:1rem 2rem 4rem;flex:1;overflow-y:auto;position:relative;">
           <div v-if="currentSlide.subtitle" style="color:var(--edps-blue,#1b4293);font-size:1.1rem;font-weight:bold;margin-bottom:1rem;">{{ currentSlide.subtitle }}</div>
 
-          <!-- Content: visual elements or legacy -->
+          <!-- Content: always show text content + media -->
           <template v-if="currentSlide.type === 'content'">
+            <!-- Text content (markdown rendered) -->
+            <div v-if="currentSlide.content" style="line-height:1.8;font-size:1.05rem;color:#333;margin-bottom:1rem;" v-html="renderMd(currentSlide.content)"></div>
+
+            <!-- Images from elements or legacy field -->
             <template v-if="currentSlide.elements && currentSlide.elements.length">
-              <div v-for="el in currentSlide.elements" :key="el.id" :style="elStyle(el)">
-                <span v-if="el.kind==='text'" :style="textStyle(el)" v-html="renderMd(el.content)"></span>
-                <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
-                <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
-                <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-              </div>
+              <template v-for="el in currentSlide.elements" :key="el.id">
+                <div v-if="el.kind==='image'" style="text-align:center;margin:0.5rem 0;">
+                  <img :src="resolveUrl(el.src)" style="max-width:100%;max-height:300px;border-radius:6px;" />
+                </div>
+                <div v-if="el.kind==='video'" style="margin:0.5rem 0;">
+                  <video v-if="isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;max-height:280px;border-radius:6px;"></video>
+                  <iframe v-else :src="toEmbedUrlCheck(el.src)" style="width:100%;height:260px;border-radius:6px;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                </div>
+              </template>
             </template>
             <template v-else>
-              <div style="line-height:1.8;font-size:1.05rem;color:#333;" v-html="renderMd(currentSlide.content)"></div>
-              <div v-if="currentSlide.image" style="margin-top:1rem;text-align:center;"><img :src="resolveUrl(currentSlide.image)" style="max-width:100%;max-height:270px;border-radius:6px;" /></div>
+              <div v-if="currentSlide.image" style="text-align:center;"><img :src="resolveUrl(currentSlide.image)" style="max-width:100%;max-height:270px;border-radius:6px;" /></div>
               <div v-if="currentSlide.video" style="margin-top:1rem;">
                 <video v-if="isLocalVideoCheck(currentSlide.video)" :src="resolveUrl(currentSlide.video)" controls style="width:100%;max-height:260px;border-radius:6px;"></video>
                 <iframe v-else :src="toEmbedUrlCheck(currentSlide.video)" style="width:100%;height:260px;border-radius:6px;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
@@ -156,7 +157,7 @@
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;min-height:280px;">
               <div style="position:relative; width:300px; height:300px;">
                 <svg viewBox="0 0 200 200" style="width:100%; height:100%; transform:rotate(-90deg);">
-                  <circle cx="100" cy="100" r="88" fill="none" stroke="#e2e8f0" stroke-width="8" />
+                  <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(200,200,200,0.3)" stroke-width="8" />
                   <circle cx="100" cy="100" r="88" fill="none" :stroke="timerSeconds <= 10 && timerRunning ? '#ef4444' : timerSeconds <= 30 && timerRunning ? '#f59e0b' : 'var(--edps-blue,#1b4293)'" stroke-width="8" stroke-linecap="round" :stroke-dasharray="553" :stroke-dashoffset="553 - (553 * timerProgress)" style="transition: stroke-dashoffset 1s linear, stroke 0.5s ease; filter: drop-shadow(0 0 6px currentColor);" />
                 </svg>
                 <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center;">

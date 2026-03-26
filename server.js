@@ -289,9 +289,10 @@ function validateSlides(req, res, next) {
         if (!slide || typeof slide !== 'object') {
             return res.status(400).json({ error: 'Each slide must be an object.' });
         }
-        if (!slide.id || !slide.type || !slide.title) {
-            return res.status(400).json({ error: 'Each slide requires id, type, and title.' });
+        if (!slide.id || !slide.type) {
+            return res.status(400).json({ error: 'Each slide requires id and type.' });
         }
+        if (!slide.title) slide.title = 'Untitled';
         if (!VALID_SLIDE_TYPES.includes(slide.type)) {
             return res.status(400).json({ error: `Invalid slide type: ${slide.type}` });
         }
