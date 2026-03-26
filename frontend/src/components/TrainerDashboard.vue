@@ -753,6 +753,12 @@ export default {
 
     this.socket.on('connect', () => { this.connected = true; });
     this.socket.on('disconnect', () => { this.connected = false; });
+    this.socket.on('connect_error', (err) => {
+      if (err.message === 'Authentication failed' || err.message === 'Authentication required') {
+        clearAuth();
+        this.$router.push('/');
+      }
+    });
     this.socket.on('users:count', (count) => { this.connectedUsers = count; });
 
     this.socket.on('slide:current', (id) => {

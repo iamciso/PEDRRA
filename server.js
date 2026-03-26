@@ -11,7 +11,7 @@ const jwt = require('jsonwebtoken');
 const db = require('./db.js');
 require('dotenv').config();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'pedrra-default-secret-change-in-production-' + Date.now();
+const JWT_SECRET = process.env.JWT_SECRET || 'pedrra-training-platform-default-secret-key';
 
 const app = express();
 const server = http.createServer(app);
