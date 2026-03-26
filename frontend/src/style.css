@@ -1,7 +1,8 @@
 :root {
-  --edps-blue: #3B5998;
-  --edps-gold: #F0AD4E;
-  --edps-beige: #D7D4C8;
+  --edps-blue: #254A9A;
+  --edps-gold: #F1C064;
+  --edps-beige: #DCDACE;
+  --edps-bottom-bar: #ECEBE6;
   --edps-light-gray: #f4f4f4;
   --edps-text: #333333;
   --primary: var(--edps-blue);

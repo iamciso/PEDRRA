@@ -44,7 +44,8 @@ app.use('/uploads', express.static(uploadsDir));
 // #5 — File upload setup with file type validation
 const ALLOWED_MIMETYPES = [
     'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml',
-    'video/mp4', 'video/webm'
+    'video/mp4', 'video/webm',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
 ];
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadsDir),
@@ -316,6 +317,108 @@ app.post('/api/slides', authMiddleware('Trainer'), validateSlides, (req, res) =>
 app.post('/api/upload', authMiddleware('Trainer'), upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     res.json({ url: `/uploads/${req.file.filename}`, filename: req.file.filename });
+});
+
+// Import PPTX — extract slides from a PowerPoint file
+const JSZip = require('jszip');
+const xml2js = require('xml2js');
+
+app.post('/api/import-pptx', authMiddleware('Trainer'), upload.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    try {
+        const zipData = fs.readFileSync(req.file.path);
+        const zip = await JSZip.loadAsync(zipData);
+
+        // Find all slide XML files
+        const slideFiles = Object.keys(zip.files)
+            .filter(f => f.match(/^ppt\/slides\/slide\d+\.xml$/))
+            .sort((a, b) => {
+                const na = parseInt(a.match(/slide(\d+)/)[1]);
+                const nb = parseInt(b.match(/slide(\d+)/)[1]);
+                return na - nb;
+            });
+
+        const parser = new xml2js.Parser({ explicitArray: false, ignoreAttrs: false });
+        const slides = [];
+
+        // Extract images from pptx
+        const imageFiles = Object.keys(zip.files).filter(f => f.startsWith('ppt/media/'));
+        const imageMap = {};
+        for (const imgPath of imageFiles) {
+            const imgData = await zip.files[imgPath].async('base64');
+            const ext = path.extname(imgPath).replace('.', '');
+            const mimeType = ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
+            const fname = Date.now() + '_' + path.basename(imgPath);
+            fs.writeFileSync(path.join(uploadsDir, fname), Buffer.from(imgData, 'base64'));
+            imageMap[path.basename(imgPath)] = `/uploads/${fname}`;
+        }
+
+        // Parse relationship files for image references
+        for (let i = 0; i < slideFiles.length; i++) {
+            const slideXml = await zip.files[slideFiles[i]].async('string');
+            const result = await parser.parseStringPromise(slideXml);
+
+            // Extract text from the slide
+            let texts = [];
+            let title = '';
+            const extractText = (obj) => {
+                if (!obj) return;
+                if (typeof obj === 'string') return;
+                if (obj['a:t']) {
+                    const t = typeof obj['a:t'] === 'string' ? obj['a:t'] : (obj['a:t']._ || obj['a:t']);
+                    if (t && typeof t === 'string' && t.trim()) texts.push(t.trim());
+                }
+                if (Array.isArray(obj)) obj.forEach(extractText);
+                else if (typeof obj === 'object') Object.values(obj).forEach(extractText);
+            };
+            extractText(result);
+
+            // First text is usually the title
+            title = texts[0] || `Slide ${i + 1}`;
+            const content = texts.slice(1).join('\n');
+
+            // Find images referenced by this slide
+            const relPath = slideFiles[i].replace('ppt/slides/', 'ppt/slides/_rels/') + '.rels';
+            let slideImage = '';
+            if (zip.files[relPath]) {
+                const relsXml = await zip.files[relPath].async('string');
+                const relsResult = await parser.parseStringPromise(relsXml);
+                const rels = relsResult?.Relationships?.Relationship;
+                const relArr = Array.isArray(rels) ? rels : (rels ? [rels] : []);
+                for (const rel of relArr) {
+                    const target = rel?.$?.Target || '';
+                    if (target.match(/\.png|\.jpg|\.jpeg|\.gif|\.webp/i)) {
+                        const imgName = path.basename(target);
+                        if (imageMap[imgName]) { slideImage = imageMap[imgName]; break; }
+                    }
+                }
+            }
+
+            // Determine slide type
+            let type = 'content';
+            if (i === 0) type = 'title';
+
+            slides.push({
+                id: Date.now() + i,
+                type,
+                title,
+                subtitle: '',
+                content,
+                image: slideImage,
+                video: '',
+                ratingEnabled: false,
+                notes: '',
+            });
+        }
+
+        // Clean up uploaded pptx file
+        try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
+
+        res.json({ success: true, slides, imageCount: Object.keys(imageMap).length });
+    } catch (err) {
+        console.error('PPTX import error:', err);
+        res.status(500).json({ error: 'Failed to parse PPTX file: ' + err.message });
+    }
 });
 
 // List uploaded files — Trainer only

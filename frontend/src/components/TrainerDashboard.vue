@@ -227,7 +227,8 @@
           <span style="width:1px;height:28px;background:#cbd5e1;align-self:center;"></span>
           <button class="secondary" @click="undo" :disabled="undoStack.length===0" style="width:auto;padding:0.5rem 0.6rem;font-size:0.82rem;" title="Undo (Ctrl+Z)">↩️</button>
           <button class="secondary" @click="redo" :disabled="redoStack.length===0" style="width:auto;padding:0.5rem 0.6rem;font-size:0.82rem;" title="Redo (Ctrl+Y)">↪️</button>
-          <button class="secondary" @click="importSlides" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;" title="Import slides from JSON file">📥 Import</button>
+          <button class="secondary" @click="importSlides" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;" title="Import slides from JSON file">📥 JSON</button>
+          <button class="secondary" @click="importPptx" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;" title="Import slides from PowerPoint file">📊 PPTX</button>
           <button class="secondary" @click="exportSlides" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;" title="Export slides to JSON file">📤 Export</button>
           <button class="secondary" @click="toggleAllCollapsed" style="width:auto;padding:0.5rem 0.8rem;font-size:0.82rem;">{{ allCollapsed ? '▼ Expand All' : '▲ Collapse All' }}</button>
           <button @click="saveSlides" style="width: auto; padding: 0.5rem 1rem;">Save Changes</button>
@@ -238,6 +239,7 @@
         </div>
       </div>
       <input type="file" ref="importFileInput" accept=".json" style="display:none;" @change="onImportFile" />
+      <input type="file" ref="importPptxInput" accept=".pptx" style="display:none;" @change="onImportPptx" />
       <div v-if="saveMessage" style="color: #10b981; font-weight: bold; margin-bottom: 1rem;">{{ saveMessage }}</div>
 
       <div v-for="(slide, index) in editSlides" :key="slide.id" draggable="true" @dragstart="onDragStart(index, $event)" @dragover.prevent="onDragOver(index, $event)" @drop="onDrop(index)" @dragend="dragIdx=null" :style="{border: '1px solid var(--border-color)', padding: '1.5rem', borderRadius: '8px', marginBottom: '0.75rem', background: '#fff', opacity: dragIdx===index ? 0.4 : 1, borderTop: dragOverIdx===index ? '3px solid var(--primary)' : '1px solid var(--border-color)'}">
@@ -1186,6 +1188,42 @@ export default {
         } catch (err) { this.showError('Invalid JSON file: ' + err.message); }
       };
       reader.readAsText(file);
+    },
+    importPptx() {
+      this.$refs.importPptxInput.value = '';
+      this.$refs.importPptxInput.click();
+    },
+    async onImportPptx(e) {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!file.name.endsWith('.pptx')) { this.showError('Please select a .pptx file'); return; }
+      this.saveMessage = 'Importing PowerPoint... Please wait.';
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const token = getToken();
+        const res = await fetch(`${baseUrl}/api/import-pptx`, {
+          method: 'POST', body: formData,
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Import failed'); }
+        const data = await res.json();
+        if (data.slides && data.slides.length > 0) {
+          const action = confirm(`Imported ${data.slides.length} slides (${data.imageCount} images). Replace current slides? (OK = Replace, Cancel = Append)`);
+          if (action) {
+            this.editSlides = data.slides;
+          } else {
+            this.editSlides.push(...data.slides);
+          }
+          this.saveMessage = `✅ Imported ${data.slides.length} slides from "${file.name}". Click "Save Changes" to persist.`;
+          setTimeout(() => this.saveMessage = '', 8000);
+        } else {
+          this.showError('No slides found in the PowerPoint file.');
+        }
+      } catch (err) {
+        this.saveMessage = '';
+        this.showError('PPTX import error: ' + err.message);
+      }
     },
     // Slide templates
     addFromTemplate(tpl) {
