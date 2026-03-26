@@ -39,13 +39,27 @@
           <div class="slide-content">{{ currentSlide.content || currentSlide.question || currentSlide.description }}</div>
           
           <div v-if="currentSlide.type === 'content' || currentSlide.type === 'title'">
-             <div v-if="currentSlide.image" style="margin-top: 1rem; text-align: center;">
-                 <img :src="currentSlide.image" style="max-width: 100%; max-height: 300px; border-radius: 4px;" />
-             </div>
-             <div v-if="currentSlide.video" style="margin-top: 1rem; text-align: center;">
-                 <video v-if="isLocalVideoCheck(currentSlide.video)" :src="resolveUrl(currentSlide.video)" controls style="width: 100%; max-height: 350px; border-radius: 8px;"></video>
-                 <iframe v-else :src="toEmbedUrlCheck(currentSlide.video)" style="width: 100%; height: 350px; border-radius: 8px;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-             </div>
+             <!-- Canvas visual elements (if present) -->
+             <template v-if="currentSlide.elements && currentSlide.elements.length">
+               <div style="position:relative;width:100%;min-height:280px;margin-top:1rem;">
+                 <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:(el.x*0.6)+'px',top:(el.y*0.5)+'px',width:(el.w*0.6)+'px',height:(el.h*0.5)+'px',overflow:'hidden'}">
+                   <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize*0.6)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',color:el.color||'#333',textAlign:el.textAlign||'left',whiteSpace:'pre-wrap',display:'block'}">{{ el.content }}</span>
+                   <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
+                   <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
+                   <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allowfullscreen></iframe>
+                 </div>
+               </div>
+             </template>
+             <!-- Legacy fields (only if no canvas elements) -->
+             <template v-else>
+               <div v-if="currentSlide.image" style="margin-top: 1rem; text-align: center;">
+                   <img :src="resolveUrl(currentSlide.image)" style="max-width: 100%; max-height: 300px; border-radius: 4px;" />
+               </div>
+               <div v-if="currentSlide.video" style="margin-top: 1rem; text-align: center;">
+                   <video v-if="isLocalVideoCheck(currentSlide.video)" :src="resolveUrl(currentSlide.video)" controls style="width: 100%; max-height: 350px; border-radius: 8px;"></video>
+                   <iframe v-else :src="toEmbedUrlCheck(currentSlide.video)" style="width: 100%; height: 350px; border-radius: 8px;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+               </div>
+             </template>
           </div>
 
           <!-- Live Poll Results (Bar Chart) -->
@@ -285,6 +299,7 @@
           <tr>
             <th style="padding: 0.75rem 1rem;">ID</th>
             <th style="padding: 0.75rem 1rem;">Username</th>
+            <th style="padding: 0.75rem 1rem;">Password</th>
             <th style="padding: 0.75rem 1rem;">Team/Unit</th>
             <th style="padding: 0.75rem 1rem;">Role</th>
             <th style="padding: 0.75rem 1rem;">Actions</th>
@@ -293,13 +308,46 @@
         <tbody>
           <tr v-for="u in usersList" :key="u.id" style="border-bottom: 1px solid var(--border-color);">
             <td style="padding: 0.75rem 1rem;">{{ u.id }}</td>
-            <td style="padding: 0.75rem 1rem;"><strong>{{ u.username }}</strong></td>
-            <td style="padding: 0.75rem 1rem;">{{ u.team }}</td>
-            <td style="padding: 0.75rem 1rem;">
-              <span :style="{ color: u.role === 'Trainer' ? 'var(--primary)' : '#64748b', fontWeight: u.role === 'Trainer' ? 'bold' : 'normal' }">{{ u.role }}</span>
+            <td style="padding: 0.5rem 1rem;">
+              <template v-if="editingUser && editingUser.id === u.id">
+                <input v-model="editingUser.username" style="margin-bottom:0;padding:0.3rem 0.5rem;font-size:0.85rem;width:100%;" />
+              </template>
+              <template v-else><strong>{{ u.username }}</strong></template>
             </td>
-            <td style="padding: 0.75rem 1rem;">
-              <button class="danger" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.8rem;" @click="deleteUser(u.id)" :disabled="u.username === user?.username">Delete</button>
+            <td style="padding: 0.5rem 1rem;">
+              <template v-if="editingUser && editingUser.id === u.id">
+                <input v-model="editingUser.password" type="password" placeholder="(unchanged)" style="margin-bottom:0;padding:0.3rem 0.5rem;font-size:0.85rem;width:100%;" />
+              </template>
+              <template v-else><span style="color:#94a3b8;">••••••</span></template>
+            </td>
+            <td style="padding: 0.5rem 1rem;">
+              <template v-if="editingUser && editingUser.id === u.id">
+                <input v-model="editingUser.team" style="margin-bottom:0;padding:0.3rem 0.5rem;font-size:0.85rem;width:100%;" />
+              </template>
+              <template v-else>{{ u.team }}</template>
+            </td>
+            <td style="padding: 0.5rem 1rem;">
+              <template v-if="editingUser && editingUser.id === u.id">
+                <select v-model="editingUser.role" style="margin-bottom:0;padding:0.3rem;font-size:0.85rem;">
+                  <option value="Attendee">Attendee</option>
+                  <option value="Trainer">Trainer (Admin)</option>
+                </select>
+              </template>
+              <template v-else>
+                <span :style="{ color: u.role === 'Trainer' ? 'var(--primary)' : '#64748b', fontWeight: u.role === 'Trainer' ? 'bold' : 'normal' }">{{ u.role }}</span>
+              </template>
+            </td>
+            <td style="padding: 0.5rem 1rem;">
+              <div style="display:flex;gap:0.3rem;">
+                <template v-if="editingUser && editingUser.id === u.id">
+                  <button @click="saveUser" style="width:auto;padding:0.2rem 0.5rem;font-size:0.8rem;background:#10b981;">Save</button>
+                  <button @click="editingUser=null" class="secondary" style="width:auto;padding:0.2rem 0.5rem;font-size:0.8rem;">Cancel</button>
+                </template>
+                <template v-else>
+                  <button @click="startEditUser(u)" class="secondary" style="width:auto;padding:0.2rem 0.5rem;font-size:0.8rem;">✏️ Edit</button>
+                  <button class="danger" style="width:auto;padding:0.2rem 0.5rem;font-size:0.8rem;" @click="deleteUser(u.id)" :disabled="u.username === user?.username">Delete</button>
+                </template>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -524,6 +572,7 @@ export default {
       saveMessage: '',
       usersList: [],
       newUser: { username: '', password: '', team: '', role: 'Attendee' },
+      editingUser: null,
       userMessage: '',
       currentTime: '',
       clockInterval: null,
@@ -718,6 +767,24 @@ export default {
         const res = await authFetch(`${baseUrl}/api/users/${id}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Failed to delete user');
         this.fetchUsers();
+      } catch(e) { this.showError(e.message); }
+    },
+    startEditUser(u) {
+      this.editingUser = { id: u.id, username: u.username, password: '', team: u.team, role: u.role };
+    },
+    async saveUser() {
+      if (!this.editingUser) return;
+      try {
+        const res = await authFetch(`${baseUrl}/api/users/${this.editingUser.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.editingUser)
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed to update user'); }
+        this.editingUser = null;
+        this.userMessage = 'User updated successfully!';
+        this.fetchUsers();
+        setTimeout(() => this.userMessage = '', 3000);
       } catch(e) { this.showError(e.message); }
     },
     addSlide(type) {

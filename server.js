@@ -151,6 +151,34 @@ app.get('/api/users', authMiddleware('Trainer'), (req, res) => {
     });
 });
 
+// Update user — Trainer only
+app.put('/api/users/:id', authMiddleware('Trainer'), async (req, res) => {
+    const { username, password, team, role } = req.body;
+    const id = req.params.id;
+    if (!username) return res.status(400).json({ error: 'Username is required.' });
+    try {
+        // If password provided, hash it; otherwise keep existing
+        if (password && password.trim()) {
+            const hashed = await bcrypt.hash(password, 10);
+            db.run('UPDATE users SET username = ?, password = ?, team = ?, role = ? WHERE id = ?',
+                [username, hashed, team || '', role || 'Attendee', id], function(err) {
+                    if (err) return res.status(400).json({ error: 'Username already exists or DB error.' });
+                    if (this.changes === 0) return res.status(404).json({ error: 'User not found.' });
+                    res.json({ success: true, user: { id: Number(id), username, team, role } });
+                });
+        } else {
+            db.run('UPDATE users SET username = ?, team = ?, role = ? WHERE id = ?',
+                [username, team || '', role || 'Attendee', id], function(err) {
+                    if (err) return res.status(400).json({ error: 'Username already exists or DB error.' });
+                    if (this.changes === 0) return res.status(404).json({ error: 'User not found.' });
+                    res.json({ success: true, user: { id: Number(id), username, team, role } });
+                });
+        }
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to update user.' });
+    }
+});
+
 app.delete('/api/users/:id', authMiddleware('Trainer'), (req, res) => {
     db.run('DELETE FROM users WHERE id = ?', [req.params.id], function(err) {
         if (err) return res.status(500).json({ error: err.message });
