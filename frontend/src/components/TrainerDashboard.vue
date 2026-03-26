@@ -542,8 +542,8 @@
     </div>
 
     <!-- Modals -->
-    <SpinningWheel :visible="showWheel" :attendees="wheelAttendees" @close="showWheel=false" @result="onWheelResult" />
-    <Leaderboard :visible="showLeaderboard" :entries="leaderboardEntries" @close="showLeaderboard=false" />
+    <SpinningWheel :visible="showWheel" :attendees="wheelAttendees" @close="showWheel=false; socket && socket.emit('overlay:hide')" @result="onWheelResult" />
+    <Leaderboard :visible="showLeaderboard" :entries="leaderboardEntries" @close="showLeaderboard=false; socket && socket.emit('overlay:hide')" />
   </div>
 
   <!-- FULLSCREEN TRAINER VIEW (MIRRORS ATTENDEE EXACTLY) -->
@@ -722,9 +722,9 @@
         <span style="color:rgba(255,255,255,0.5);font-size:0.8rem;">Slide {{ currentIndex + 1 }}/{{ slides.length }}</span>
       </div>
       <div style="display:flex;align-items:center;gap:0.4rem;">
-        <button @click.stop="showWheel=!showWheel" style="background:rgba(255,255,255,0.15);border:none;color:white;padding:0.3rem 0.7rem;border-radius:16px;font-size:0.8rem;cursor:pointer;">🎡 Wheel</button>
-        <button @click.stop="showQR=!showQR" style="background:rgba(255,255,255,0.15);border:none;color:white;padding:0.3rem 0.7rem;border-radius:16px;font-size:0.8rem;cursor:pointer;">📱 QR</button>
-        <button @click.stop="fetchLeaderboard" style="background:rgba(255,255,255,0.15);border:none;color:white;padding:0.3rem 0.7rem;border-radius:16px;font-size:0.8rem;cursor:pointer;">🏆 Leaderboard</button>
+        <button @click.stop="openWheel" style="background:rgba(255,255,255,0.15);border:none;color:white;padding:0.3rem 0.7rem;border-radius:16px;font-size:0.8rem;cursor:pointer;">🎡 Wheel</button>
+        <button @click.stop="showQROverlay" style="background:rgba(255,255,255,0.15);border:none;color:white;padding:0.3rem 0.7rem;border-radius:16px;font-size:0.8rem;cursor:pointer;">📱 QR</button>
+        <button @click.stop="openLeaderboard" style="background:rgba(255,255,255,0.15);border:none;color:white;padding:0.3rem 0.7rem;border-radius:16px;font-size:0.8rem;cursor:pointer;">🏆 Leaderboard</button>
         <button v-if="handRaisedCount > 0" @click.stop="clearHands" style="background:rgba(255,255,255,0.15);border:none;color:white;padding:0.3rem 0.7rem;border-radius:16px;font-size:0.8rem;cursor:pointer;">✋ Clear hands</button>
         <button @click.stop="toggleFreeze" :style="{background:frozen?'#ef4444':'rgba(255,255,255,0.15)',border:'none',color:'white',padding:'0.3rem 0.7rem',borderRadius:'16px',fontSize:'0.8rem',cursor:'pointer'}">{{ frozen ? '❄️ Unfreeze' : '🧊 Freeze' }}</button>
         <span style="color:rgba(255,255,255,0.6);font-size:1rem;font-weight:bold;margin-left:0.5rem;font-variant-numeric:tabular-nums;">{{ currentTime }}</span>
@@ -1530,9 +1530,14 @@ export default {
         if (res.ok) this.wheelAttendees = await res.json();
       } catch (e) { /* ignore */ }
       this.showWheel = true;
+      // Broadcast wheel overlay to attendees
+      if (this.socket) this.socket.emit('overlay:show', { type: 'wheel', attendees: this.wheelAttendees });
     },
     onWheelResult(winner) {
-      if (this.socket) this.socket.emit('wheel:result', winner.username);
+      if (this.socket) {
+        this.socket.emit('wheel:result', winner);
+        this.socket.emit('wheel:spinning');
+      }
     },
     async openLeaderboard() {
       try {
@@ -1540,6 +1545,15 @@ export default {
         if (res.ok) this.leaderboardEntries = await res.json();
       } catch (e) { /* ignore */ }
       this.showLeaderboard = true;
+      if (this.socket) this.socket.emit('overlay:show', { type: 'leaderboard', entries: this.leaderboardEntries });
+    },
+    showQROverlay() {
+      this.showQR = !this.showQR;
+      if (this.showQR && this.socket) {
+        this.socket.emit('overlay:show', { type: 'qr', qrUrl: this.qrCodeUrl, sessionCode: this.sessionCode });
+      } else if (this.socket) {
+        this.socket.emit('overlay:hide');
+      }
     },
     async loadAnalytics() {
       try {

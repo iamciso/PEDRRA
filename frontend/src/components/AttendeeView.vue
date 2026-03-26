@@ -208,6 +208,59 @@
       <button v-for="emoji in reactionEmojis" :key="emoji" @click="sendReaction(emoji)" style="background:none;border:none;font-size:1.4rem;cursor:pointer;padding:0.2rem 0.4rem;transition:transform 0.15s;" @mouseenter="$event.target.style.transform='scale(1.3)'" @mouseleave="$event.target.style.transform='scale(1)'" :title="reactionLabel(emoji)">{{ emoji }}</button>
     </div>
 
+    <!-- ═══ OVERLAYS (broadcast from trainer, visible on projector) ═══ -->
+
+    <!-- Wheel overlay -->
+    <div v-if="overlay === 'wheel'" class="pres-overlay">
+      <div style="text-align:center;">
+        <div style="position:relative;width:320px;height:320px;margin:0 auto;">
+          <div :style="{width:'100%',height:'100%',borderRadius:'50%',border:'5px solid white',overflow:'hidden',transition:wheelSpinning?'transform 4s cubic-bezier(0.17,0.67,0.12,0.99)':'none',transform:'rotate('+wheelRotation+'deg)',boxShadow:'0 0 40px rgba(0,0,0,0.4)'}">
+            <div v-for="(att, i) in wheelAttendees" :key="i" :style="wedgeStyle(i)" style="display:flex;align-items:center;justify-content:center;overflow:hidden;">
+              <span :style="{transform:'rotate('+(90+360/wheelAttendees.length/2)+'deg)',display:'block',fontSize:wheelAttendees.length>10?'0.55rem':'0.7rem',fontWeight:'bold',color:'white',textShadow:'1px 1px 2px rgba(0,0,0,0.6)',maxWidth:'55px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}">{{ att.display_name || att.username }}</span>
+            </div>
+          </div>
+          <div style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:16px solid transparent;border-right:16px solid transparent;border-top:28px solid #e11d48;z-index:10;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));"></div>
+        </div>
+        <div v-if="wheelWinner" style="margin-top:1.5rem;padding:1rem 2rem;background:rgba(255,255,255,0.95);border-radius:16px;display:inline-flex;align-items:center;gap:1rem;">
+          <span style="font-size:2.5rem;">🎉</span>
+          <img v-if="wheelWinner.avatar" :src="resolveUrl(wheelWinner.avatar)" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:3px solid var(--edps-gold);" />
+          <span style="font-size:1.8rem;font-weight:bold;color:var(--edps-blue,#3B5998);">{{ wheelWinner.display_name || wheelWinner.username }}</span>
+          <span style="font-size:2.5rem;">🎉</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leaderboard overlay -->
+    <div v-if="overlay === 'leaderboard'" class="pres-overlay">
+      <div style="background:white;border-radius:20px;padding:2rem;width:85%;max-width:550px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+        <h2 style="margin:0 0 1rem;text-align:center;color:var(--edps-blue,#3B5998);font-size:2rem;">🏆 Leaderboard</h2>
+        <div v-if="leaderboardData.length >= 1" class="podium-container">
+          <div v-if="leaderboardData[1]" class="podium-place silver"><div class="podium-rank">🥈</div><img v-if="leaderboardData[1].avatar" :src="resolveUrl(leaderboardData[1].avatar)" class="podium-avatar" /><div class="podium-name">{{ leaderboardData[1].display_name || leaderboardData[1].username }}</div><div class="podium-points">{{ leaderboardData[1].total_points || 0 }} pts</div></div>
+          <div class="podium-place gold"><div class="podium-rank">🥇</div><img v-if="leaderboardData[0].avatar" :src="resolveUrl(leaderboardData[0].avatar)" class="podium-avatar" /><div class="podium-name">{{ leaderboardData[0].display_name || leaderboardData[0].username }}</div><div class="podium-points">{{ leaderboardData[0].total_points || 0 }} pts</div></div>
+          <div v-if="leaderboardData[2]" class="podium-place bronze"><div class="podium-rank">🥉</div><img v-if="leaderboardData[2].avatar" :src="resolveUrl(leaderboardData[2].avatar)" class="podium-avatar" /><div class="podium-name">{{ leaderboardData[2].display_name || leaderboardData[2].username }}</div><div class="podium-points">{{ leaderboardData[2].total_points || 0 }} pts</div></div>
+        </div>
+        <div v-for="(e, i) in leaderboardData.slice(3)" :key="e.username" style="display:flex;align-items:center;gap:0.8rem;padding:0.5rem 0.8rem;margin-bottom:0.3rem;background:#f8fafc;border-radius:6px;">
+          <span style="width:24px;text-align:center;font-weight:bold;color:#94a3b8;">{{ i+4 }}</span>
+          <span style="flex:1;font-weight:600;">{{ e.display_name || e.username }}</span>
+          <span style="font-weight:bold;color:var(--edps-blue);">{{ e.total_points || 0 }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- QR code sidebar overlay -->
+    <div v-if="overlay === 'qr'" class="qr-overlay">
+      <div style="font-size:1.3rem;font-weight:bold;color:var(--edps-blue,#3B5998);margin-bottom:1rem;">📱 Join the Session</div>
+      <img v-if="qrUrl" :src="qrUrl" style="width:280px;height:280px;border:2px solid #e2e8f0;border-radius:12px;" />
+      <div v-if="sessionCode" style="margin-top:1rem;font-size:2.5rem;font-weight:900;color:var(--edps-blue,#3B5998);letter-spacing:8px;">{{ sessionCode }}</div>
+      <div style="margin-top:0.5rem;color:#94a3b8;font-size:0.9rem;">Scan QR or enter PIN above</div>
+    </div>
+
+    <!-- Hand raise flying notification -->
+    <div v-for="hn in handNotifications" :key="hn.id" class="hand-notification">
+      <div class="hand-emoji">✋</div>
+      <div class="hand-name">{{ hn.name }}</div>
+    </div>
+
     <!-- #13 — Hand raise button -->
     <button v-if="isSlideVisible" :class="['hand-raise-btn', {raised: handRaised}]" @click="toggleHandRaise" :title="handRaised ? 'Lower hand' : 'Raise hand'">
       {{ handRaised ? '🙋' : '✋' }}
@@ -253,6 +306,15 @@ export default {
       frozen: false,
       handRaised: false,
       slideTransitionName: 'slide-fade',
+      overlay: null,
+      wheelAttendees: [],
+      wheelRotation: 0,
+      wheelSpinning: false,
+      wheelWinner: null,
+      leaderboardData: [],
+      qrUrl: '',
+      sessionCode: '',
+      handNotifications: [],
     };
   },
   computed: {
@@ -388,6 +450,46 @@ export default {
     // Hand raise cleared by trainer
     this.socket.on('hand:cleared', () => { this.handRaised = false; });
 
+    // Overlay broadcasts from trainer (visible on projector)
+    this.socket.on('overlay:show', (data) => {
+      this.overlay = data.type;
+      if (data.type === 'wheel' && data.attendees) {
+        this.wheelAttendees = data.attendees;
+        this.wheelWinner = null;
+        this.wheelRotation = 0;
+        this.wheelSpinning = false;
+      }
+      if (data.type === 'leaderboard' && data.entries) {
+        this.leaderboardData = data.entries;
+      }
+      if (data.type === 'qr') {
+        this.qrUrl = data.qrUrl || '';
+        this.sessionCode = data.sessionCode || '';
+      }
+    });
+    this.socket.on('overlay:hide', () => { this.overlay = null; });
+
+    // Wheel spin broadcast
+    this.socket.on('wheel:spinning', () => {
+      this.wheelSpinning = true;
+      this.wheelWinner = null;
+      const extraSpins = 5 + Math.floor(Math.random() * 5);
+      this.wheelRotation = 360 * extraSpins + Math.floor(Math.random() * 360);
+    });
+    this.socket.on('wheel:result', (data) => {
+      setTimeout(() => {
+        this.wheelSpinning = false;
+        this.wheelWinner = data;
+      }, 4200);
+    });
+
+    // Hand raise notification (fly-up animation)
+    this.socket.on('hand:raised', (data) => {
+      const notif = { id: Date.now() + Math.random(), name: data.display_name || data.username };
+      this.handNotifications.push(notif);
+      setTimeout(() => { this.handNotifications = this.handNotifications.filter(n => n.id !== notif.id); }, 3500);
+    });
+
     window.addEventListener('resize', this.computeScale);
     this.computeScale();
     const tick = () => { this.currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
@@ -438,6 +540,17 @@ export default {
     renderMd(text) {
       if (!text) return '';
       try { return marked.parse(text, { breaks: true }); } catch { return text; }
+    },
+    wedgeStyle(i) {
+      const COLORS = ['#3B5998','#F0AD4E','#e11d48','#059669','#7c3aed','#d97706','#0891b2','#be185d','#4f46e5','#ca8a04','#0d9488','#dc2626'];
+      const n = this.wheelAttendees.length || 1;
+      const angle = 360 / n;
+      return {
+        position:'absolute', width:'50%', height:'50%', top:'0', right:'0',
+        transformOrigin:'0% 100%',
+        transform:`rotate(${angle*i-90}deg) skewY(${-(90-angle)}deg)`,
+        background: COLORS[i % COLORS.length],
+      };
     },
     toggleHandRaise() {
       this.handRaised = !this.handRaised;

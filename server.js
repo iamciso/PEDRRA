@@ -469,9 +469,19 @@ io.on('connection', (socket) => {
         if (socket.user.role !== 'Trainer') return;
         io.emit('wheel:spinning');
     });
-    socket.on('wheel:result', (username) => {
+    socket.on('wheel:result', (data) => {
         if (socket.user.role !== 'Trainer') return;
-        io.emit('wheel:result', username);
+        io.emit('wheel:result', data);
+    });
+
+    // ── OVERLAY BROADCASTS (visible to attendees on projector) ──
+    socket.on('overlay:show', (overlay) => {
+        if (socket.user.role !== 'Trainer') return;
+        io.emit('overlay:show', overlay);
+    });
+    socket.on('overlay:hide', () => {
+        if (socket.user.role !== 'Trainer') return;
+        io.emit('overlay:hide');
     });
 
     // ── REACTIONS ─────────────────────────────────────────────
