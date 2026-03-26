@@ -575,17 +575,17 @@
           <div style="position:absolute;top:3%;left:2%;z-index:3;">
             <img src="/template/edps_logo.png" style="height:55px;" alt="EDPS Logo" />
           </div>
-          <!-- PEDRRA in blue rectangle (top-right) -->
-          <div style="position:absolute;top:5%;right:3%;z-index:3;text-align:right;">
-            <div style="font-size:2.5rem;font-weight:900;color:white;letter-spacing:3px;text-shadow:0 2px 4px rgba(0,0,0,0.2);">PEDRRA</div>
+          <!-- PEDRRA centered at bottom of blue rectangle -->
+          <div style="position:absolute;top:35%;left:52%;right:0;z-index:3;text-align:center;">
+            <div style="font-size:3rem;font-weight:900;color:white;letter-spacing:5px;text-shadow:0 2px 6px rgba(0,0,0,0.3);">PEDRRA</div>
           </div>
           <!-- Title in white rectangle (center-left) -->
-          <div style="position:absolute;top:32%;left:17%;width:28%;z-index:2;">
+          <div style="position:absolute;top:32%;left:16%;width:30%;z-index:2;">
             <h2 style="margin:0;font-size:1.4rem;line-height:1.3;color:var(--edps-blue);">{{ currentSlide.title }}</h2>
             <div v-if="currentSlide.subtitle" style="margin-top:0.6rem;font-size:0.9rem;color:#666;">{{ currentSlide.subtitle }}</div>
           </div>
-          <!-- Content in gold rectangle (bottom-right) -->
-          <div v-if="currentSlide.content" style="position:absolute;bottom:16%;right:5%;width:38%;z-index:2;color:white;font-size:0.8rem;line-height:1.4;">{{ currentSlide.content }}</div>
+          <!-- Content inside gold rectangle -->
+          <div v-if="currentSlide.content" style="position:absolute;top:57%;right:5%;width:35%;height:20%;display:flex;align-items:center;z-index:2;color:white;font-size:0.8rem;line-height:1.4;padding:0.5rem;">{{ currentSlide.content }}</div>
         </div>
 
         <!-- #10 — SECTION SLIDE TEMPLATE (fullscreen) -->
