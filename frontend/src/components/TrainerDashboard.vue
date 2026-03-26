@@ -168,6 +168,7 @@
         <!-- Slide counter + live info -->
         <div style="display:flex;justify-content:center;gap:2rem;margin-top:0.5rem;font-size:0.8rem;color:#94a3b8;">
           <span>Slide {{ currentIndex + 1 }} / {{ slides.length }}</span>
+          <span v-if="slideTimeDisplay">⏱ {{ slideTimeDisplay }}</span>
           <span v-if="connectedUsers > 0">👥 {{ connectedUsers }} connected</span>
         </div>
       </div>
@@ -409,6 +410,11 @@
           <button @click="createUser" style="margin-bottom:0;">Create</button>
         </div>
         <div v-if="userMessage" style="margin-top: 0.5rem; font-size: 0.9rem; color: #10b981;">{{ userMessage }}</div>
+      </div>
+
+      <div style="display:flex;gap:0.5rem;margin:1rem 0;">
+        <button class="secondary" @click="printPinCards" style="width:auto;padding:0.4rem 1rem;font-size:0.8rem;">🖨 Print PIN Cards</button>
+        <button class="secondary" @click="exportSessionPDF" style="width:auto;padding:0.4rem 1rem;font-size:0.8rem;">📄 Session Report</button>
       </div>
 
       <!-- Users Table -->
@@ -806,8 +812,7 @@
 <script>
 import { io } from 'socket.io-client';
 import { baseUrl } from '../config.js';
-import { authFetch, authHeaders, getToken, clearAuth } from '../auth.js';
-import PptxGenJS from 'pptxgenjs';
+import { authFetch, authHeaders, getToken, getTokenForRole, clearAuth } from '../auth.js';
 import { marked } from 'marked';
 import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 import SurveyResults from './SurveyResults.vue';
@@ -862,6 +867,9 @@ export default {
       showTemplateMenu: false,
       showWheel: false,
       showLeaderboard: false,
+      slideEnteredAt: Date.now(),
+      slideElapsedSeconds: 0,
+      slideElapsedInterval: null,
       wheelAttendees: [],
       leaderboardEntries: [],
       sessionCode: '',
@@ -926,6 +934,12 @@ export default {
       const sec = s % 60;
       return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
     },
+    slideTimeDisplay() {
+      if (this.slideElapsedSeconds < 5) return '';
+      const m = Math.floor(this.slideElapsedSeconds / 60);
+      const s = this.slideElapsedSeconds % 60;
+      return m > 0 ? `${m}m ${String(s).padStart(2,'0')}s` : `${s}s`;
+    },
     timerProgress() {
       const dur = this.currentSlide?.duration || 300;
       if (dur <= 0) return 1;
@@ -964,7 +978,7 @@ export default {
     window.addEventListener('keydown', this._keyHandler);
 
     // Create socket connection FIRST
-    this.socket = io(baseUrl, { auth: { token: getToken() } });
+    this.socket = io(baseUrl, { auth: { token: getTokenForRole('Trainer') || getToken() }, reconnection: true, reconnectionDelay: 1000, reconnectionDelayMax: 10000, reconnectionAttempts: 50 });
 
     this.socket.on('connect', () => { this.connected = true; });
     this.socket.on('disconnect', () => { this.connected = false; });
@@ -992,6 +1006,7 @@ export default {
       this.reactions.push(r);
       if (this.reactions.length > 20) this.reactions.shift();
       setTimeout(() => { this.reactions.shift(); }, 5000);
+      this._playNotifSound(600, 0.1);
     });
 
     // Freeze mode
@@ -1000,6 +1015,7 @@ export default {
     this.socket.on('hand:count', (count) => { this.handRaisedCount = count; });
     this.socket.on('hand:raised', (data) => {
       this.handRaisedCount++;
+      this._playNotifSound(800, 0.15);
       // Show fly-up notification in fullscreen
       if (this.isFullscreen) {
         const notif = { id: Date.now() + Math.random(), name: data.display_name || data.username };
@@ -1010,6 +1026,12 @@ export default {
     this.socket.on('hand:cleared', () => { this.handRaisedCount = 0; });
 
     this.checkPollResults();
+
+    // Slide time tracker
+    this.slideEnteredAt = Date.now();
+    this.slideElapsedInterval = setInterval(() => {
+      this.slideElapsedSeconds = Math.floor((Date.now() - this.slideEnteredAt) / 1000);
+    }, 1000);
 
     // Fullscreen Listeners
     document.addEventListener('fullscreenchange', this.onFullscreenChange);
@@ -1032,6 +1054,7 @@ export default {
     clearInterval(this.clockInterval);
     clearInterval(this.autoSaveInterval);
     clearInterval(this.timerInterval);
+    clearInterval(this.slideElapsedInterval);
   },
   watch: {
     currentIndex() {
@@ -1411,8 +1434,12 @@ export default {
         this.showError('Error saving changes: ' + e.message);
       }
     },
-    prevSlide() { if (this.currentIndex > 0) this.currentIndex--; },
-    nextSlide() { if (this.currentIndex < this.slides.length - 1) this.currentIndex++; },
+    prevSlide() { if (this.currentIndex > 0) { this.currentIndex--; this._resetSlideTimer(); } },
+    nextSlide() { if (this.currentIndex < this.slides.length - 1) { this.currentIndex++; this._resetSlideTimer(); } },
+    _resetSlideTimer() {
+      this.slideEnteredAt = Date.now();
+      this.slideElapsedSeconds = 0;
+    },
     toggleVisibility() {
       this.socket.emit('slide:toggleVisibility', !this.isSlideVisible);
     },
@@ -1535,6 +1562,7 @@ export default {
     },
     async exportPPTX() {
       try {
+        const { default: PptxGenJS } = await import('pptxgenjs');
         const pptx = new PptxGenJS();
         pptx.defineLayout({ name: 'WIDE', width: 13.33, height: 7.5 });
         pptx.layout = 'WIDE';
@@ -1764,6 +1792,18 @@ export default {
         if (res.ok) { const d = await res.json(); this.sessionCode = d.code; }
       } catch (e) { /* ignore */ }
     },
+    _playNotifSound(freq = 600, vol = 0.1) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine'; osc.frequency.value = freq;
+        gain.gain.setValueAtTime(vol, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(); osc.stop(ctx.currentTime + 0.15);
+      } catch (e) { /* audio not supported */ }
+    },
     _playTimerEndSound() {
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1804,6 +1844,74 @@ export default {
         this.timerRunning = this.timerSeconds > 0;
         if (this.timerRunning) this._startTimerTick();
       }
+    },
+    // #6 — Print PIN cards
+    printPinCards() {
+      const attendees = this.usersList.filter(u => u.role === 'Attendee');
+      if (!attendees.length) return this.showError('No attendees to print.');
+      const w = window.open('', '_blank');
+      let html = `<html><head><title>PIN Cards</title><style>
+        body{font-family:'Segoe UI',sans-serif;margin:0;padding:1rem;}
+        .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;}
+        .card{border:2px solid #254A9A;border-radius:12px;padding:1.2rem;text-align:center;page-break-inside:avoid;}
+        .card h3{color:#254A9A;margin:0 0 0.3rem;font-size:1rem;}
+        .card .pin{font-size:2.5rem;font-weight:bold;color:#254A9A;letter-spacing:8px;margin:0.5rem 0;}
+        .card .user{font-size:0.75rem;color:#94a3b8;}
+        .card .avatar{width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid #F1C064;margin:0.5rem auto;display:block;}
+        @media print{body{padding:0;}.grid{gap:0.5rem;}}
+      </style></head><body>
+      <h2 style="text-align:center;color:#254A9A;">PEDRRA Training — Login Cards</h2>
+      <div class="grid">`;
+      attendees.forEach(u => {
+        html += `<div class="card">`;
+        if (u.avatar) html += `<img class="avatar" src="${this.resolveUrl(u.avatar)}" />`;
+        html += `<h3>${u.display_name || u.username}</h3>`;
+        html += `<div class="pin">${u.pin || '----'}</div>`;
+        html += `<div class="user">Username: ${u.username}</div>`;
+        html += `</div>`;
+      });
+      html += `</div></body></html>`;
+      w.document.write(html);
+      w.document.close();
+      w.onload = () => w.print();
+    },
+    // #7 — Export session results as PDF report
+    exportSessionPDF() {
+      const w = window.open('', '_blank');
+      let html = `<html><head><title>PEDRRA Session Report</title><style>
+        body{font-family:'Segoe UI',sans-serif;margin:2rem;color:#333;}
+        h1{color:#254A9A;border-bottom:3px solid #F1C064;padding-bottom:0.5rem;}
+        h2{color:#254A9A;margin-top:2rem;}
+        table{width:100%;border-collapse:collapse;margin:1rem 0;}
+        th{background:#254A9A;color:white;padding:0.5rem;text-align:left;}
+        td{padding:0.4rem 0.5rem;border-bottom:1px solid #e2e8f0;}
+        .stat{display:inline-block;padding:1rem 2rem;background:#f1f5f9;border-radius:8px;text-align:center;margin:0.5rem;}
+        .stat .number{font-size:2rem;font-weight:bold;color:#254A9A;}
+        .stat .label{font-size:0.8rem;color:#64748b;}
+        @media print{body{margin:1rem;}}
+      </style></head><body>`;
+      html += `<h1>PEDRRA Session Report</h1>`;
+      html += `<p>Generated: ${new Date().toLocaleString()}</p>`;
+      html += `<div>`;
+      html += `<div class="stat"><div class="number">${this.slides.length}</div><div class="label">Slides</div></div>`;
+      html += `<div class="stat"><div class="number">${this.usersList.filter(u => u.role === 'Attendee').length}</div><div class="label">Attendees</div></div>`;
+      html += `</div>`;
+      // Attendee list
+      html += `<h2>Attendees</h2><table><tr><th>Display Name</th><th>Username</th><th>Team</th></tr>`;
+      this.usersList.filter(u => u.role === 'Attendee').forEach(u => {
+        html += `<tr><td>${u.display_name || u.username}</td><td>${u.username}</td><td>${u.team || '-'}</td></tr>`;
+      });
+      html += `</table>`;
+      // Slides summary
+      html += `<h2>Slides</h2><table><tr><th>#</th><th>Type</th><th>Title</th></tr>`;
+      this.slides.forEach((s, i) => {
+        html += `<tr><td>${i+1}</td><td>${s.type}</td><td>${s.title}</td></tr>`;
+      });
+      html += `</table>`;
+      html += `</body></html>`;
+      w.document.write(html);
+      w.document.close();
+      w.onload = () => w.print();
     },
     logout() {
       clearAuth();

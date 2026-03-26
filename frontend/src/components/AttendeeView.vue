@@ -233,7 +233,7 @@
 import { io } from 'socket.io-client';
 import { baseUrl } from '../config.js';
 import { marked } from 'marked';
-import { getToken, clearAuth } from '../auth.js';
+import { getToken, getTokenForRole, clearAuth } from '../auth.js';
 import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 
 const W = 1024, H = 576;
@@ -340,7 +340,7 @@ export default {
       this.slides = await r.json();
     } catch(e) { console.error(e); }
 
-    this.socket = io(baseUrl, { auth: { token: getToken() } });
+    this.socket = io(baseUrl, { auth: { token: getTokenForRole('Attendee') || getToken() }, reconnection: true, reconnectionDelay: 1000, reconnectionDelayMax: 10000, reconnectionAttempts: 50 });
 
     this.socket.on('connect', () => { this.connected = true; });
     this.socket.on('disconnect', () => { this.connected = false; });
