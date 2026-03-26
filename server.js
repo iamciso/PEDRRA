@@ -113,7 +113,7 @@ function authMiddleware(requiredRole) {
                 return res.status(401).json({ error: 'Invalid token.' });
             }
             if (requiredRole && user.role !== requiredRole) {
-                return res.status(403).json({ error: 'Insufficient permissions.' });
+                return res.status(403).json({ error: `Insufficient permissions. Required: ${requiredRole}, your role: ${user.role}` });
             }
             req.user = user;
             next();

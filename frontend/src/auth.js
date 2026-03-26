@@ -27,7 +27,13 @@ export function authHeaders() {
     return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
-export function authFetch(url, options = {}) {
+export async function authFetch(url, options = {}) {
     const headers = { ...authHeaders(), ...(options.headers || {}) };
-    return fetch(url, { ...options, headers });
+    const res = await fetch(url, { ...options, headers });
+    // Auto-logout on auth failure (token expired or invalid)
+    if (res.status === 401) {
+        clearAuth();
+        window.location.href = '/';
+    }
+    return res;
 }
