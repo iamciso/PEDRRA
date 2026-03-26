@@ -228,16 +228,13 @@
         <template v-if="slide.type === 'content' || slide.type === 'title'">
           <input v-model="slide.subtitle" placeholder="Subtitle (Optional)" />
 
-          <!-- Text Content -->
+          <!-- Text Content (synced with first text element in visual editor) -->
           <div style="margin-bottom:0.75rem;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.3rem;">
-              <label style="font-size:0.8rem;font-weight:bold;color:#64748b;">Text Content</label>
-              <button v-if="slide.content && !(slide.elements && slide.elements.length)" type="button" @click="convertTextToElement(slide)" class="secondary" style="width:auto;padding:0.15rem 0.5rem;font-size:0.75rem;margin-bottom:0;" title="Convert to visual element">→ Send to Visual Editor</button>
-            </div>
-            <textarea v-model="slide.content" :ref="'content_' + slide.id" placeholder="Slide content text..." rows="2" style="margin-bottom:0;font-size:0.9rem;"></textarea>
+            <label style="font-size:0.8rem;font-weight:bold;color:#64748b;display:block;margin-bottom:0.3rem;">Text Content</label>
+            <textarea :value="getSlideText(slide)" @input="setSlideText(slide, $event.target.value)" placeholder="Slide content text (synced with visual editor)..." rows="2" style="margin-bottom:0;font-size:0.9rem;"></textarea>
           </div>
 
-          <!-- Visual Editor (always visible for content/title slides) -->
+          <!-- Visual Editor -->
           <div style="margin-top:0.5rem;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.3rem;">
               <label style="font-size:0.8rem;font-weight:bold;color:#64748b;">🎨 Visual Editor</label>
@@ -249,7 +246,7 @@
               {{ slide.elements.length }} visual element(s) — click Expand to edit
             </div>
             <div v-if="slide._showCanvas" style="margin-top:0.3rem;">
-              <SlideCanvas v-model="slide.elements" :slideTitle="slide.title" />
+              <SlideCanvas v-model="slide.elements" :slideTitle="slide.title" @update:modelValue="syncTextFromElements(slide)" />
             </div>
           </div>
         </template>
@@ -1048,19 +1045,51 @@ export default {
       const icons = { title: '📌', content: '📝', section: '📂', poll: '📊', survey: '📋', timer: '⏱' };
       return icons[type] || '📄';
     },
+    // Bidirectional sync: textarea ↔ first text element in visual editor
+    getSlideText(slide) {
+      // If elements exist, read from the first text element
+      if (slide.elements && slide.elements.length) {
+        const textEl = slide.elements.find(el => el.kind === 'text');
+        if (textEl) return textEl.content || '';
+      }
+      // Otherwise read from legacy slide.content
+      return slide.content || '';
+    },
+    setSlideText(slide, value) {
+      // Always update legacy field
+      slide.content = value;
+      // Also update first text element if it exists
+      if (slide.elements && slide.elements.length) {
+        const textEl = slide.elements.find(el => el.kind === 'text');
+        if (textEl) {
+          textEl.content = value;
+        }
+      }
+    },
     toggleAllCollapsed() {
       const target = !this.allCollapsed;
       this.editSlides.forEach(s => { s._collapsed = target; });
     },
-    convertTextToElement(slide) {
-      if (!slide.content) return;
+    syncTextFromElements(slide) {
+      // When visual editor changes, sync first text element back to slide.content
+      if (slide.elements && slide.elements.length) {
+        const textEl = slide.elements.find(el => el.kind === 'text');
+        if (textEl) slide.content = textEl.content || '';
+      }
+    },
+    ensureTextElement(slide) {
+      // Ensure a text element exists in the visual editor, create one if needed
       if (!slide.elements) slide.elements = [];
-      const id = 'el_' + Date.now();
-      slide.elements.push({
-        id, kind: 'text', x: 50, y: 90, w: 900, h: 350,
-        content: slide.content,
-        fontSize: 20, fontFamily: 'Segoe UI', bold: false, italic: false, color: '#333333', textAlign: 'left'
-      });
+      let textEl = slide.elements.find(el => el.kind === 'text');
+      if (!textEl && slide.content) {
+        const id = 'el_' + Date.now();
+        textEl = {
+          id, kind: 'text', x: 50, y: 90, w: 900, h: 350,
+          content: slide.content,
+          fontSize: 20, fontFamily: 'Segoe UI', bold: false, italic: false, color: '#333333', textAlign: 'left'
+        };
+        slide.elements.push(textEl);
+      }
       slide._showCanvas = true;
     },
     insertFormat(slide, prefix, suffix) {
