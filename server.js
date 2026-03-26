@@ -14,6 +14,8 @@ require('dotenv').config();
 const JWT_SECRET = process.env.JWT_SECRET || 'pedrra-training-platform-default-secret-key';
 
 const app = express();
+// Trust proxy when behind reverse proxy (Render, Heroku, etc.)
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 // #3 — Restrict CORS to known origins (allow env override)
