@@ -7,11 +7,13 @@ import { getUser } from './auth.js'
 import Login from './components/Login.vue'
 import TrainerDashboard from './components/TrainerDashboard.vue'
 import AttendeeView from './components/AttendeeView.vue'
+import ProjectorView from './components/ProjectorView.vue'
 
 const routes = [
   { path: '/', component: Login },
   { path: '/trainer', component: TrainerDashboard, meta: { requiresRole: 'Trainer' } },
-  { path: '/attendee', component: AttendeeView, meta: { requiresRole: 'Attendee' } }
+  { path: '/attendee', component: AttendeeView, meta: { requiresRole: 'Attendee' } },
+  { path: '/projector', component: ProjectorView, meta: { requiresRole: 'Trainer' } }
 ]
 
 const router = createRouter({

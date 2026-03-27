@@ -1,5 +1,52 @@
 <template>
-  <div class="glass-panel" style="max-width: 1200px; margin: 0 auto; min-height: 85vh;" v-if="!isFullscreen">
+  <!-- ═══ REMOTE CONTROL MODE (mobile-optimized) ═══ -->
+  <div v-if="remoteMode" style="position:fixed;inset:0;background:#0f172a;color:white;z-index:9999;display:flex;flex-direction:column;overflow:hidden;">
+    <!-- Remote header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;background:rgba(255,255,255,0.08);flex-shrink:0;">
+      <span style="font-weight:bold;font-size:0.9rem;">{{ currentSlide.title || 'No slide' }}</span>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <span style="font-size:0.8rem;opacity:0.6;">{{ currentIndex+1 }}/{{ slides.length }}</span>
+        <button @click="remoteMode=false" style="background:rgba(255,255,255,0.15);border:none;color:white;padding:0.3rem 0.6rem;border-radius:8px;font-size:0.8rem;cursor:pointer;">Exit</button>
+      </div>
+    </div>
+
+    <!-- Slide preview with drawing overlay -->
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:#1e293b;">
+      <div :style="{width:'1024px',height:'576px',transform:`scale(${remoteScale})`,transformOrigin:'center center',position:'relative',background:'white',borderRadius:'4px',overflow:'hidden'}">
+        <!-- Mini slide preview content -->
+        <div style="padding:1rem;height:100%;display:flex;flex-direction:column;">
+          <h3 style="margin:0 0 0.5rem;color:var(--edps-blue);font-size:1.2rem;">{{ currentSlide.title }}</h3>
+          <p v-if="currentSlide.subtitle" style="margin:0;color:#64748b;font-size:0.9rem;">{{ currentSlide.subtitle }}</p>
+          <div v-if="currentSlide.question" style="font-weight:bold;margin-top:1rem;color:var(--edps-blue);">{{ currentSlide.question }}</div>
+          <div v-if="currentSlide.type==='timer'" style="text-align:center;margin-top:2rem;font-size:3rem;font-weight:bold;color:var(--edps-blue);">{{ timerDisplay }}</div>
+        </div>
+        <!-- Drawing overlay (sender mode) -->
+        <DrawingOverlay ref="remoteDrawing" :active="drawingActive" :sendMode="true" :strokes="drawStrokes"
+          @stroke="onDrawStroke" @clear="onDrawClear" @pointer="onDrawPointer" />
+      </div>
+    </div>
+
+    <!-- Remote controls -->
+    <div style="padding:0.75rem;background:rgba(255,255,255,0.05);flex-shrink:0;">
+      <!-- Navigation row -->
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">
+        <button @click="prevSlide" :disabled="currentIndex===0" style="flex:1;padding:1rem;font-size:1.1rem;border-radius:12px;background:var(--edps-blue);color:white;border:none;cursor:pointer;opacity:currentIndex===0?0.3:1;" aria-label="Previous slide">◀ Prev</button>
+        <button @click="toggleVisibility" :style="{flex:1,padding:'1rem',fontSize:'1.1rem',borderRadius:'12px',border:'none',cursor:'pointer',background:isSlideVisible?'#ef4444':'#10b981',color:'white'}" :aria-label="isSlideVisible?'Stop':'Start'">{{ isSlideVisible ? '⏹ Stop' : '▶ Live' }}</button>
+        <button @click="nextSlide" :disabled="currentIndex===slides.length-1" style="flex:1;padding:1rem;font-size:1.1rem;border-radius:12px;background:var(--edps-blue);color:white;border:none;cursor:pointer;opacity:currentIndex>=slides.length-1?0.3:1;" aria-label="Next slide">Next ▶</button>
+      </div>
+      <!-- Tools row -->
+      <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+        <button @click="drawingActive=!drawingActive" :style="{padding:'0.6rem 1rem',borderRadius:'10px',border:'none',cursor:'pointer',fontSize:'0.85rem',fontWeight:'bold',background:drawingActive?'#ef4444':'rgba(255,255,255,0.15)',color:'white'}">{{ drawingActive ? '✏️ Drawing ON' : '✏️ Draw' }}</button>
+        <button @click="toggleFreeze" :style="{padding:'0.6rem 1rem',borderRadius:'10px',border:'none',cursor:'pointer',fontSize:'0.85rem',background:frozen?'#f59e0b':'rgba(255,255,255,0.15)',color:'white'}">{{ frozen ? '❄️ Frozen' : '🧊 Freeze' }}</button>
+        <button v-if="handRaisedCount>0" @click="clearHands" style="padding:0.6rem 1rem;border-radius:10px;border:none;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.15);color:white;">✋ {{ handRaisedCount }}</button>
+        <button v-if="currentSlide.type==='timer' && !timerRunning" @click="startTimer" style="padding:0.6rem 1rem;border-radius:10px;border:none;cursor:pointer;font-size:0.85rem;background:#10b981;color:white;">▶ Timer</button>
+        <button v-if="currentSlide.type==='timer' && timerRunning" @click="pauseTimer" style="padding:0.6rem 1rem;border-radius:10px;border:none;cursor:pointer;font-size:0.85rem;background:#f59e0b;color:white;">⏸ Pause</button>
+        <button @click="openProjector" style="padding:0.6rem 1rem;border-radius:10px;border:none;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.15);color:white;">📽 Projector</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="glass-panel" style="max-width: 1200px; margin: 0 auto; min-height: 85vh;" v-if="!isFullscreen && !remoteMode">
     <!-- Header & Tabs -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
       <h2 style="margin: 0;">Trainer Dashboard</h2>
@@ -12,6 +59,7 @@
         </select> |
         <a v-if="!notificationsEnabled" href="#" @click.prevent="enableNotifications" style="font-size:0.8rem;margin:0 0.3rem;" title="Enable desktop notifications">🔔</a>
         <span v-else style="font-size:0.8rem;margin:0 0.3rem;opacity:0.5;" title="Notifications enabled">🔔✓</span> |
+        <a href="#" @click.prevent="remoteMode=true" style="font-size:0.8rem;margin:0 0.3rem;" title="Remote control mode for mobile">📱 Remote</a> |
         <a href="#" @click.prevent="logout" style="color: var(--primary);">Log Out</a>
       </div>
     </div>
@@ -889,6 +937,7 @@ import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 import { renderMarkdown } from '../utils/safeMd.js';
 import { t, setLocale, getLocale, getAvailableLocales } from '../utils/i18n.js';
 import { requestNotificationPermission, sendNotification, isSupported as notifSupported } from '../utils/notify.js';
+import DrawingOverlay from './DrawingOverlay.vue';
 import SurveyResults from './SurveyResults.vue';
 import MediaManager from './MediaManager.vue';
 import SlideCanvas from './SlideCanvas.vue';
@@ -896,7 +945,7 @@ import SlideCanvas from './SlideCanvas.vue';
 // Leaderboard component replaced by inline overlay
 
 export default {
-  components: { SurveyResults, MediaManager, SlideCanvas },
+  components: { SurveyResults, MediaManager, SlideCanvas, DrawingOverlay },
   data() {
     return {
       activeTab: 'live',
@@ -931,6 +980,11 @@ export default {
       autoSaveLabel: '',
       hasUnsavedChanges: false,
       showQR: false,
+      // Remote control + drawing
+      remoteMode: false,
+      drawingActive: false,
+      drawStrokes: [],
+      drawPointer: { x: 0, y: 0, visible: false },
       fullscreenWheelRotation: 0,
       wheelSpinState: false,
       fullscreenWheelWinner: null,
@@ -992,9 +1046,13 @@ export default {
       return this.slides[this.currentIndex] || {};
     },
     livePreviewWidth() {
-      // The live presenter area is roughly 2/3 of the panel width (~700px)
-      // This matches the 16:9 ratio container for proper element scaling
       return 700;
+    },
+    remoteScale() {
+      // Scale the 1024x576 canvas to fit the mobile viewport
+      const w = Math.min(window.innerWidth - 20, 1024);
+      const h = Math.min(window.innerHeight * 0.5, 576);
+      return Math.min(w / 1024, h / 576);
     },
     pollAggregated() {
       const counts = {};
@@ -1114,6 +1172,11 @@ export default {
       }
     });
     this.socket.on('hand:cleared', () => { this.handRaisedCount = 0; });
+
+    // Drawing events (receive from other trainer devices)
+    this.socket.on('draw:stroke', s => { this.drawStrokes = [...this.drawStrokes, s]; });
+    this.socket.on('draw:clear', () => { this.drawStrokes = []; });
+    this.socket.on('draw:pointer', p => { this.drawPointer = p; });
 
     this.checkPollResults();
 
@@ -1920,10 +1983,29 @@ export default {
       w.onload = () => w.print();
     },
     openPresenterMode() {
-      // Open a second window showing the attendee view
       const url = window.location.origin + '/attendee';
       this.presenterWindow = window.open(url, 'presenter', 'width=1024,height=576');
       if (!this.presenterWindow) this.showError('Pop-up blocked. Please allow pop-ups for presenter mode.');
+    },
+    openProjector() {
+      const url = window.location.origin + '/projector';
+      const w = window.open(url, 'projector', 'width=1280,height=720');
+      if (!w) this.showError('Pop-up blocked. Please allow pop-ups for projector mode.');
+    },
+    // Drawing methods
+    onDrawStroke(stroke) {
+      if (!this.socket || !this.currentSlide?.id) return;
+      this.socket.emit('draw:stroke', { ...stroke, slideId: this.currentSlide.id });
+    },
+    onDrawClear() {
+      if (!this.socket || !this.currentSlide?.id) return;
+      this.socket.emit('draw:clear', this.currentSlide.id);
+      this.drawStrokes = [];
+      if (this.$refs.remoteDrawing) this.$refs.remoteDrawing.clearLocal();
+    },
+    onDrawPointer(data) {
+      if (!this.socket || !this.currentSlide?.id) return;
+      this.socket.emit('draw:pointer', { ...data, slideId: this.currentSlide.id });
     },
     async loadSessionCode() {
       try {

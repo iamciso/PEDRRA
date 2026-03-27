@@ -78,7 +78,10 @@
         <select v-model="sel.fontFamily" @change="emit" style="padding:0.25rem;font-size:0.8rem;border:1px solid #cbd5e1;border-radius:4px;width:100px;">
           <option v-for="f in fonts" :key="f" :value="f">{{ f }}</option>
         </select>
-        <input type="number" v-model.number="sel.fontSize" @change="emit" min="8" max="120" style="width:46px;padding:0.25rem;font-size:0.8rem;border:1px solid #cbd5e1;border-radius:4px;" />
+        <select :value="sel.fontSize" @change="sel.fontSize=Number($event.target.value); emit()" style="padding:0.25rem;font-size:0.8rem;border:1px solid #cbd5e1;border-radius:4px;width:56px;">
+          <option v-if="!fontSizes.includes(sel.fontSize)" :value="sel.fontSize">{{ sel.fontSize }}</option>
+          <option v-for="s in fontSizes" :key="s" :value="s">{{ s }}</option>
+        </select>
         <input type="color" v-model="sel.color" @input="emit" @change="addRecentColor(sel.color)" style="width:26px;height:24px;padding:1px;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;" />
         <!-- EDPS color palette + recent colors -->
         <span v-for="c in edpsColors" :key="'edps-'+c" @click="sel.color=c; addRecentColor(c); emit()" :style="{display:'inline-block',width:'14px',height:'14px',borderRadius:'2px',background:c,border:'1px solid #aaa',cursor:'pointer',verticalAlign:'middle'}" :title="c"></span>
@@ -280,6 +283,7 @@ export default {
       showBgMenu: false,
       showGrid: false,
       previewMode: false,
+      fontSizes: [10, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 42, 48, 56, 64, 72, 96],
       uploadKind: null,
       uploading: false,
       showMediaPicker: false,

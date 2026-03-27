@@ -210,6 +210,8 @@
         </div>
       </template>
 
+      <!-- Drawing overlay (receive-only for attendees) -->
+      <DrawingOverlay :strokes="drawStrokes" :pointer="drawPointer" />
     </div>
 
     <!-- Reaction buttons (floating bottom) -->
@@ -235,11 +237,15 @@ import { baseUrl } from '../config.js';
 import { getUser, getToken, getTokenForRole, clearAuth } from '../auth.js';
 import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 import { renderMarkdown } from '../utils/safeMd.js';
+import DrawingOverlay from './DrawingOverlay.vue';
 
 const W = 1024, H = 576;
 export default {
+  components: { DrawingOverlay },
   data() {
     return {
+      drawStrokes: [],
+      drawPointer: { x: 0, y: 0, visible: false },
       _prevResultsSlideId: null,
       slides: [],
       currentSlideId: null,
@@ -363,6 +369,7 @@ export default {
         }
         this.surveyForm = {};
         this.publishedResults = null;
+        this.drawStrokes = [];
         clearInterval(this.timerInterval);
         this.timerRunning = false;
       }
@@ -400,6 +407,11 @@ export default {
       this.publishedResults = null;
       this.surveyForm = {};
     });
+
+    // Drawing annotations from trainer
+    this.socket.on('draw:stroke', s => { this.drawStrokes = [...this.drawStrokes, s]; });
+    this.socket.on('draw:clear', () => { this.drawStrokes = []; });
+    this.socket.on('draw:pointer', p => { this.drawPointer = p; });
 
     // Freeze mode
     this.socket.on('slide:freeze', (frozen) => { this.frozen = frozen; });

@@ -605,6 +605,9 @@ function broadcastUserCount() {
 io.on('connection', (socket) => {
     // Apply socket rate limiting to all incoming events
     socket.use((packet, next) => {
+        // Exempt drawing events from rate limiting (high frequency by nature)
+        const eventName = packet[0];
+        if (eventName === 'draw:stroke' || eventName === 'draw:pointer') return next();
         if (socketLimiter(socket.id)) {
             log.warn(`Rate limited socket ${socket.user?.username || socket.id}`);
             return next(new Error('Too many events. Slow down.'));
@@ -760,6 +763,32 @@ io.on('connection', (socket) => {
         handRaisedUsers.clear();
         io.emit('hand:cleared');
         io.emit('hand:count', 0);
+    });
+
+    // ── DRAWING / ANNOTATIONS ────────────────────────────────
+    socket.on('draw:stroke', (data) => {
+        if (socket.user.role !== 'Trainer') return;
+        if (!data || !data.slideId || !Array.isArray(data.points)) return;
+        // Broadcast to all OTHER clients (not back to sender)
+        socket.broadcast.emit('draw:stroke', {
+            slideId: data.slideId,
+            color: String(data.color || '#ef4444').slice(0, 20),
+            width: Math.max(1, Math.min(Number(data.width) || 3, 20)),
+            points: data.points.slice(0, 5000), // limit points per stroke
+        });
+    });
+    socket.on('draw:clear', (slideId) => {
+        if (socket.user.role !== 'Trainer') return;
+        io.emit('draw:clear', slideId);
+    });
+    socket.on('draw:pointer', (data) => {
+        if (socket.user.role !== 'Trainer') return;
+        socket.broadcast.emit('draw:pointer', {
+            slideId: data?.slideId,
+            x: Number(data?.x) || 0,
+            y: Number(data?.y) || 0,
+            visible: !!data?.visible,
+        });
     });
 });
 
