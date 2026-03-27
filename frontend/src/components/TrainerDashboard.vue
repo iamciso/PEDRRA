@@ -266,22 +266,16 @@
         <template v-if="slide.type === 'content' || slide.type === 'title'">
           <input v-model="slide.subtitle" placeholder="Subtitle (Optional)" />
 
-          <!-- Text Content (synced with first text element in visual editor) -->
-          <div style="margin-bottom:0.75rem;">
-            <label style="font-size:0.8rem;font-weight:bold;color:#64748b;display:block;margin-bottom:0.3rem;">Text Content <span style="font-weight:normal;color:#94a3b8;">(supports **Markdown**)</span></label>
-            <textarea :value="getSlideText(slide)" @input="setSlideText(slide, $event.target.value)" placeholder="Slide content text (supports Markdown: **bold**, *italic*, - lists, ## headings)..." rows="3" style="margin-bottom:0;font-size:0.9rem;font-family:'Cascadia Code','Fira Code',monospace;"></textarea>
-          </div>
-
-          <!-- Visual Editor -->
+          <!-- Visual Editor (primary editor — always visible) -->
           <div style="margin-top:0.5rem;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.3rem;">
-              <label style="font-size:0.8rem;font-weight:bold;color:#64748b;">🎨 Visual Editor</label>
+              <label style="font-size:0.8rem;font-weight:bold;color:#64748b;">🎨 Slide Editor <span style="font-weight:normal;color:#94a3b8;">(drag elements, double-click text to edit, supports **Markdown**)</span></label>
               <button class="secondary" @click="openVisualEditor(slide)" style="width:auto;padding:0.15rem 0.5rem;font-size:0.75rem;margin-bottom:0;">
                 {{ slide._showCanvas ? '▲ Collapse' : '▼ Expand' }}
               </button>
             </div>
-            <div v-if="slide.elements && slide.elements.length && !slide._showCanvas" style="padding:0.5rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;font-size:0.8rem;color:#64748b;">
-              {{ slide.elements.length }} visual element(s) — click Expand to edit
+            <div v-if="!slide._showCanvas" @click="openVisualEditor(slide)" style="padding:0.75rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;font-size:0.85rem;color:#64748b;cursor:pointer;text-align:center;">
+              {{ (slide.elements && slide.elements.length) || 0 }} element(s) — click to open editor
             </div>
             <div v-if="slide._showCanvas" style="margin-top:0.3rem;">
               <SlideCanvas v-model="slide.elements" :slideTitle="slide.title" @update:modelValue="syncTextFromElements(slide)" />

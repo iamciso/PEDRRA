@@ -84,27 +84,22 @@
         <div style="padding:1rem 2rem 4rem;flex:1;overflow-y:auto;position:relative;">
           <div v-if="currentSlide.subtitle" style="color:var(--edps-blue,#1b4293);font-size:1.1rem;font-weight:bold;margin-bottom:1rem;">{{ currentSlide.subtitle }}</div>
 
-          <!-- Content: always show text content + media -->
+          <!-- Content: render canvas elements with absolute positioning -->
           <template v-if="currentSlide.type === 'content'">
-            <!-- Text content (markdown rendered) — check both content field and text elements -->
-            <div v-if="currentSlide.content" style="line-height:1.8;font-size:1.05rem;color:#333;margin-bottom:1rem;" v-html="renderMd(currentSlide.content)"></div>
-            <template v-else-if="currentSlide.elements && currentSlide.elements.length">
-              <div v-for="el in currentSlide.elements.filter(e => e.kind==='text' && e.content)" :key="'t'+el.id" style="line-height:1.8;font-size:1.05rem;color:#333;margin-bottom:0.5rem;" v-html="renderMd(el.content)"></div>
-            </template>
-
-            <!-- Images from elements or legacy field -->
             <template v-if="currentSlide.elements && currentSlide.elements.length">
-              <template v-for="el in currentSlide.elements" :key="el.id">
-                <div v-if="el.kind==='image'" style="text-align:center;margin:0.5rem 0;">
-                  <img :src="resolveUrl(el.src)" style="max-width:100%;max-height:300px;border-radius:6px;" />
+              <div style="position:relative;width:100%;min-height:380px;">
+                <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden',zIndex:el.zIndex||10}">
+                  <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize||16)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',textDecoration:el.underline?'underline':'none',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block',lineHeight:1.4,wordWrap:'break-word',whiteSpace:'pre-wrap'}" v-html="renderMd(el.content)"></span>
+                  <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
+                  <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
+                  <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                  <div v-if="el.kind==='shape'" :style="shapeStyle(el)"></div>
                 </div>
-                <div v-if="el.kind==='video'" style="margin:0.5rem 0;">
-                  <video v-if="isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;max-height:280px;border-radius:6px;"></video>
-                  <iframe v-else :src="toEmbedUrlCheck(el.src)" style="width:100%;height:260px;border-radius:6px;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-                </div>
-              </template>
+              </div>
             </template>
             <template v-else>
+              <!-- Fallback: legacy content field -->
+              <div v-if="currentSlide.content" style="line-height:1.8;font-size:1.05rem;color:#333;margin-bottom:1rem;" v-html="renderMd(currentSlide.content)"></div>
               <div v-if="currentSlide.image" style="text-align:center;"><img :src="resolveUrl(currentSlide.image)" style="max-width:100%;max-height:270px;border-radius:6px;" /></div>
               <div v-if="currentSlide.video" style="margin-top:1rem;">
                 <video v-if="isLocalVideoCheck(currentSlide.video)" :src="resolveUrl(currentSlide.video)" controls style="width:100%;max-height:260px;border-radius:6px;"></video>
@@ -438,6 +433,14 @@ export default {
     getPct(count) {
       if (!count || !this.totalPublicAnswers) return 0;
       return (count / this.totalPublicAnswers) * 100;
+    },
+    shapeStyle(el) {
+      const base = { width: '100%', height: '100%', background: el.fill || '#254A9A', border: `${el.strokeWidth || 0}px solid ${el.stroke || '#000'}` };
+      if (el.shape === 'circle') base.borderRadius = '50%';
+      else if (el.shape === 'roundrect') base.borderRadius = '12px';
+      else if (el.shape === 'line') { base.height = `${el.strokeWidth || 3}px`; base.background = el.fill || '#254A9A'; base.borderRadius = '2px'; base.marginTop = (el.h / 2 - 1) + 'px'; base.border = 'none'; }
+      else if (el.shape === 'arrow') { base.clipPath = 'polygon(0 30%, 70% 30%, 70% 0, 100% 50%, 70% 100%, 70% 70%, 0 70%)'; base.border = 'none'; }
+      return base;
     },
     submitRating(value) {
       if (!this.socket || !this.currentSlide) return;

@@ -6,3 +6,4 @@ uploads/
 .env
 state.json
 *.bak
+client_secret_*.json
