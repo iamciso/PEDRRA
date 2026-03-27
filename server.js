@@ -595,7 +595,9 @@ io.on('connection', (socket) => {
         const safeTimeMs = Math.max(0, Math.min(Number(timeMs) || 0, 600000));
         const safePoints = Math.max(0, Math.min(Number(points) || 0, 10000));
         db.run('INSERT OR REPLACE INTO quiz_scores (username, slide_id, correct, time_ms, points) VALUES (?, ?, ?, ?, ?)',
-            [socket.user.username, slideId, correct ? 1 : 0, safeTimeMs, safePoints]);
+            [socket.user.username, slideId, correct ? 1 : 0, safeTimeMs, safePoints], (err) => {
+            if (err) { console.error('quiz:score save failed:', err.message); return; }
+        });
         // Broadcast updated leaderboard
         db.all(`SELECT username, SUM(points) as total_points FROM quiz_scores GROUP BY username ORDER BY total_points DESC`, (err, rows) => {
             if (!err) io.emit('quiz:leaderboard', rows);

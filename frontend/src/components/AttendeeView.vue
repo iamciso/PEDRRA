@@ -341,7 +341,7 @@ export default {
 
     try {
       const r = await fetch(`${baseUrl}/api/slides`);
-      this.slides = await r.json();
+      if (r.ok) this.slides = await r.json();
     } catch(e) { console.error(e); }
 
     this.socket = io(baseUrl, { auth: { token: getTokenForRole('Attendee') || getToken() }, reconnection: true, reconnectionDelay: 1000, reconnectionDelayMax: 10000, reconnectionAttempts: 50 });

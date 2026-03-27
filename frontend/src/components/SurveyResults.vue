@@ -108,7 +108,7 @@ export default {
     async fetchAll() {
       try {
         const res = await authFetch(`${baseUrl}/api/surveys/results`);
-        this.allAnswers = await res.json();
+        if (res.ok) this.allAnswers = await res.json();
       } catch (e) { console.error(e); }
     },
     getAnswers(slideId) {

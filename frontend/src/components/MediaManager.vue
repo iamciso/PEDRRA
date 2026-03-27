@@ -69,7 +69,7 @@ export default {
     async fetchFiles() {
       try {
         const res = await authFetch(`${baseUrl}/api/uploads`);
-        this.files = await res.json();
+        if (res.ok) this.files = await res.json();
       } catch(e) { console.error(e); }
     },
     onFileSelect(e) { this.uploadFiles(e.target.files); },
