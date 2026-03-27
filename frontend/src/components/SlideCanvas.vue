@@ -24,13 +24,27 @@
         </div>
       </div>
 
-      <!-- #10 — Shape dropdown -->
+      <!-- Shape dropdown -->
       <div style="position:relative;" ref="shapeMenuRef">
         <button @click="showShapeMenu=!showShapeMenu; showImageMenu=false; showVideoMenu=false" class="secondary" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;">⬛ Shape ▾</button>
         <div v-if="showShapeMenu" style="position:absolute;top:100%;left:0;z-index:200;background:white;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:140px;margin-top:4px;">
-          <button v-for="s in shapes" :key="s.name" @click="addShape(s); showShapeMenu=false" style="display:block;width:100%;text-align:left;padding:0.5rem 0.75rem;border:none;background:none;cursor:pointer;font-size:0.85rem;color:#334155;" @mouseenter="$event.target.style.background='#f1f5f9'" @mouseleave="$event.target.style.background='none'">{{ s.icon }} {{ s.name }}</button>
+          <button v-for="s in shapeList" :key="s.name" @click="addShape(s); showShapeMenu=false" style="display:block;width:100%;text-align:left;padding:0.5rem 0.75rem;border:none;background:none;cursor:pointer;font-size:0.85rem;color:#334155;" @mouseenter="$event.target.style.background='#f1f5f9'" @mouseleave="$event.target.style.background='none'">{{ s.icon }} {{ s.name }}</button>
         </div>
       </div>
+
+      <!-- #6 — Background selector (promoted to toolbar) -->
+      <div style="position:relative;" ref="bgMenuRef">
+        <button @click="showBgMenu=!showBgMenu" class="secondary" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;">🎨 BG ▾</button>
+        <div v-if="showBgMenu" style="position:absolute;top:100%;left:0;z-index:200;background:white;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:160px;margin-top:4px;">
+          <button v-for="bg in bgOptions" :key="bg.value" @click="localBg=bg.value; $emit('update:background',bg.value); showBgMenu=false" style="display:block;width:100%;text-align:left;padding:0.5rem 0.75rem;border:none;background:none;cursor:pointer;font-size:0.85rem;color:#334155;" @mouseenter="$event.target.style.background='#f1f5f9'" @mouseleave="$event.target.style.background='none'">
+            <span :style="{display:'inline-block',width:'14px',height:'14px',borderRadius:'3px',border:'1px solid #ccc',verticalAlign:'middle',marginRight:'6px',background:bg.preview}"></span>
+            {{ bg.label }}
+          </button>
+        </div>
+      </div>
+
+      <!-- #10 — Grid toggle -->
+      <button @click="showGrid=!showGrid" :class="showGrid?'':'secondary'" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;" :title="showGrid?'Hide grid':'Show grid'">⊞</button>
 
       <!-- Hidden file input -->
       <input type="file" ref="fileInput" :accept="uploadKind==='image' ? 'image/png,image/jpeg,image/gif,image/webp' : 'video/mp4,video/webm'" style="display:none;" @change="onFileUpload" />
@@ -38,50 +52,57 @@
 
       <!-- Inline URL input -->
       <template v-if="addUrlKind">
-        <input v-model="addUrlValue" :placeholder="addUrlKind === 'image' ? 'Paste image URL...' : 'Paste YouTube or video URL...'" @keyup.enter="confirmAddUrl" @keyup.escape="cancelAddUrl" ref="addUrlInput" style="min-width:220px;padding:0.3rem 0.5rem;font-size:0.82rem;border:1px solid #cbd5e1;border-radius:4px;margin-bottom:0;" />
+        <input v-model="addUrlValue" :placeholder="addUrlKind === 'image' ? 'Paste image URL...' : 'Paste YouTube or video URL...'" @keyup.enter="confirmAddUrl" @keyup.escape="cancelAddUrl" ref="addUrlInput" style="min-width:200px;padding:0.3rem 0.5rem;font-size:0.82rem;border:1px solid #cbd5e1;border-radius:4px;margin-bottom:0;" />
         <button @click="confirmAddUrl" class="secondary" style="width:auto;padding:0.3rem 0.5rem;font-size:0.82rem;">Add</button>
-        <button @click="cancelAddUrl" class="secondary" style="width:auto;padding:0.3rem 0.5rem;font-size:0.82rem;">Cancel</button>
+        <button @click="cancelAddUrl" class="secondary" style="width:auto;padding:0.3rem 0.5rem;font-size:0.82rem;">✕</button>
       </template>
 
       <span v-if="sel" style="width:1px;height:24px;background:#cbd5e1;margin:0 0.2rem;"></span>
 
       <!-- Text controls -->
       <template v-if="sel && sel.kind==='text'">
-        <select v-model="sel.fontFamily" @change="emit" style="padding:0.25rem;font-size:0.8rem;border:1px solid #cbd5e1;border-radius:4px;width:110px;">
+        <select v-model="sel.fontFamily" @change="emit" style="padding:0.25rem;font-size:0.8rem;border:1px solid #cbd5e1;border-radius:4px;width:100px;">
           <option v-for="f in fonts" :key="f" :value="f">{{ f }}</option>
         </select>
-        <input type="number" v-model.number="sel.fontSize" @change="emit" min="8" max="120" style="width:48px;padding:0.25rem;font-size:0.8rem;border:1px solid #cbd5e1;border-radius:4px;" />
-        <input type="color" v-model="sel.color" @input="emit" style="width:28px;height:26px;padding:1px;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;" />
-        <button @click="toggleBold" :style="{fontWeight:'bold',background:sel.bold?'var(--primary)':'#f1f5f9',color:sel.bold?'white':'#334155'}" class="secondary" style="width:28px;padding:0.2rem;font-size:0.85rem;">B</button>
-        <button @click="toggleItalic" :style="{fontStyle:'italic',background:sel.italic?'var(--primary)':'#f1f5f9',color:sel.italic?'white':'#334155'}" class="secondary" style="width:28px;padding:0.2rem;font-size:0.85rem;">I</button>
-        <button @click="toggleUnderline" :style="{textDecoration:'underline',background:sel.underline?'var(--primary)':'#f1f5f9',color:sel.underline?'white':'#334155'}" class="secondary" style="width:28px;padding:0.2rem;font-size:0.85rem;">U</button>
-        <select v-model="sel.textAlign" @change="emit" style="padding:0.25rem;font-size:0.8rem;border:1px solid #cbd5e1;border-radius:4px;width:70px;">
+        <input type="number" v-model.number="sel.fontSize" @change="emit" min="8" max="120" style="width:46px;padding:0.25rem;font-size:0.8rem;border:1px solid #cbd5e1;border-radius:4px;" />
+        <input type="color" v-model="sel.color" @input="emit" style="width:26px;height:24px;padding:1px;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;" />
+        <!-- EDPS color palette -->
+        <span v-for="c in edpsColors" :key="c" @click="sel.color=c; emit()" :style="{display:'inline-block',width:'16px',height:'16px',borderRadius:'3px',background:c,border:'1px solid #aaa',cursor:'pointer',verticalAlign:'middle'}" :title="c"></span>
+        <button @click="toggleBold" :style="{fontWeight:'bold',background:sel.bold?'var(--primary)':'#f1f5f9',color:sel.bold?'white':'#334155'}" class="secondary" style="width:26px;padding:0.2rem;font-size:0.85rem;">B</button>
+        <button @click="toggleItalic" :style="{fontStyle:'italic',background:sel.italic?'var(--primary)':'#f1f5f9',color:sel.italic?'white':'#334155'}" class="secondary" style="width:26px;padding:0.2rem;font-size:0.85rem;">I</button>
+        <button @click="toggleUnderline" :style="{textDecoration:'underline',background:sel.underline?'var(--primary)':'#f1f5f9',color:sel.underline?'white':'#334155'}" class="secondary" style="width:26px;padding:0.2rem;font-size:0.85rem;">U</button>
+        <select v-model="sel.textAlign" @change="emit" style="padding:0.25rem;font-size:0.8rem;border:1px solid #cbd5e1;border-radius:4px;width:60px;">
           <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
         </select>
       </template>
 
       <!-- Shape controls -->
       <template v-if="sel && sel.kind==='shape'">
-        <input type="color" v-model="sel.fill" @input="emit" title="Fill color" style="width:28px;height:26px;padding:1px;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;" />
-        <input type="color" v-model="sel.stroke" @input="emit" title="Border color" style="width:28px;height:26px;padding:1px;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;" />
-        <input type="number" v-model.number="sel.strokeWidth" @change="emit" min="0" max="10" title="Border width" style="width:40px;padding:0.25rem;font-size:0.8rem;border:1px solid #cbd5e1;border-radius:4px;" />
+        <input type="color" v-model="sel.fill" @input="emit" title="Fill" style="width:26px;height:24px;padding:1px;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;" />
+        <input type="color" v-model="sel.stroke" @input="emit" title="Border" style="width:26px;height:24px;padding:1px;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;" />
+        <input type="number" v-model.number="sel.strokeWidth" @change="emit" min="0" max="10" title="Border width" style="width:38px;padding:0.25rem;font-size:0.8rem;border:1px solid #cbd5e1;border-radius:4px;" />
       </template>
 
       <!-- Image/video src -->
       <template v-if="sel && (sel.kind==='image'||sel.kind==='video')">
-        <input v-model="sel.src" @change="emit" placeholder="Paste URL here..." style="flex:1;min-width:200px;padding:0.3rem 0.5rem;font-size:0.82rem;border:1px solid #cbd5e1;border-radius:4px;margin-bottom:0;" />
+        <input v-model="sel.src" @change="emit" placeholder="URL..." style="flex:1;min-width:180px;padding:0.3rem 0.5rem;font-size:0.82rem;border:1px solid #cbd5e1;border-radius:4px;margin-bottom:0;" />
       </template>
 
       <span style="flex:1;"></span>
 
-      <!-- #4 — Layer controls -->
+      <!-- Position/size indicator (#10) -->
+      <span v-if="sel" style="font-size:0.7rem;color:#94a3b8;font-variant-numeric:tabular-nums;">
+        {{ sel.x }},{{ sel.y }} · {{ sel.w }}×{{ sel.h }}
+      </span>
+
+      <!-- Layer & action controls -->
       <template v-if="sel">
-        <button @click="bringForward" class="secondary" title="Bring forward" style="width:auto;padding:0.2rem 0.5rem;font-size:0.78rem;">↑</button>
-        <button @click="sendBackward" class="secondary" title="Send backward" style="width:auto;padding:0.2rem 0.5rem;font-size:0.78rem;">↓</button>
-        <button @click="duplicateEl" class="secondary" title="Duplicate (Ctrl+D)" style="width:auto;padding:0.2rem 0.5rem;font-size:0.78rem;">📋</button>
-        <button @click="deleteSelected" class="danger" style="width:auto;padding:0.2rem 0.5rem;font-size:0.78rem;">🗑</button>
+        <button @click="bringForward" class="secondary" title="Bring forward" style="width:auto;padding:0.2rem 0.4rem;font-size:0.78rem;">↑</button>
+        <button @click="sendBackward" class="secondary" title="Send backward" style="width:auto;padding:0.2rem 0.4rem;font-size:0.78rem;">↓</button>
+        <button @click="duplicateEl" class="secondary" title="Duplicate (Ctrl+D)" style="width:auto;padding:0.2rem 0.4rem;font-size:0.78rem;">📋</button>
+        <button @click="deleteSelected" class="danger" style="width:auto;padding:0.2rem 0.4rem;font-size:0.78rem;">🗑</button>
       </template>
-      <button v-if="selIdx>=0" @click="deselect" class="secondary" style="width:auto;padding:0.2rem 0.5rem;font-size:0.78rem;">✕</button>
+      <button v-if="selIdx>=0" @click="deselect" class="secondary" style="width:auto;padding:0.2rem 0.4rem;font-size:0.78rem;">✕</button>
     </div>
 
     <!-- Canvas wrapper -->
@@ -93,9 +114,17 @@
           @mousemove="onMouseMove"
           @click.self="deselect"
         >
-          <!-- Alignment guides (#5) -->
-          <div v-if="guides.vCenter" style="position:absolute;top:0;bottom:0;left:50%;width:1px;background:#3b82f6;z-index:200;pointer-events:none;opacity:0.7;"></div>
-          <div v-if="guides.hCenter" style="position:absolute;left:0;right:0;top:50%;height:1px;background:#3b82f6;z-index:200;pointer-events:none;opacity:0.7;"></div>
+          <!-- #10 — Grid overlay -->
+          <svg v-if="showGrid" :width="W" :height="H" style="position:absolute;inset:0;pointer-events:none;z-index:1;opacity:0.15;">
+            <defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#000" stroke-width="0.5"/></pattern></defs>
+            <rect width="100%" height="100%" fill="url(#grid)" />
+            <line :x1="W/2" y1="0" :x2="W/2" :y2="H" stroke="#f00" stroke-width="0.5" stroke-dasharray="4"/>
+            <line x1="0" :y1="H/2" :x2="W" :y2="H/2" stroke="#f00" stroke-width="0.5" stroke-dasharray="4"/>
+          </svg>
+
+          <!-- Alignment guides -->
+          <div v-if="guides.vCenter" style="position:absolute;top:0;bottom:0;left:50%;width:1px;background:#3b82f6;z-index:200;pointer-events:none;opacity:0.8;"></div>
+          <div v-if="guides.hCenter" style="position:absolute;left:0;right:0;top:50%;height:1px;background:#3b82f6;z-index:200;pointer-events:none;opacity:0.8;"></div>
 
           <!-- EDPS header -->
           <div style="position:absolute;top:0;left:0;right:0;height:74px;display:flex;align-items:center;padding:0 2rem;gap:1rem;z-index:0;pointer-events:none;">
@@ -108,54 +137,44 @@
             v-for="(el, idx) in localEls"
             :key="el.id"
             :style="elStyle(el, idx)"
-            @mousedown.stop="startDrag(idx, $event)"
+            @mousedown.stop="onElMouseDown(idx, $event)"
           >
-            <!-- Text -->
-            <div v-if="el.kind==='text'" @dblclick.stop="startEdit(idx)"
-              :style="{...textStyle(el), width:'100%', height:'100%', overflow:'hidden', cursor: selIdx===idx ? 'move' : 'default', wordWrap:'break-word', whiteSpace:'pre-wrap'}">{{ el.content }}</div>
+            <!-- Text (show markdown preview when not editing) -->
+            <div v-if="el.kind==='text' && editingIdx!==idx" @dblclick.stop="startEdit(idx)"
+              :style="{...textStyle(el), width:'100%', height:'100%', overflow:'hidden', cursor: selIdx===idx ? 'move' : 'default', wordWrap:'break-word', whiteSpace:'pre-wrap'}"
+              v-html="renderMdPreview(el.content)"></div>
 
             <!-- Textarea overlay for editing -->
             <textarea v-if="el.kind==='text' && editingIdx===idx" :value="el.content" @input="el.content=$event.target.value" @blur="stopEdit" @mousedown.stop ref="editTextarea"
-              :style="{...textStyle(el), position:'absolute', inset:0, border:'2px solid var(--edps-blue)', resize:'none', padding:0, margin:0, background:'rgba(255,255,255,0.92)', zIndex:100, cursor:'text', boxSizing:'border-box'}"></textarea>
+              :style="{...textStyle(el), position:'absolute', inset:0, border:'2px solid var(--edps-blue)', resize:'none', padding:'2px', margin:0, background:'rgba(255,255,255,0.95)', zIndex:100, cursor:'text', boxSizing:'border-box'}"
+              placeholder="Type here... (supports **Markdown**)"></textarea>
 
             <!-- Image -->
-            <img v-if="el.kind==='image'" :src="resolveElUrl(el.src)" style="width:100%;height:100%;object-fit:contain;pointer-events:none;" />
+            <img v-if="el.kind==='image'" :src="resolveElUrl(el.src)" style="width:100%;height:100%;object-fit:contain;pointer-events:none;" @error="$event.target.style.opacity='0.3'" />
 
             <!-- Video -->
             <video v-if="el.kind==='video' && isLocalVideo(el.src)" :src="resolveElUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;pointer-events:none;"></video>
             <iframe v-else-if="el.kind==='video'" :src="toEmbedUrl(el.src)" style="width:100%;height:100%;border:none;pointer-events:none;" frameborder="0" allowfullscreen></iframe>
 
-            <!-- #10 — Shape -->
+            <!-- Shape -->
             <div v-if="el.kind==='shape'" :style="shapeStyle(el)"></div>
 
             <!-- Selection handles -->
-            <template v-if="selIdx===idx">
-              <div style="position:absolute;inset:-2px;border:2px solid var(--edps-blue,#254A9A);pointer-events:none;"></div>
-              <!-- Corner handles -->
-              <div v-for="handle in ['nw','ne','sw','se']" :key="handle"
-                :style="handlePos(handle)"
-                @mousedown.stop="startResize(idx, $event, handle)"></div>
-              <!-- Edge handles -->
-              <div style="position:absolute;top:50%;right:-5px;width:8px;height:8px;background:#4a90d9;border-radius:50%;transform:translateY(-50%);cursor:e-resize;z-index:10;" @mousedown.stop="startResize(idx, $event,'e')"></div>
-              <div style="position:absolute;bottom:-5px;left:50%;width:8px;height:8px;background:#4a90d9;border-radius:50%;transform:translateX(-50%);cursor:s-resize;z-index:10;" @mousedown.stop="startResize(idx, $event,'s')"></div>
+            <template v-if="selectedIndices.includes(idx)">
+              <div :style="{position:'absolute',inset:'-2px',border: selIdx===idx ? '2px solid var(--edps-blue,#254A9A)' : '2px dashed #60a5fa',pointerEvents:'none'}"></div>
+              <template v-if="selIdx===idx">
+                <div v-for="handle in ['nw','ne','sw','se']" :key="handle" :style="handlePos(handle)" @mousedown.stop="startResize(idx, $event, handle)"></div>
+                <div style="position:absolute;top:50%;right:-5px;width:8px;height:8px;background:#4a90d9;border-radius:50%;transform:translateY(-50%);cursor:e-resize;z-index:10;" @mousedown.stop="startResize(idx, $event,'e')"></div>
+                <div style="position:absolute;bottom:-5px;left:50%;width:8px;height:8px;background:#4a90d9;border-radius:50%;transform:translateX(-50%);cursor:s-resize;z-index:10;" @mousedown.stop="startResize(idx, $event,'s')"></div>
+              </template>
             </template>
           </div>
         </div>
       </div>
     </div>
 
-    <div style="display:flex;justify-content:space-between;margin-top:0.4rem;font-size:0.75rem;color:#94a3b8;">
-      <span>Click to select · Drag to move · Dbl-click text to edit · Del to delete · Ctrl+D duplicate · Ctrl+C/V copy/paste · Shift+drag: keep ratio</span>
-      <!-- #11 — Background selector -->
-      <span>
-        BG: <select v-model="localBg" @change="$emit('update:background', localBg)" style="font-size:0.72rem;padding:0.1rem;border:1px solid #cbd5e1;border-radius:3px;">
-          <option value="">Default (Template)</option>
-          <option value="white">White</option>
-          <option value="#1b4293">Blue</option>
-          <option value="#f1f5f9">Light Gray</option>
-          <option value="linear-gradient(135deg,#1b4293,#0f2b5e)">Blue Gradient</option>
-        </select>
-      </span>
+    <div style="display:flex;justify-content:space-between;margin-top:0.3rem;font-size:0.72rem;color:#94a3b8;">
+      <span>Dbl-click text to edit · Del delete · Ctrl+D duplicate · Ctrl+C/V copy · Shift+click multi-select · Alt disables snap · Arrows move (Shift=10px)</span>
     </div>
 
     <!-- Media Picker Modal -->
@@ -167,7 +186,10 @@
 import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 import { authFetch } from '../auth.js';
 import { baseUrl } from '../config.js';
+import { marked } from 'marked';
 import MediaPicker from './MediaPicker.vue';
+
+let _nextZIndex = 100;
 
 export default {
   name: 'SlideCanvas',
@@ -186,21 +208,33 @@ export default {
       localEls: [],
       localBg: '',
       selIdx: -1,
+      multiSelIndices: [], // #9 — multi-select
       editingIdx: -1,
       drag: null,
       addUrlKind: null,
       addUrlValue: '',
-      fonts: ['Segoe UI','Arial','Georgia','Courier New','Verdana','Times New Roman','Calibri','Impact','Comic Sans MS'],
+      fonts: ['Segoe UI','Arial','Georgia','Courier New','Verdana','Times New Roman','Calibri','Impact'],
+      edpsColors: ['#254A9A','#F1C064','#DCDACE','#333333','#ffffff','#ef4444','#10b981'], // #13 — EDPS palette
       showImageMenu: false,
       showVideoMenu: false,
       showShapeMenu: false,
+      showBgMenu: false,
+      showGrid: false, // #10
       uploadKind: null,
       uploading: false,
       showMediaPicker: false,
       mediaPickerFilter: 'all',
-      clipboard: null, // #6 — clipboard for copy/paste
-      guides: { vCenter: false, hCenter: false }, // #5 — alignment guides
-      shapes: [
+      clipboard: null,
+      guides: { vCenter: false, hCenter: false },
+      bgOptions: [
+        { label: 'Template Default', value: '', preview: 'linear-gradient(135deg,#ddd,#eee)' },
+        { label: 'White', value: 'white', preview: 'white' },
+        { label: 'EDPS Blue', value: '#254A9A', preview: '#254A9A' },
+        { label: 'Light Gray', value: '#f1f5f9', preview: '#f1f5f9' },
+        { label: 'EDPS Beige', value: '#DCDACE', preview: '#DCDACE' },
+        { label: 'Blue Gradient', value: 'linear-gradient(135deg,#254A9A,#0f2b5e)', preview: 'linear-gradient(135deg,#254A9A,#0f2b5e)' },
+      ],
+      shapeList: [
         { name: 'Rectangle', icon: '⬛', shape: 'rect' },
         { name: 'Circle', icon: '⚫', shape: 'circle' },
         { name: 'Rounded Rect', icon: '🟦', shape: 'roundrect' },
@@ -215,11 +249,22 @@ export default {
     canvasWrapStyle() {
       return { width: this.W * this.scale + 'px', height: this.H * this.scale + 'px', position: 'relative', flexShrink: 0 };
     },
+    // #9 — combined selected indices
+    selectedIndices() {
+      const s = new Set(this.multiSelIndices);
+      if (this.selIdx >= 0) s.add(this.selIdx);
+      return Array.from(s);
+    },
   },
   watch: {
     modelValue: {
       immediate: true,
-      handler(v) { this.localEls = JSON.parse(JSON.stringify(v || [])); },
+      handler(v) {
+        this.localEls = JSON.parse(JSON.stringify(v || []));
+        // Track max zIndex
+        const maxZ = this.localEls.reduce((m, e) => Math.max(m, e.zIndex || 0), 0);
+        if (maxZ >= _nextZIndex) _nextZIndex = maxZ + 1;
+      },
     },
     background: {
       immediate: true,
@@ -241,6 +286,12 @@ export default {
     toEmbedUrl,
     isLocalVideo,
 
+    // #5 — Markdown preview in canvas
+    renderMdPreview(text) {
+      if (!text) return '';
+      try { return marked.parse(text, { breaks: true }); } catch { return text; }
+    },
+
     resolveElUrl(url) {
       if (!url) return '';
       return url.startsWith('http') ? url : `${baseUrl}${url}`;
@@ -250,6 +301,7 @@ export default {
       if (this.$refs.imageMenuRef && !this.$refs.imageMenuRef.contains(e.target)) this.showImageMenu = false;
       if (this.$refs.videoMenuRef && !this.$refs.videoMenuRef.contains(e.target)) this.showVideoMenu = false;
       if (this.$refs.shapeMenuRef && !this.$refs.shapeMenuRef.contains(e.target)) this.showShapeMenu = false;
+      if (this.$refs.bgMenuRef && !this.$refs.bgMenuRef.contains(e.target)) this.showBgMenu = false;
     },
 
     fitScale() {
@@ -271,7 +323,7 @@ export default {
     },
     textStyle(el) {
       return {
-        fontSize: el.fontSize + 'px',
+        fontSize: (el.fontSize || 18) + 'px',
         fontFamily: el.fontFamily || 'Segoe UI',
         fontWeight: el.bold ? 'bold' : 'normal',
         fontStyle: el.italic ? 'italic' : 'normal',
@@ -281,7 +333,6 @@ export default {
         lineHeight: 1.4,
       };
     },
-    // #10 — Shape rendering
     shapeStyle(el) {
       const base = { width: '100%', height: '100%', background: el.fill || '#254A9A', border: `${el.strokeWidth || 0}px solid ${el.stroke || '#000'}` };
       if (el.shape === 'circle') base.borderRadius = '50%';
@@ -291,7 +342,6 @@ export default {
       return base;
     },
 
-    // #4 — Handle positions for all corners
     handlePos(corner) {
       const base = { position: 'absolute', width: '10px', height: '10px', background: 'var(--edps-blue,#254A9A)', borderRadius: '50%', zIndex: 10 };
       if (corner === 'nw') return { ...base, top: '-5px', left: '-5px', cursor: 'nw-resize' };
@@ -300,20 +350,23 @@ export default {
       return { ...base, bottom: '-5px', right: '-5px', cursor: 'se-resize' };
     },
 
+    _newZIndex() { return _nextZIndex++; },
+
     addEl(kind) {
       const id = 'el_' + Date.now();
-      const el = { id, kind, x: 80, y: 90, w: 500, h: 80, content: 'Double-click to edit', fontSize: 22, fontFamily: 'Segoe UI', bold: false, italic: false, underline: false, color: '#333333', textAlign: 'left', zIndex: this.localEls.length + 10 };
+      const el = { id, kind, x: 80, y: 100, w: 500, h: 80, content: 'Double-click to edit', fontSize: 18, fontFamily: 'Segoe UI', bold: false, italic: false, underline: false, color: '#333333', textAlign: 'left', zIndex: this._newZIndex() };
       this.localEls.push(el);
       this.selIdx = this.localEls.length - 1;
+      this.multiSelIndices = [];
       this.emit();
     },
 
-    // #10 — Add shape
     addShape(shapeDef) {
       const id = 'el_' + Date.now();
-      const el = { id, kind: 'shape', shape: shapeDef.shape, x: 200, y: 150, w: 200, h: shapeDef.shape === 'line' ? 6 : 150, fill: '#254A9A', stroke: '#1a3a7a', strokeWidth: 0, zIndex: this.localEls.length + 10 };
+      const el = { id, kind: 'shape', shape: shapeDef.shape, x: 200, y: 150, w: 200, h: shapeDef.shape === 'line' ? 6 : 150, fill: '#254A9A', stroke: '#1a3a7a', strokeWidth: 0, zIndex: this._newZIndex() };
       this.localEls.push(el);
       this.selIdx = this.localEls.length - 1;
+      this.multiSelIndices = [];
       this.emit();
     },
 
@@ -330,11 +383,8 @@ export default {
       if (!url) { this.cancelAddUrl(); return; }
       const id = 'el_' + Date.now();
       let el;
-      if (this.addUrlKind === 'image') {
-        el = { id, kind: 'image', x: 200, y: 100, w: 350, h: 250, src: url, zIndex: this.localEls.length + 10 };
-      } else {
-        el = { id, kind: 'video', x: 150, y: 100, w: 500, h: 300, src: url, zIndex: this.localEls.length + 10 };
-      }
+      if (this.addUrlKind === 'image') el = { id, kind: 'image', x: 200, y: 100, w: 350, h: 250, src: url, zIndex: this._newZIndex() };
+      else el = { id, kind: 'video', x: 150, y: 100, w: 500, h: 300, src: url, zIndex: this._newZIndex() };
       this.localEls.push(el);
       this.selIdx = this.localEls.length - 1;
       this.addUrlKind = null;
@@ -359,11 +409,8 @@ export default {
         const data = await res.json();
         const id = 'el_' + Date.now();
         let el;
-        if (this.uploadKind === 'image') {
-          el = { id, kind: 'image', x: 200, y: 100, w: 350, h: 250, src: data.url, zIndex: this.localEls.length + 10 };
-        } else {
-          el = { id, kind: 'video', x: 150, y: 100, w: 500, h: 300, src: data.url, zIndex: this.localEls.length + 10 };
-        }
+        if (this.uploadKind === 'image') el = { id, kind: 'image', x: 200, y: 100, w: 350, h: 250, src: data.url, zIndex: this._newZIndex() };
+        else el = { id, kind: 'video', x: 150, y: 100, w: 500, h: 300, src: data.url, zIndex: this._newZIndex() };
         this.localEls.push(el);
         this.selIdx = this.localEls.length - 1;
         this.emit();
@@ -374,8 +421,8 @@ export default {
     onMediaPicked({ url, kind }) {
       const id = 'el_' + Date.now();
       let el;
-      if (kind === 'image') el = { id, kind: 'image', x: 200, y: 100, w: 350, h: 250, src: url, zIndex: this.localEls.length + 10 };
-      else el = { id, kind: 'video', x: 150, y: 100, w: 500, h: 300, src: url, zIndex: this.localEls.length + 10 };
+      if (kind === 'image') el = { id, kind: 'image', x: 200, y: 100, w: 350, h: 250, src: url, zIndex: this._newZIndex() };
+      else el = { id, kind: 'video', x: 150, y: 100, w: 500, h: 300, src: url, zIndex: this._newZIndex() };
       this.localEls.push(el);
       this.selIdx = this.localEls.length - 1;
       this.showMediaPicker = false;
@@ -383,20 +430,22 @@ export default {
     },
 
     deleteSelected() {
-      if (this.selIdx < 0) return;
-      this.localEls.splice(this.selIdx, 1);
+      if (this.selectedIndices.length === 0) return;
+      // Delete all selected (in reverse to preserve indices)
+      const toDelete = [...this.selectedIndices].sort((a, b) => b - a);
+      toDelete.forEach(i => this.localEls.splice(i, 1));
       this.selIdx = -1;
+      this.multiSelIndices = [];
       this.editingIdx = -1;
       this.emit();
     },
 
-    deselect() { this.selIdx = -1; this.editingIdx = -1; },
+    deselect() { this.selIdx = -1; this.multiSelIndices = []; this.editingIdx = -1; },
 
     toggleBold() { if (this.sel) { this.sel.bold = !this.sel.bold; this.emit(); } },
     toggleItalic() { if (this.sel) { this.sel.italic = !this.sel.italic; this.emit(); } },
     toggleUnderline() { if (this.sel) { this.sel.underline = !this.sel.underline; this.emit(); } },
 
-    // #4 — Layer management
     bringForward() {
       if (this.selIdx < 0 || this.selIdx >= this.localEls.length - 1) return;
       const el = this.localEls.splice(this.selIdx, 1)[0];
@@ -412,13 +461,13 @@ export default {
       this.emit();
     },
 
-    // #6 — Copy/paste/duplicate
     duplicateEl() {
       if (this.selIdx < 0) return;
       const copy = JSON.parse(JSON.stringify(this.localEls[this.selIdx]));
       copy.id = 'el_' + Date.now();
-      copy.x += 20;
-      copy.y += 20;
+      copy.x = Math.min(this.W - copy.w, copy.x + 30);
+      copy.y = Math.min(this.H - copy.h, copy.y + 30);
+      copy.zIndex = this._newZIndex();
       this.localEls.push(copy);
       this.selIdx = this.localEls.length - 1;
       this.emit();
@@ -431,8 +480,9 @@ export default {
       if (!this.clipboard) return;
       const el = JSON.parse(JSON.stringify(this.clipboard));
       el.id = 'el_' + Date.now();
-      el.x += 20;
-      el.y += 20;
+      el.x = Math.min(this.W - el.w, el.x + 30);
+      el.y = Math.min(this.H - el.h, el.y + 30);
+      el.zIndex = this._newZIndex();
       this.localEls.push(el);
       this.selIdx = this.localEls.length - 1;
       this.emit();
@@ -440,6 +490,7 @@ export default {
 
     startEdit(idx) {
       this.selIdx = idx;
+      this.multiSelIndices = [];
       this.editingIdx = idx;
       this.$nextTick(() => {
         const ta = this.$refs.editTextarea;
@@ -449,15 +500,30 @@ export default {
     },
     stopEdit() { this.editingIdx = -1; this.emit(); },
 
+    // #9 — Multi-select with Shift+click
+    onElMouseDown(idx, e) {
+      if (e.shiftKey) {
+        // Add/remove from multi-selection
+        const i = this.multiSelIndices.indexOf(idx);
+        if (i >= 0) this.multiSelIndices.splice(i, 1);
+        else this.multiSelIndices.push(idx);
+        if (this.selIdx < 0) this.selIdx = idx;
+        e.preventDefault();
+        return;
+      }
+      this.multiSelIndices = [];
+      this.startDrag(idx, e);
+    },
+
     startDrag(idx, e) {
       this.selIdx = idx;
       const el = this.localEls[idx];
-      this.drag = { type: 'move', idx, startX: e.clientX, startY: e.clientY, origX: el.x, origY: el.y, shift: e.shiftKey };
+      this.drag = { type: 'move', idx, startX: e.clientX, startY: e.clientY, origX: el.x, origY: el.y, altKey: e.altKey };
       e.preventDefault();
     },
     startResize(idx, e, dir) {
       const el = this.localEls[idx];
-      this.drag = { type: 'resize', idx, dir, startX: e.clientX, startY: e.clientY, origW: el.w, origH: el.h, origX: el.x, origY: el.y, aspect: el.w / el.h, shift: false };
+      this.drag = { type: 'resize', idx, dir, startX: e.clientX, startY: e.clientY, origW: el.w, origH: el.h, origX: el.x, origY: el.y, aspect: el.w / (el.h || 1) };
       e.preventDefault();
     },
     onMouseMove(e) {
@@ -466,31 +532,68 @@ export default {
       const dy = (e.clientY - this.drag.startY) / this.scale;
       const el = this.localEls[this.drag.idx];
       if (this.drag.type === 'move') {
-        el.x = Math.max(0, Math.min(this.W - el.w, Math.round(this.drag.origX + dx)));
-        el.y = Math.max(0, Math.min(this.H - el.h, Math.round(this.drag.origY + dy)));
-        // #5 — Snap to center guides
-        const cx = el.x + el.w / 2;
-        const cy = el.y + el.h / 2;
-        this.guides.vCenter = Math.abs(cx - this.W / 2) < 8;
-        this.guides.hCenter = Math.abs(cy - this.H / 2) < 8;
-        if (this.guides.vCenter) el.x = Math.round(this.W / 2 - el.w / 2);
-        if (this.guides.hCenter) el.y = Math.round(this.H / 2 - el.h / 2);
-      } else {
-        const dir = this.drag.dir;
-        // #8 — Shift for aspect ratio lock
-        const lockRatio = e.shiftKey && (dir === 'se' || dir === 'nw' || dir === 'ne' || dir === 'sw');
-        let newW = this.drag.origW, newH = this.drag.origH;
-        if (dir.includes('e')) newW = Math.max(40, Math.round(this.drag.origW + dx));
-        if (dir.includes('s')) newH = Math.max(20, Math.round(this.drag.origH + dy));
-        if (dir.includes('w')) { newW = Math.max(40, Math.round(this.drag.origW - dx)); el.x = Math.round(this.drag.origX + dx); }
-        if (dir.includes('n')) { newH = Math.max(20, Math.round(this.drag.origH - dy)); el.y = Math.round(this.drag.origY + dy); }
-        if (lockRatio) {
-          const a = this.drag.aspect;
-          if (Math.abs(dx) > Math.abs(dy)) { newH = Math.round(newW / a); }
-          else { newW = Math.round(newH * a); }
+        let newX = Math.max(0, Math.min(this.W - el.w, Math.round(this.drag.origX + dx)));
+        let newY = Math.max(0, Math.min(this.H - el.h, Math.round(this.drag.origY + dy)));
+
+        // #8 — Alt key disables snap
+        if (!e.altKey) {
+          // #10 — Snap to grid (40px)
+          if (this.showGrid) {
+            newX = Math.round(newX / 40) * 40;
+            newY = Math.round(newY / 40) * 40;
+          }
+          // Snap to center
+          const cx = newX + el.w / 2;
+          const cy = newY + el.h / 2;
+          this.guides.vCenter = Math.abs(cx - this.W / 2) < 10;
+          this.guides.hCenter = Math.abs(cy - this.H / 2) < 10;
+          if (this.guides.vCenter) newX = Math.round(this.W / 2 - el.w / 2);
+          if (this.guides.hCenter) newY = Math.round(this.H / 2 - el.h / 2);
+        } else {
+          this.guides.vCenter = false;
+          this.guides.hCenter = false;
         }
+
+        // Move multi-selected elements together (#9)
+        const deltaX = newX - el.x;
+        const deltaY = newY - el.y;
+        if (this.multiSelIndices.length > 0) {
+          for (const i of this.multiSelIndices) {
+            if (i !== this.drag.idx) {
+              this.localEls[i].x = Math.max(0, Math.min(this.W - this.localEls[i].w, this.localEls[i].x + deltaX));
+              this.localEls[i].y = Math.max(0, Math.min(this.H - this.localEls[i].h, this.localEls[i].y + deltaY));
+            }
+          }
+        }
+        el.x = newX;
+        el.y = newY;
+      } else {
+        // Resize — #2 fix: handle all directions correctly
+        const dir = this.drag.dir;
+        let newW = this.drag.origW, newH = this.drag.origH;
+        let newX = this.drag.origX, newY = this.drag.origY;
+
+        if (dir.includes('e')) newW = Math.max(40, Math.round(this.drag.origW + dx));
+        if (dir.includes('w')) { newW = Math.max(40, Math.round(this.drag.origW - dx)); newX = Math.round(this.drag.origX + dx); }
+        if (dir.includes('s')) newH = Math.max(20, Math.round(this.drag.origH + dy));
+        if (dir.includes('n')) { newH = Math.max(20, Math.round(this.drag.origH - dy)); newY = Math.round(this.drag.origY + dy); }
+
+        // #8 — Shift for aspect ratio lock (fixed for all corners)
+        if (e.shiftKey && (dir === 'se' || dir === 'nw' || dir === 'ne' || dir === 'sw')) {
+          const a = this.drag.aspect;
+          if (Math.abs(dx) > Math.abs(dy)) {
+            newH = Math.max(20, Math.round(newW / a));
+            if (dir.includes('n')) newY = this.drag.origY + this.drag.origH - newH;
+          } else {
+            newW = Math.max(40, Math.round(newH * a));
+            if (dir.includes('w')) newX = this.drag.origX + this.drag.origW - newW;
+          }
+        }
+
         el.w = newW;
         el.h = newH;
+        el.x = Math.max(0, newX);
+        el.y = Math.max(0, newY);
       }
     },
     stopDrag() {
@@ -501,18 +604,29 @@ export default {
       }
     },
 
-    // #9 — Keyboard shortcuts
     onKeyDown(e) {
-      if (this.editingIdx >= 0) return; // don't intercept while editing text
+      if (this.editingIdx >= 0) return;
       if (e.key === 'Delete' || e.key === 'Backspace') { this.deleteSelected(); e.preventDefault(); }
       else if (e.key === 'd' && (e.ctrlKey || e.metaKey)) { this.duplicateEl(); e.preventDefault(); }
       else if (e.key === 'c' && (e.ctrlKey || e.metaKey)) { this.copyEl(); e.preventDefault(); }
       else if (e.key === 'v' && (e.ctrlKey || e.metaKey)) { this.pasteEl(); e.preventDefault(); }
-      else if (e.key === 'ArrowUp' && this.selIdx >= 0) { this.localEls[this.selIdx].y = Math.max(0, this.localEls[this.selIdx].y - (e.shiftKey ? 10 : 1)); this.emit(); e.preventDefault(); }
-      else if (e.key === 'ArrowDown' && this.selIdx >= 0) { this.localEls[this.selIdx].y = Math.min(this.H - this.localEls[this.selIdx].h, this.localEls[this.selIdx].y + (e.shiftKey ? 10 : 1)); this.emit(); e.preventDefault(); }
-      else if (e.key === 'ArrowLeft' && this.selIdx >= 0) { this.localEls[this.selIdx].x = Math.max(0, this.localEls[this.selIdx].x - (e.shiftKey ? 10 : 1)); this.emit(); e.preventDefault(); }
-      else if (e.key === 'ArrowRight' && this.selIdx >= 0) { this.localEls[this.selIdx].x = Math.min(this.W - this.localEls[this.selIdx].w, this.localEls[this.selIdx].x + (e.shiftKey ? 10 : 1)); this.emit(); e.preventDefault(); }
+      else if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+        // Select all
+        this.multiSelIndices = this.localEls.map((_, i) => i);
+        if (this.localEls.length > 0) this.selIdx = 0;
+        e.preventDefault();
+      }
       else if (e.key === 'Escape') { this.deselect(); }
+      else if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key) && this.selIdx >= 0) {
+        const step = e.shiftKey ? 10 : 1;
+        const el = this.localEls[this.selIdx];
+        if (e.key === 'ArrowUp') el.y = Math.max(0, el.y - step);
+        else if (e.key === 'ArrowDown') el.y = Math.min(this.H - el.h, el.y + step);
+        else if (e.key === 'ArrowLeft') el.x = Math.max(0, el.x - step);
+        else if (e.key === 'ArrowRight') el.x = Math.min(this.W - el.w, el.x + step);
+        this.emit();
+        e.preventDefault();
+      }
     },
 
     emit() {

@@ -87,13 +87,18 @@
           <!-- Content: render canvas elements with absolute positioning -->
           <template v-if="currentSlide.type === 'content'">
             <template v-if="currentSlide.elements && currentSlide.elements.length">
-              <div style="position:relative;width:100%;min-height:380px;">
-                <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden',zIndex:el.zIndex||10}">
-                  <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize||16)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',textDecoration:el.underline?'underline':'none',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block',lineHeight:1.4,wordWrap:'break-word',whiteSpace:'pre-wrap'}" v-html="renderMd(el.content)"></span>
-                  <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
-                  <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
-                  <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-                  <div v-if="el.kind==='shape'" :style="shapeStyle(el)"></div>
+              <!-- Elements container: uses same 1024x576 canvas, scaled to fit the content area -->
+              <div style="position:relative;width:100%;padding-bottom:56.25%;overflow:hidden;">
+                <div style="position:absolute;inset:0;transform-origin:top left;" :style="{transform:'scale('+(contentAreaWidth/1024)+')'}">
+                  <div style="position:relative;width:1024px;height:576px;">
+                    <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden',zIndex:el.zIndex||10}">
+                      <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize||18)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',textDecoration:el.underline?'underline':'none',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block',lineHeight:1.4,wordWrap:'break-word',whiteSpace:'pre-wrap'}" v-html="renderMd(el.content)"></span>
+                      <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
+                      <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
+                      <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                      <div v-if="el.kind==='shape'" :style="shapeStyle(el)"></div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </template>
@@ -311,6 +316,10 @@ export default {
       const idx = this.slides.findIndex(s => s.id === this.currentSlideId);
       if (idx < 0) return 0;
       return ((idx + 1) / this.slides.length) * 100;
+    },
+    contentAreaWidth() {
+      // Approximate the content area width based on scale
+      return Math.round(940 * this.scale);
     },
     slideTransform() {
       return {

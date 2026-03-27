@@ -1379,11 +1379,12 @@ export default {
       this.editSlides.forEach(s => { s._collapsed = target; });
     },
     syncTextFromElements(slide) {
-      // When visual editor changes, sync first text element back to slide.content
+      // Sync ALL text elements to slide.content (joined with newlines)
       if (slide.elements && slide.elements.length) {
-        const textEl = slide.elements.find(el => el.kind === 'text');
-        if (textEl) slide.content = textEl.content || '';
+        const texts = slide.elements.filter(el => el.kind === 'text' && el.content).map(el => el.content);
+        slide.content = texts.join('\n\n');
       }
+      this.hasUnsavedChanges = true;
     },
     ensureTextElement(slide) {
       // Ensure a text element exists in the visual editor, create one if needed
