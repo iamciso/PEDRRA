@@ -648,3 +648,33 @@ a:focus-visible {
   0% { transform: translateX(100%); }
   100% { transform: translateX(0); }
 }
+
+/* ── RESPONSIVE MOBILE (#3) ─────────────────────────────────── */
+@media (max-width: 768px) {
+  #app { align-items: flex-start; }
+  .glass-panel { margin: 0.5rem; padding: 1rem; border-radius: 8px; }
+  .tabs { gap: 0; flex-wrap: wrap; }
+  .tab-link { padding: 0.4rem 0.6rem; font-size: 0.8rem; }
+  .dash-layout { grid-template-columns: 1fr; gap: 1rem; }
+  .podium-container { gap: 0.3rem; }
+  .podium-place { min-width: 80px; padding: 0.6rem; }
+  .podium-place.gold { min-height: 120px; }
+  .podium-place.silver { min-height: 100px; }
+  .podium-place.bronze { min-height: 80px; }
+  .podium-avatar { width: 40px; height: 40px; }
+  .podium-name { font-size: 0.75rem; }
+  .hand-raise-btn { width: 44px; height: 44px; font-size: 1.2rem; bottom: 60px; right: 10px; }
+  .qr-overlay { width: 100%; }
+  /* Trainer content editor buttons */
+  .slide-container { padding: 1rem !important; }
+}
+
+@media (max-width: 480px) {
+  .glass-panel { padding: 0.75rem; margin: 0.25rem; }
+  .tabs { margin-bottom: 1rem; }
+  .tab-link { padding: 0.3rem 0.4rem; font-size: 0.75rem; }
+  .edps-header { padding: 0.5rem 1rem 0.3rem; }
+  .edps-header-logo { width: 35px; height: 28px; }
+  .edps-header-title { font-size: 1.1rem; }
+  .edps-content-area { padding: 0.3rem 1rem 1rem; font-size: 0.9rem; }
+}
