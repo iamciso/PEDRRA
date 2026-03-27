@@ -1314,6 +1314,12 @@ export default {
         try {
           const slides = JSON.parse(ev.target.result);
           if (!Array.isArray(slides)) throw new Error('File must contain an array of slides');
+          // Validate each slide has required fields
+          for (const s of slides) {
+            if (!s || typeof s !== 'object' || !s.id || !s.type) {
+              throw new Error('Each slide must have at least "id" and "type" fields');
+            }
+          }
           if (confirm(`Import ${slides.length} slides? This will REPLACE all current slides.`)) {
             this.editSlides = slides;
             this.saveMessage = `Imported ${slides.length} slides. Click "Save Changes" to persist.`;
@@ -1488,33 +1494,42 @@ export default {
       }
     },
     checkPollResults() {
-      // Clean up any previous listeners
+      if (!this.currentSlide?.id) return;
+      const slideId = this.currentSlide.id;
+
+      // Always clean up previous listeners first to prevent accumulation
       if (this._prevPollSlideId) {
         this.socket.off(`poll:results:trainer:${this._prevPollSlideId}`);
         this.socket.off(`poll:progress:trainer:${this._prevPollSlideId}`);
         this.socket.off(`timer:update:${this._prevPollSlideId}`);
       }
+      // Also clean current slide listeners (in case checkPollResults is called twice for same slide)
+      if (this._prevPollSlideId !== slideId) {
+        this.socket.off(`poll:results:trainer:${slideId}`);
+        this.socket.off(`poll:progress:trainer:${slideId}`);
+        this.socket.off(`timer:update:${slideId}`);
+      }
       clearInterval(this.timerInterval);
-      this._prevPollSlideId = this.currentSlide.id;
+      this._prevPollSlideId = slideId;
 
       if (this.currentSlide.type === 'poll' || this.currentSlide.type === 'survey') {
         this.pollResults = [];
         this.pollProgress = { answered: 0, total: 0 };
 
-        this.socket.on(`poll:results:trainer:${this.currentSlide.id}`, (results) => {
+        this.socket.on(`poll:results:trainer:${slideId}`, (results) => {
           this.pollResults = results;
         });
 
-        this.socket.on(`poll:progress:trainer:${this.currentSlide.id}`, (progress) => {
+        this.socket.on(`poll:progress:trainer:${slideId}`, (progress) => {
           this.pollProgress = progress;
         });
 
-        this.socket.emit('poll:getResults', this.currentSlide.id);
+        this.socket.emit('poll:getResults', slideId);
       } else if (this.currentSlide.type === 'timer') {
         this.timerSeconds = this.currentSlide.duration || 300;
         this.timerRunning = false;
-        this.socket.on(`timer:update:${this.currentSlide.id}`, (state) => this._handleTimerUpdate(state));
-        this.socket.emit('timer:get', this.currentSlide.id);
+        this.socket.on(`timer:update:${slideId}`, (state) => this._handleTimerUpdate(state));
+        this.socket.emit('timer:get', slideId);
       }
     },
     getPercentage(count) {
@@ -1578,18 +1593,18 @@ export default {
         html += `<h1>${this.escHtml(s.title)}</h1>`;
         if (s.subtitle) html += `<h2>${this.escHtml(s.subtitle)}</h2>`;
         if (s.content) html += `<div class="content">${this.escHtml(s.content)}</div>`;
-        if (s.image) html += `<img src="${this.resolveUrl(s.image)}" />`;
+        if (s.image) html += `<img src="${this.esc(this.resolveUrl(s.image))}" />`;
         if (s.type === 'poll') {
-          html += `<div class="poll-q">${this.escHtml(s.question || '')}</div>`;
-          (s.options || []).forEach(o => { html += `<div class="poll-opt">${this.escHtml(o)}</div>`; });
+          html += `<div class="poll-q">${this.esc(s.question || '')}</div>`;
+          (s.options || []).forEach(o => { html += `<div class="poll-opt">${this.esc(o)}</div>`; });
         }
         if (s.type === 'survey' && s.questions) {
-          s.questions.forEach((q, qi) => { html += `<div class="poll-q">Q${qi+1}: ${this.escHtml(q.text || '')}</div>`; });
+          s.questions.forEach((q, qi) => { html += `<div class="poll-q">Q${qi+1}: ${this.esc(q.text || '')}</div>`; });
         }
         if (s.elements && s.elements.length) {
           s.elements.forEach(el => {
-            if (el.kind === 'text') html += `<div style="font-size:${el.fontSize||16}px;color:${el.color||'#333'};font-weight:${el.bold?'bold':'normal'};white-space:pre-wrap;margin:0.5rem 0;">${this.escHtml(el.content||'')}</div>`;
-            if (el.kind === 'image') html += `<img src="${this.resolveUrl(el.src)}" />`;
+            if (el.kind === 'text') html += `<div style="font-size:${el.fontSize||16}px;color:${this.esc(el.color||'#333')};font-weight:${el.bold?'bold':'normal'};white-space:pre-wrap;margin:0.5rem 0;">${this.esc(el.content||'')}</div>`;
+            if (el.kind === 'image') html += `<img src="${this.esc(this.resolveUrl(el.src))}" />`;
           });
         }
         html += `<div class="footer">Slide ${i+1} / ${this.slides.length}</div>`;

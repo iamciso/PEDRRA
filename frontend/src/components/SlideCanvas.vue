@@ -243,6 +243,8 @@ import { renderMarkdown } from '../utils/safeMd.js';
 import MediaPicker from './MediaPicker.vue';
 
 let _nextZIndex = 100;
+let _elIdCounter = 0;
+function _uniqueElId() { return _uniqueElId() + '_' + (++_elIdCounter); }
 
 export default {
   name: 'SlideCanvas',
@@ -419,7 +421,7 @@ export default {
     _newZIndex() { return _nextZIndex++; },
 
     addEl(kind) {
-      const id = 'el_' + Date.now();
+      const id = _uniqueElId();
       const el = { id, kind, x: 80, y: 100, w: 500, h: 80, content: '', fontSize: 18, fontFamily: 'Segoe UI', bold: false, italic: false, underline: false, color: '#333333', textAlign: 'left', zIndex: this._newZIndex() };
       this.localEls.push(el);
       this.selIdx = this.localEls.length - 1;
@@ -428,7 +430,7 @@ export default {
     },
 
     addShape(shapeDef) {
-      const id = 'el_' + Date.now();
+      const id = _uniqueElId();
       const el = { id, kind: 'shape', shape: shapeDef.shape, x: 200, y: 150, w: 200, h: shapeDef.shape === 'line' ? 6 : 150, fill: '#254A9A', stroke: '#1a3a7a', strokeWidth: 0, zIndex: this._newZIndex() };
       this.localEls.push(el);
       this.selIdx = this.localEls.length - 1;
@@ -447,7 +449,7 @@ export default {
     confirmAddUrl() {
       const url = this.addUrlValue.trim();
       if (!url) { this.cancelAddUrl(); return; }
-      const id = 'el_' + Date.now();
+      const id = _uniqueElId();
       let el;
       if (this.addUrlKind === 'image') el = { id, kind: 'image', x: 200, y: 100, w: 350, h: 250, src: url, zIndex: this._newZIndex() };
       else el = { id, kind: 'video', x: 150, y: 100, w: 500, h: 300, src: url, zIndex: this._newZIndex() };
@@ -478,7 +480,7 @@ export default {
           this.localEls[this.replaceTarget].src = data.url;
           this.replaceTarget = -1;
         } else {
-          const id = 'el_' + Date.now();
+          const id = _uniqueElId();
           let el;
           if (this.uploadKind === 'image') el = { id, kind: 'image', x: 200, y: 100, w: 350, h: 250, src: data.url, zIndex: this._newZIndex() };
           else el = { id, kind: 'video', x: 150, y: 100, w: 500, h: 300, src: data.url, zIndex: this._newZIndex() };
@@ -496,7 +498,7 @@ export default {
         this.localEls[this.replaceTarget].src = url;
         this.replaceTarget = -1;
       } else {
-        const id = 'el_' + Date.now();
+        const id = _uniqueElId();
         let el;
         if (kind === 'image') el = { id, kind: 'image', x: 200, y: 100, w: 350, h: 250, src: url, zIndex: this._newZIndex() };
         else el = { id, kind: 'video', x: 150, y: 100, w: 500, h: 300, src: url, zIndex: this._newZIndex() };
@@ -554,9 +556,9 @@ export default {
     },
 
     duplicateEl() {
-      if (this.selIdx < 0) return;
+      if (this.selIdx < 0 || this.selIdx >= this.localEls.length) return;
       const copy = JSON.parse(JSON.stringify(this.localEls[this.selIdx]));
-      copy.id = 'el_' + Date.now();
+      copy.id = _uniqueElId();
       copy.x = Math.min(this.W - copy.w, copy.x + 30);
       copy.y = Math.min(this.H - copy.h, copy.y + 30);
       copy.zIndex = this._newZIndex();
@@ -565,13 +567,13 @@ export default {
       this.emit();
     },
     copyEl() {
-      if (this.selIdx < 0) return;
+      if (this.selIdx < 0 || this.selIdx >= this.localEls.length) return;
       this.clipboard = JSON.parse(JSON.stringify(this.localEls[this.selIdx]));
     },
     pasteEl() {
       if (!this.clipboard) return;
       const el = JSON.parse(JSON.stringify(this.clipboard));
-      el.id = 'el_' + Date.now();
+      el.id = _uniqueElId();
       el.x = Math.min(this.W - el.w, el.x + 30);
       el.y = Math.min(this.H - el.h, el.y + 30);
       el.zIndex = this._newZIndex();
@@ -633,6 +635,7 @@ export default {
       const dx = (e.clientX - this.drag.startX) / this.scale;
       const dy = (e.clientY - this.drag.startY) / this.scale;
       const el = this.localEls[this.drag.idx];
+      if (!el) { this.drag = null; return; }
       if (this.drag.type === 'move') {
         let newX = Math.max(0, Math.min(this.W - el.w, Math.round(this.drag.origX + dx)));
         let newY = Math.max(0, Math.min(this.H - el.h, Math.round(this.drag.origY + dy)));
@@ -661,7 +664,7 @@ export default {
         const deltaY = newY - el.y;
         if (this.multiSelIndices.length > 0) {
           for (const i of this.multiSelIndices) {
-            if (i !== this.drag.idx) {
+            if (i !== this.drag.idx && this.localEls[i]) {
               this.localEls[i].x = Math.max(0, Math.min(this.W - this.localEls[i].w, this.localEls[i].x + deltaX));
               this.localEls[i].y = Math.max(0, Math.min(this.H - this.localEls[i].h, this.localEls[i].y + deltaY));
             }
