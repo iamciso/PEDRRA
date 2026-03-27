@@ -324,6 +324,9 @@ export default {
     modelValue: {
       immediate: true,
       handler(v) {
+        // Skip reset when the change came from our own emit() — prevents
+        // losing selection state and causing flickering on click
+        if (this._selfEmit) { this._selfEmit = false; return; }
         this.localEls = JSON.parse(JSON.stringify(v || []));
         // Track max zIndex
         const maxZ = this.localEls.reduce((m, e) => Math.max(m, e.zIndex || 0), 0);
@@ -613,7 +616,7 @@ export default {
       this.selIdx = idx;
       const el = this.localEls[idx];
       if (el.locked) { e.preventDefault(); return; } // Don't drag locked elements
-      this.drag = { type: 'move', idx, startX: e.clientX, startY: e.clientY, origX: el.x, origY: el.y, altKey: e.altKey };
+      this.drag = { type: 'move', idx, startX: e.clientX, startY: e.clientY, origX: el.x, origY: el.y, altKey: e.altKey, moved: false };
       e.preventDefault();
     },
     startRotate(idx, e) {
@@ -636,6 +639,7 @@ export default {
       const dy = (e.clientY - this.drag.startY) / this.scale;
       const el = this.localEls[this.drag.idx];
       if (!el) { this.drag = null; return; }
+      this.drag.moved = true;
       if (this.drag.type === 'move') {
         let newX = Math.max(0, Math.min(this.W - el.w, Math.round(this.drag.origX + dx)));
         let newY = Math.max(0, Math.min(this.H - el.h, Math.round(this.drag.origY + dy)));
@@ -710,9 +714,11 @@ export default {
     },
     stopDrag() {
       if (this.drag) {
+        const wasMoved = this.drag.moved;
         this.drag = null;
         this.guides = { vCenter: false, hCenter: false };
-        this.emit();
+        // Only emit (save snapshot + sync to parent) if something actually moved
+        if (wasMoved) this.emit();
       }
     },
 
@@ -782,6 +788,7 @@ export default {
 
     emit() {
       this._saveUndoSnapshot();
+      this._selfEmit = true;
       this.$emit('update:modelValue', JSON.parse(JSON.stringify(this.localEls)));
     },
   },
