@@ -244,7 +244,7 @@ import MediaPicker from './MediaPicker.vue';
 
 let _nextZIndex = 100;
 let _elIdCounter = 0;
-function _uniqueElId() { return _uniqueElId() + '_' + (++_elIdCounter); }
+function _uniqueElId() { return 'el_' + Date.now() + '_' + (++_elIdCounter); }
 
 export default {
   name: 'SlideCanvas',

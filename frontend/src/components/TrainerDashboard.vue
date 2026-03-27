@@ -57,13 +57,18 @@
           <div v-if="currentSlide.description" style="color:#64748b;margin-top:0.5rem;">{{ currentSlide.description }}</div>
 
           <div v-if="currentSlide.type === 'content' || currentSlide.type === 'title'">
-             <!-- Canvas visual elements -->
-             <div v-if="currentSlide.elements && currentSlide.elements.length" style="position:relative;width:100%;min-height:250px;margin-top:0.5rem;background:#fafafa;border:1px solid #f0f0f0;border-radius:4px;overflow:hidden;">
-               <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:(el.x*0.55)+'px',top:(el.y*0.45)+'px',width:(el.w*0.55)+'px',height:(el.h*0.45)+'px',overflow:'hidden'}">
-                 <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize*0.55)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block'}" v-html="renderMd(el.content)"></span>
-                 <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" alt="Slide element" />
-                 <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
-                 <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allowfullscreen></iframe>
+             <!-- Canvas visual elements (scaled to fit, matching attendee rendering) -->
+             <div v-if="currentSlide.elements && currentSlide.elements.length" style="position:relative;width:100%;padding-bottom:56.25%;margin-top:0.5rem;background:#fafafa;border:1px solid #f0f0f0;border-radius:4px;overflow:hidden;">
+               <div style="position:absolute;inset:0;transform-origin:top left;" :style="{transform:'scale('+(livePreviewWidth/1024)+')'}">
+                 <div style="position:relative;width:1024px;height:576px;">
+                   <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden',zIndex:el.zIndex||10,opacity:el.opacity??1,transform:el.rotation?`rotate(${el.rotation}deg)`:'none',filter:el.shadow?'drop-shadow(2px 4px 6px rgba(0,0,0,0.3))':'none'}">
+                     <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize||18)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',textDecoration:el.underline?'underline':'none',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block',lineHeight:1.4,wordWrap:'break-word',whiteSpace:'pre-wrap'}" v-html="renderMd(el.content)"></span>
+                     <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" alt="Slide element" />
+                     <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
+                     <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allowfullscreen></iframe>
+                     <div v-if="el.kind==='shape'" :style="shapeStyle(el)"></div>
+                   </div>
+                 </div>
                </div>
              </div>
              <!-- Legacy image/video (only if no canvas elements) -->
@@ -308,7 +313,7 @@
               {{ (slide.elements && slide.elements.length) || 0 }} element(s) — click to open editor
             </div>
             <div v-if="slide._showCanvas" style="margin-top:0.3rem;">
-              <SlideCanvas v-model="slide.elements" :slideTitle="slide.title" :slideSubtitle="slide.subtitle" @update:modelValue="syncTextFromElements(slide)" @update:slideTitle="v => slide.title = v" @update:slideSubtitle="v => slide.subtitle = v" />
+              <SlideCanvas v-model="slide.elements" :slideTitle="slide.title" :slideSubtitle="slide.subtitle" :background="slide.background || ''" @update:modelValue="syncTextFromElements(slide)" @update:slideTitle="v => slide.title = v" @update:slideSubtitle="v => slide.subtitle = v" @update:background="v => { slide.background = v; hasUnsavedChanges = true; }" />
             </div>
           </div>
         </template>
@@ -685,11 +690,12 @@
             <template v-if="currentSlide.type === 'content'">
               <template v-if="currentSlide.elements && currentSlide.elements.length">
                 <div style="position:relative;width:100%;min-height:300px;">
-                  <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden',opacity:el.opacity??1,transform:el.rotation?`rotate(${el.rotation}deg)`:'none',filter:el.shadow?'drop-shadow(2px 4px 6px rgba(0,0,0,0.3))':'none'}">
-                    <span v-if="el.kind==='text'" :style="{fontSize:el.fontSize+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block'}" v-html="renderMd(el.content)"></span>
+                  <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden',zIndex:el.zIndex||10,opacity:el.opacity??1,transform:el.rotation?`rotate(${el.rotation}deg)`:'none',filter:el.shadow?'drop-shadow(2px 4px 6px rgba(0,0,0,0.3))':'none'}">
+                    <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize||18)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',textDecoration:el.underline?'underline':'none',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block',lineHeight:1.4,wordWrap:'break-word',whiteSpace:'pre-wrap'}" v-html="renderMd(el.content)"></span>
                     <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" alt="Slide element" />
                     <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
                     <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                    <div v-if="el.kind==='shape'" :style="shapeStyle(el)"></div>
                   </div>
                 </div>
               </template>
@@ -984,6 +990,11 @@ export default {
   computed: {
     currentSlide() {
       return this.slides[this.currentIndex] || {};
+    },
+    livePreviewWidth() {
+      // The live presenter area is roughly 2/3 of the panel width (~700px)
+      // This matches the 16:9 ratio container for proper element scaling
+      return 700;
     },
     pollAggregated() {
       const counts = {};
@@ -1506,7 +1517,9 @@ export default {
         textEl = {
           id, kind: 'text', x: 50, y: 90, w: 900, h: 350,
           content: slide.content,
-          fontSize: 20, fontFamily: 'Segoe UI', bold: false, italic: false, color: '#333333', textAlign: 'left'
+          fontSize: 20, fontFamily: 'Segoe UI', bold: false, italic: false, underline: false,
+          color: '#333333', textAlign: 'left',
+          zIndex: 10, opacity: 1, rotation: 0, shadow: false,
         };
         slide.elements.push(textEl);
       }
@@ -1592,6 +1605,14 @@ export default {
         this.socket.on(`timer:update:${slideId}`, (state) => this._handleTimerUpdate(state));
         this.socket.emit('timer:get', slideId);
       }
+    },
+    shapeStyle(el) {
+      const base = { width: '100%', height: '100%', background: el.fill || '#254A9A', border: `${el.strokeWidth || 0}px solid ${el.stroke || '#000'}` };
+      if (el.shape === 'circle') base.borderRadius = '50%';
+      else if (el.shape === 'roundrect') base.borderRadius = '12px';
+      else if (el.shape === 'line') { base.height = `${el.strokeWidth || 3}px`; base.background = el.fill || '#254A9A'; base.borderRadius = '2px'; base.marginTop = (el.h / 2 - 1) + 'px'; base.border = 'none'; }
+      else if (el.shape === 'arrow') { base.clipPath = 'polygon(0 30%, 70% 30%, 70% 0, 100% 50%, 70% 100%, 70% 70%, 0 70%)'; base.border = 'none'; }
+      return base;
     },
     getPercentage(count) {
       if (!count || this.totalPollAnswers === 0) return 0;
