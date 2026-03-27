@@ -30,7 +30,7 @@
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem;">
       <div v-for="file in files" :key="file.filename" style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #fff;">
         <div style="height: 120px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
-          <img v-if="isImage(file.filename)" :src="fullUrl(file.url)" style="width: 100%; height: 100%; object-fit: cover;" />
+          <img v-if="isImage(file.filename)" :src="fullUrl(file.url)" style="width: 100%; height: 100%; object-fit: cover;" :alt="file.filename.substring(file.filename.indexOf('_')+1)" />
           <div v-else style="font-size: 3rem;">🎬</div>
         </div>
         <div style="padding: 0.5rem;">

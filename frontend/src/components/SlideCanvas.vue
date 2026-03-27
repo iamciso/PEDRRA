@@ -167,7 +167,7 @@
           <!-- EDPS header with editable title/subtitle -->
           <div style="position:absolute;top:0;left:0;right:0;z-index:5;">
             <div style="display:flex;align-items:center;padding:1rem 2rem 0.3rem;gap:1rem;">
-              <img src="/template/edps_logo.png" style="height:38px;pointer-events:none;" onerror="this.src='/logo.png'; this.onerror=null;" />
+              <img src="/template/edps_logo.png" style="height:38px;pointer-events:none;" onerror="this.src='/logo.png'; this.onerror=null;" alt="EDPS logo" />
               <input v-if="editingTitle" ref="titleInput" :value="slideTitle" @input="$emit('update:slideTitle', $event.target.value)" @blur="editingTitle=false" @keyup.enter="editingTitle=false"
                 style="flex:1;color:var(--edps-blue,#254A9A);font-weight:bold;font-size:1.1rem;border:1px dashed var(--edps-blue);border-radius:4px;padding:0.2rem 0.4rem;background:rgba(255,255,255,0.9);margin:0;" />
               <span v-else @dblclick="editingTitle=true; $nextTick(()=>$refs.titleInput?.focus())" style="flex:1;color:var(--edps-blue,#254A9A);font-weight:bold;font-size:1.1rem;cursor:text;min-height:1.4em;padding:0.2rem 0;" :title="'Double-click to edit title'">{{ slideTitle || 'Click to add title...' }}</span>
@@ -198,7 +198,7 @@
               placeholder="Type here... (supports **Markdown**)"></textarea>
 
             <!-- Image -->
-            <img v-if="el.kind==='image'" :src="resolveElUrl(el.src)" :style="{width:'100%',height:'100%',objectFit:'contain',pointerEvents:'none',borderRadius:(el.borderRadius||0)+'px'}" @error="$event.target.style.opacity='0.3'" />
+            <img v-if="el.kind==='image'" :src="resolveElUrl(el.src)" :style="{width:'100%',height:'100%',objectFit:'contain',pointerEvents:'none',borderRadius:(el.borderRadius||0)+'px'}" @error="$event.target.style.opacity='0.3'" alt="Slide element" />
 
             <!-- Video -->
             <video v-if="el.kind==='video' && isLocalVideo(el.src)" :src="resolveElUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;pointer-events:none;"></video>

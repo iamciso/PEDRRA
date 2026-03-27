@@ -1,7 +1,7 @@
 <template>
   <div class="glass-panel" style="max-width: 420px; margin: 0 auto;">
     <div style="text-align:center;margin-bottom:1.5rem;">
-      <img src="/template/edps_logo.png" style="height:50px;margin-bottom:0.5rem;" onerror="this.style.display='none'" />
+      <img src="/template/edps_logo.png" style="height:50px;margin-bottom:0.5rem;" onerror="this.style.display='none'" alt="EDPS logo" />
       <h2 style="margin:0;color:var(--edps-blue);">PEDRRA Training</h2>
     </div>
 

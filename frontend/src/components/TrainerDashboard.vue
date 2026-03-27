@@ -56,14 +56,14 @@
              <div v-if="currentSlide.elements && currentSlide.elements.length" style="position:relative;width:100%;min-height:250px;margin-top:0.5rem;background:#fafafa;border:1px solid #f0f0f0;border-radius:4px;overflow:hidden;">
                <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:(el.x*0.55)+'px',top:(el.y*0.45)+'px',width:(el.w*0.55)+'px',height:(el.h*0.45)+'px',overflow:'hidden'}">
                  <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize*0.55)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block'}" v-html="renderMd(el.content)"></span>
-                 <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
+                 <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" alt="Slide element" />
                  <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
                  <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allowfullscreen></iframe>
                </div>
              </div>
              <!-- Legacy image/video (only if no canvas elements) -->
              <div v-if="currentSlide.image && !(currentSlide.elements && currentSlide.elements.length)" style="margin-top:0.5rem;text-align:center;">
-               <img :src="resolveUrl(currentSlide.image)" style="max-width:100%;max-height:250px;border-radius:4px;" />
+               <img :src="resolveUrl(currentSlide.image)" style="max-width:100%;max-height:250px;border-radius:4px;" alt="Slide image" />
              </div>
              <div v-if="currentSlide.video && !(currentSlide.elements && currentSlide.elements.length)" style="margin-top:0.5rem;text-align:center;">
                <video v-if="isLocalVideoCheck(currentSlide.video)" :src="resolveUrl(currentSlide.video)" controls style="width:100%;max-height:300px;border-radius:8px;"></video>
@@ -460,7 +460,7 @@
                 <input v-model="editingUser.avatar" placeholder="/uploads/..." style="margin-bottom:0;padding:0.2rem;font-size:0.8rem;width:80px;" />
               </template>
               <template v-else>
-                <img v-if="u.avatar" :src="resolveUrl(u.avatar)" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" />
+                <img v-if="u.avatar" :src="resolveUrl(u.avatar)" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" :alt="(u.display_name || u.username) + ' avatar'" />
                 <span v-else style="font-size:1.2rem;">👤</span>
               </template>
             </td>
@@ -644,7 +644,7 @@
                 <div style="position:relative;width:100%;min-height:300px;">
                   <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden',opacity:el.opacity??1,transform:el.rotation?`rotate(${el.rotation}deg)`:'none',filter:el.shadow?'drop-shadow(2px 4px 6px rgba(0,0,0,0.3))':'none'}">
                     <span v-if="el.kind==='text'" :style="{fontSize:el.fontSize+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block'}" v-html="renderMd(el.content)"></span>
-                    <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
+                    <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" alt="Slide element" />
                     <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
                     <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
                   </div>
@@ -655,7 +655,7 @@
               </template>
             </template>
             <div v-if="currentSlide.image && !(currentSlide.elements && currentSlide.elements.length)" style="margin-top: 1.5rem; text-align: center;">
-               <img :src="resolveUrl(currentSlide.image)" style="max-width: 100%; max-height: 350px; border-radius: 8px;" />
+               <img :src="resolveUrl(currentSlide.image)" style="max-width: 100%; max-height: 350px; border-radius: 8px;" alt="Slide image" />
             </div>
             <div v-if="currentSlide.video && !(currentSlide.elements && currentSlide.elements.length)" style="margin-top: 1.5rem; text-align: center;">
                <video v-if="isLocalVideoCheck(currentSlide.video)" :src="resolveUrl(currentSlide.video)" controls style="width: 100%; max-height: 350px; border-radius: 8px; max-width: 800px;"></video>
@@ -761,9 +761,9 @@
       <div style="background:white;border-radius:24px;padding:2.5rem;width:85%;max-width:600px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
         <h2 style="margin:0 0 1.5rem;text-align:center;color:var(--edps-blue);font-size:2.2rem;">🏆 Leaderboard</h2>
         <div v-if="leaderboardEntries.length >= 1" class="podium-container">
-          <div v-if="leaderboardEntries[1]" class="podium-place silver"><div class="podium-rank">🥈</div><img v-if="leaderboardEntries[1].avatar" :src="resolveUrl(leaderboardEntries[1].avatar)" class="podium-avatar" /><div class="podium-name">{{ leaderboardEntries[1].display_name || leaderboardEntries[1].username }}</div><div class="podium-points">{{ leaderboardEntries[1].total_points || 0 }} pts</div></div>
-          <div class="podium-place gold"><div class="podium-rank">🥇</div><img v-if="leaderboardEntries[0].avatar" :src="resolveUrl(leaderboardEntries[0].avatar)" class="podium-avatar" /><div class="podium-name">{{ leaderboardEntries[0].display_name || leaderboardEntries[0].username }}</div><div class="podium-points">{{ leaderboardEntries[0].total_points || 0 }} pts</div></div>
-          <div v-if="leaderboardEntries[2]" class="podium-place bronze"><div class="podium-rank">🥉</div><img v-if="leaderboardEntries[2].avatar" :src="resolveUrl(leaderboardEntries[2].avatar)" class="podium-avatar" /><div class="podium-name">{{ leaderboardEntries[2].display_name || leaderboardEntries[2].username }}</div><div class="podium-points">{{ leaderboardEntries[2].total_points || 0 }} pts</div></div>
+          <div v-if="leaderboardEntries[1]" class="podium-place silver"><div class="podium-rank">🥈</div><img v-if="leaderboardEntries[1].avatar" :src="resolveUrl(leaderboardEntries[1].avatar)" class="podium-avatar" :alt="(leaderboardEntries[1].display_name || leaderboardEntries[1].username) + ' avatar'" /><div class="podium-name">{{ leaderboardEntries[1].display_name || leaderboardEntries[1].username }}</div><div class="podium-points">{{ leaderboardEntries[1].total_points || 0 }} pts</div></div>
+          <div class="podium-place gold"><div class="podium-rank">🥇</div><img v-if="leaderboardEntries[0].avatar" :src="resolveUrl(leaderboardEntries[0].avatar)" class="podium-avatar" :alt="(leaderboardEntries[0].display_name || leaderboardEntries[0].username) + ' avatar'" /><div class="podium-name">{{ leaderboardEntries[0].display_name || leaderboardEntries[0].username }}</div><div class="podium-points">{{ leaderboardEntries[0].total_points || 0 }} pts</div></div>
+          <div v-if="leaderboardEntries[2]" class="podium-place bronze"><div class="podium-rank">🥉</div><img v-if="leaderboardEntries[2].avatar" :src="resolveUrl(leaderboardEntries[2].avatar)" class="podium-avatar" :alt="(leaderboardEntries[2].display_name || leaderboardEntries[2].username) + ' avatar'" /><div class="podium-name">{{ leaderboardEntries[2].display_name || leaderboardEntries[2].username }}</div><div class="podium-points">{{ leaderboardEntries[2].total_points || 0 }} pts</div></div>
         </div>
         <div v-for="(e, i) in leaderboardEntries.slice(3)" :key="e.username" style="display:flex;align-items:center;gap:1rem;padding:0.6rem 1rem;margin-bottom:0.4rem;background:#f8fafc;border-radius:8px;">
           <span style="width:28px;text-align:center;font-weight:bold;color:#94a3b8;font-size:1.1rem;">{{ i+4 }}</span>
@@ -780,7 +780,7 @@
     <div v-if="showQR" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);animation:overlayFadeIn 0.3s ease-out;" @click.self="showQR=false">
       <div style="background:white;border-radius:24px;padding:3rem;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
         <div style="font-size:2rem;font-weight:bold;color:var(--edps-blue);margin-bottom:2rem;">📱 Join the Session</div>
-        <img v-if="qrCodeUrl" :src="qrCodeUrl" style="width:400px;height:400px;border:3px solid #e2e8f0;border-radius:16px;" />
+        <img v-if="qrCodeUrl" :src="qrCodeUrl" style="width:400px;height:400px;border:3px solid #e2e8f0;border-radius:16px;" alt="QR Code to join session" />
         <div v-if="sessionCode" style="margin-top:2rem;font-size:4rem;font-weight:900;color:var(--edps-blue);letter-spacing:12px;">{{ sessionCode }}</div>
         <div style="margin-top:1rem;color:#94a3b8;font-size:1.2rem;">Scan QR code or enter the PIN above</div>
         <button @click.stop="showQR=false" style="margin-top:2rem;padding:0.8rem 2rem;font-size:1.1rem;border-radius:24px;background:rgba(0,0,0,0.1);border:1px solid #e2e8f0;cursor:pointer;">✕ Close</button>
@@ -808,7 +808,7 @@
       <div style="position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);height:70px;border-top:3px solid var(--edps-gold);border-bottom:3px solid var(--edps-gold);background:rgba(241,192,100,0.1);z-index:5;pointer-events:none;"></div>
       <div style="position:absolute;left:0;right:0;display:flex;flex-direction:column;align-items:center;" :style="{transform:'translateY('+slotOffset+'px)'}">
         <div v-for="(att, i) in slotItems" :key="'slot-'+i" style="height:70px;display:flex;align-items:center;justify-content:center;gap:1rem;width:100%;padding:0 1.5rem;">
-          <img v-if="att.avatar" :src="resolveUrl(att.avatar)" style="width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);flex-shrink:0;" />
+          <img v-if="att.avatar" :src="resolveUrl(att.avatar)" style="width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3);flex-shrink:0;" :alt="(att.display_name || att.username) + ' avatar'" />
           <div v-else style="width:50px;height:50px;border-radius:50%;background:var(--edps-blue);display:flex;align-items:center;justify-content:center;color:white;font-size:1.2rem;font-weight:bold;flex-shrink:0;">{{ (att.display_name || att.username || '?')[0] }}</div>
           <span style="color:white;font-size:1.4rem;font-weight:bold;text-shadow:0 1px 4px rgba(0,0,0,0.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ att.display_name || att.username }}</span>
         </div>
@@ -818,7 +818,7 @@
     <div v-if="fullscreenWheelWinner" style="margin-top:2rem;animation:podiumRise 0.5s ease-out;">
       <div style="display:flex;align-items:center;gap:1.5rem;padding:1.5rem 3rem;background:linear-gradient(135deg,var(--edps-gold),#f59e0b);border-radius:24px;box-shadow:0 10px 40px rgba(241,192,100,0.4);">
         <span style="font-size:3.5rem;">🎉</span>
-        <img v-if="fullscreenWheelWinner.avatar" :src="resolveUrl(fullscreenWheelWinner.avatar)" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:4px solid white;" />
+        <img v-if="fullscreenWheelWinner.avatar" :src="resolveUrl(fullscreenWheelWinner.avatar)" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:4px solid white;" :alt="(fullscreenWheelWinner.display_name || fullscreenWheelWinner.username) + ' avatar'" />
         <div style="font-size:2.5rem;font-weight:900;color:white;text-shadow:0 2px 4px rgba(0,0,0,0.3);">{{ fullscreenWheelWinner.display_name || fullscreenWheelWinner.username }}</div>
         <span style="font-size:3.5rem;">🎉</span>
       </div>
@@ -1597,7 +1597,7 @@ export default {
         html += `<h1>${this.escHtml(s.title)}</h1>`;
         if (s.subtitle) html += `<h2>${this.escHtml(s.subtitle)}</h2>`;
         if (s.content) html += `<div class="content">${this.escHtml(s.content)}</div>`;
-        if (s.image) html += `<img src="${this.esc(this.resolveUrl(s.image))}" />`;
+        if (s.image) html += `<img src="${this.esc(this.resolveUrl(s.image))}" alt="Slide image" />`;
         if (s.type === 'poll') {
           html += `<div class="poll-q">${this.esc(s.question || '')}</div>`;
           (s.options || []).forEach(o => { html += `<div class="poll-opt">${this.esc(o)}</div>`; });
@@ -1608,7 +1608,7 @@ export default {
         if (s.elements && s.elements.length) {
           s.elements.forEach(el => {
             if (el.kind === 'text') html += `<div style="font-size:${el.fontSize||16}px;color:${this.esc(el.color||'#333')};font-weight:${el.bold?'bold':'normal'};white-space:pre-wrap;margin:0.5rem 0;">${this.esc(el.content||'')}</div>`;
-            if (el.kind === 'image') html += `<img src="${this.esc(this.resolveUrl(el.src))}" />`;
+            if (el.kind === 'image') html += `<img src="${this.esc(this.resolveUrl(el.src))}" alt="Slide element" />`;
           });
         }
         html += `<div class="footer">Slide ${i+1} / ${this.slides.length}</div>`;
@@ -1932,7 +1932,7 @@ export default {
       <div class="grid">`;
       attendees.forEach(u => {
         html += `<div class="card">`;
-        if (u.avatar) html += `<img class="avatar" src="${this.esc(this.resolveUrl(u.avatar))}" />`;
+        if (u.avatar) html += `<img class="avatar" src="${this.esc(this.resolveUrl(u.avatar))}" alt="${this.esc(u.display_name || u.username)} avatar" />`;
         html += `<h3>${this.esc(u.display_name || u.username)}</h3>`;
         html += `<div class="pin">${this.esc(u.pin || '----')}</div>`;
         html += `<div class="user">Username: ${this.esc(u.username)}</div>`;

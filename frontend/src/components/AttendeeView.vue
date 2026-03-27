@@ -17,7 +17,7 @@
     <div style="position:fixed;top:4px;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:0.4rem 1.2rem;background:rgba(0,0,0,0.45);">
       <span style="color:rgba(255,255,255,0.7);font-size:0.8rem;">
         <span :style="{display:'inline-block',width:'8px',height:'8px',borderRadius:'50%',marginRight:'6px',background:connected?'#10b981':'#ef4444'}" :title="connected?'Connected':'Disconnected'"></span>
-        <img v-if="user?.avatar" :src="resolveUrl(user.avatar)" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;" />
+        <img v-if="user?.avatar" :src="resolveUrl(user.avatar)" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;" alt="Your avatar" />
         {{ user?.display_name || user?.username }}
       </span>
       <span v-if="slideProgress" style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-right:0.5rem;">{{ slideProgress }}</span>
@@ -30,7 +30,7 @@
     <!-- WAIT SCREEN -->
     <div v-if="!currentSlide || !isSlideVisible" class="edps-presentation" :style="slideTransform">
       <div style="background:var(--edps-blue,#1b4293);width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
-        <img src="/logo.png" style="height:75px;margin-bottom:1.5rem;opacity:0.9;" onerror="this.style.display='none'" />
+        <img src="/logo.png" style="height:75px;margin-bottom:1.5rem;opacity:0.9;" onerror="this.style.display='none'" alt="PEDRRA logo" />
         <div class="edps-wait-icon"></div>
         <h2 style="color:white;margin-top:1.5rem;font-size:1.9rem;">Please wait...</h2>
         <p style="color:rgba(255,255,255,0.65);font-size:1rem;">The instructor will start the session shortly.</p>
@@ -44,7 +44,7 @@
       <div v-if="currentSlide.type === 'title'" style="position:relative;width:100%;height:100%;background-image:url('/template/cover_bg.jpg');background-size:cover;background-position:center;overflow:hidden;">
         <!-- EDPS logo (top-left beige area) -->
         <div style="position:absolute;top:3%;left:2%;z-index:3;">
-          <img src="/template/edps_logo.png" style="height:55px;" onerror="this.style.display='none'" />
+          <img src="/template/edps_logo.png" style="height:55px;" onerror="this.style.display='none'" alt="EDPS logo" />
         </div>
 
         <!-- PEDRRA centered at bottom of BLUE rectangle (top-right area) -->
@@ -77,7 +77,7 @@
       <template v-else>
         <!-- Header: EDPS logo + title (matches official template) -->
         <div style="display:flex;align-items:center;padding:0.9rem 2rem 0.7rem;flex-shrink:0;">
-          <img src="/template/edps_logo.png" style="height:46px;margin-right:1rem;" onerror="this.style.display='none'" />
+          <img src="/template/edps_logo.png" style="height:46px;margin-right:1rem;" onerror="this.style.display='none'" alt="EDPS logo" />
           <h2 style="margin:0;font-size:1.5rem;font-weight:900;color:var(--edps-blue,#3B5998);">{{ currentSlide.title }}</h2>
         </div>
 
@@ -93,7 +93,7 @@
                   <div style="position:relative;width:1024px;height:576px;">
                     <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden',zIndex:el.zIndex||10,opacity:el.opacity??1,transform:el.rotation?`rotate(${el.rotation}deg)`:'none',filter:el.shadow?'drop-shadow(2px 4px 6px rgba(0,0,0,0.3))':'none'}">
                       <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize||18)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',textDecoration:el.underline?'underline':'none',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block',lineHeight:1.4,wordWrap:'break-word',whiteSpace:'pre-wrap'}" v-html="renderMd(el.content)"></span>
-                      <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
+                      <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" alt="Slide element" />
                       <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
                       <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
                       <div v-if="el.kind==='shape'" :style="shapeStyle(el)"></div>
@@ -105,7 +105,7 @@
             <template v-else>
               <!-- Fallback: legacy content field -->
               <div v-if="currentSlide.content" style="line-height:1.8;font-size:1.05rem;color:#333;margin-bottom:1rem;" v-html="renderMd(currentSlide.content)"></div>
-              <div v-if="currentSlide.image" style="text-align:center;"><img :src="resolveUrl(currentSlide.image)" style="max-width:100%;max-height:270px;border-radius:6px;" /></div>
+              <div v-if="currentSlide.image" style="text-align:center;"><img :src="resolveUrl(currentSlide.image)" style="max-width:100%;max-height:270px;border-radius:6px;" alt="Slide image" /></div>
               <div v-if="currentSlide.video" style="margin-top:1rem;">
                 <video v-if="isLocalVideoCheck(currentSlide.video)" :src="resolveUrl(currentSlide.video)" controls style="width:100%;max-height:260px;border-radius:6px;"></video>
                 <iframe v-else :src="toEmbedUrlCheck(currentSlide.video)" style="width:100%;height:260px;border-radius:6px;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
