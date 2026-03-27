@@ -1,47 +1,113 @@
 <template>
-  <!-- ═══ REMOTE CONTROL MODE (mobile-optimized) ═══ -->
-  <div v-if="remoteMode" style="position:fixed;inset:0;background:#0f172a;color:white;z-index:9999;display:flex;flex-direction:column;overflow:hidden;">
-    <!-- Remote header -->
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;background:rgba(255,255,255,0.08);flex-shrink:0;">
-      <span style="font-weight:bold;font-size:0.9rem;">{{ currentSlide.title || 'No slide' }}</span>
-      <div style="display:flex;gap:0.5rem;align-items:center;">
-        <span style="font-size:0.8rem;opacity:0.6;">{{ currentIndex+1 }}/{{ slides.length }}</span>
-        <button @click="remoteMode=false" style="background:rgba(255,255,255,0.15);border:none;color:white;padding:0.3rem 0.6rem;border-radius:8px;font-size:0.8rem;cursor:pointer;">Exit</button>
-      </div>
-    </div>
+  <!-- ═══ REMOTE CONTROL MODE — Full-screen presentation with floating controls ═══ -->
+  <div v-if="remoteMode" style="position:fixed;inset:0;background:#000;z-index:9999;overflow:hidden;">
 
-    <!-- Slide preview with drawing overlay -->
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:#1e293b;">
-      <div :style="{width:'1024px',height:'576px',transform:`scale(${remoteScale})`,transformOrigin:'center center',position:'relative',background:'white',borderRadius:'4px',overflow:'hidden'}">
-        <!-- Mini slide preview content -->
-        <div style="padding:1rem;height:100%;display:flex;flex-direction:column;">
-          <h3 style="margin:0 0 0.5rem;color:var(--edps-blue);font-size:1.2rem;">{{ currentSlide.title }}</h3>
-          <p v-if="currentSlide.subtitle" style="margin:0;color:#64748b;font-size:0.9rem;">{{ currentSlide.subtitle }}</p>
-          <div v-if="currentSlide.question" style="font-weight:bold;margin-top:1rem;color:var(--edps-blue);">{{ currentSlide.question }}</div>
-          <div v-if="currentSlide.type==='timer'" style="text-align:center;margin-top:2rem;font-size:3rem;font-weight:bold;color:var(--edps-blue);">{{ timerDisplay }}</div>
+    <!-- Full-screen presentation (same rendering as attendee view) -->
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+      <div :style="{width:'1024px',height:'576px',transform:`translate(-50%,-50%) scale(${remoteScale})`,transformOrigin:'center center',position:'absolute',top:'50%',left:'50%'}">
+        <div class="edps-presentation" style="width:100%;height:100%;position:relative;">
+
+          <!-- TITLE SLIDE -->
+          <div v-if="currentSlide.type==='title'" style="position:relative;width:100%;height:100%;background-image:url('/template/cover_bg.jpg');background-size:cover;overflow:hidden;">
+            <div style="position:absolute;top:3%;left:2%;z-index:3;"><img src="/template/edps_logo.png" style="height:55px;" onerror="this.style.display='none'" alt="EDPS logo" /></div>
+            <div style="position:absolute;top:35%;left:52%;right:0;z-index:3;text-align:center;"><div style="font-size:3rem;font-weight:900;color:white;letter-spacing:5px;">PEDRRA</div></div>
+            <div style="position:absolute;top:32%;left:16%;width:30%;z-index:2;">
+              <div style="color:var(--edps-blue);font-size:1.3rem;font-weight:900;line-height:1.3;">{{ currentSlide.title }}</div>
+              <div v-if="currentSlide.subtitle" style="color:#666;font-size:0.85rem;margin-top:0.6rem;">{{ currentSlide.subtitle }}</div>
+            </div>
+          </div>
+
+          <!-- SECTION SLIDE -->
+          <div v-else-if="currentSlide.type==='section'" style="position:relative;width:100%;height:100%;background-image:url('/template/section_bg.png');background-size:cover;overflow:hidden;">
+            <div style="position:absolute;top:35%;left:8%;width:42%;padding:1.5rem 2rem;background:var(--edps-blue,#3B5998);">
+              <div style="color:white;font-weight:bold;font-size:1.6rem;line-height:1.3;">{{ currentSlide.title }}</div>
+              <div v-if="currentSlide.subtitle" style="color:rgba(255,255,255,0.8);font-size:0.95rem;margin-top:0.5rem;">{{ currentSlide.subtitle }}</div>
+            </div>
+          </div>
+
+          <!-- CONTENT / POLL / SURVEY / TIMER / RATING -->
+          <template v-else>
+            <div style="display:flex;align-items:center;padding:0.9rem 2rem 0.7rem;flex-shrink:0;">
+              <img src="/template/edps_logo.png" style="height:46px;margin-right:1rem;" onerror="this.style.display='none'" alt="EDPS logo" />
+              <h2 style="margin:0;font-size:1.5rem;font-weight:900;color:var(--edps-blue);">{{ currentSlide.title }}</h2>
+            </div>
+            <div style="padding:1rem 2rem 4rem;flex:1;overflow-y:auto;position:relative;">
+              <div v-if="currentSlide.subtitle" style="color:var(--edps-blue);font-size:1.1rem;font-weight:bold;margin-bottom:1rem;">{{ currentSlide.subtitle }}</div>
+              <!-- Content elements -->
+              <template v-if="currentSlide.type==='content'">
+                <template v-if="currentSlide.elements && currentSlide.elements.length">
+                  <div style="position:relative;width:100%;padding-bottom:56.25%;overflow:hidden;">
+                    <div style="position:absolute;inset:0;transform-origin:top left;" :style="{transform:'scale('+(940/1024)+')'}">
+                      <div style="position:relative;width:1024px;height:576px;">
+                        <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden',zIndex:el.zIndex||10,opacity:el.opacity??1,transform:el.rotation?`rotate(${el.rotation}deg)`:'none'}">
+                          <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize||18)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',textDecoration:el.underline?'underline':'none',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block',lineHeight:1.4,wordWrap:'break-word',whiteSpace:'pre-wrap'}" v-html="renderMd(el.content)"></span>
+                          <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" alt="Slide element" />
+                          <div v-if="el.kind==='shape'" :style="shapeStyle(el)"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+                <template v-else>
+                  <div v-if="currentSlide.content" style="line-height:1.8;font-size:1.05rem;" v-html="renderMd(currentSlide.content)"></div>
+                  <div v-if="currentSlide.image" style="text-align:center;"><img :src="resolveUrl(currentSlide.image)" style="max-width:100%;max-height:300px;border-radius:6px;" alt="Slide image" /></div>
+                </template>
+              </template>
+              <!-- Poll -->
+              <template v-if="currentSlide.type==='poll'">
+                <div style="font-weight:bold;font-size:1.2rem;color:var(--edps-blue);margin-bottom:1rem;">{{ currentSlide.question }}</div>
+                <div v-if="pollResults.length>0">
+                  <div v-for="opt in currentSlide.options" :key="opt" style="margin-bottom:0.7rem;">
+                    <div style="display:flex;justify-content:space-between;font-weight:bold;"><span>{{ opt }}</span><span>{{ pollAggregated[opt]||0 }}</span></div>
+                    <div style="background:#e2e8f0;height:18px;border-radius:9px;overflow:hidden;margin-top:0.3rem;"><div :style="{width:getPercentage(pollAggregated[opt])+'%',height:'100%',background:currentSlide.correctOption===opt?'#10b981':'var(--edps-gold)',borderRadius:'9px',transition:'width 0.5s'}"></div></div>
+                  </div>
+                </div>
+                <div v-else style="padding:1rem;background:#e0f2fe;color:var(--edps-blue);font-weight:bold;border-radius:8px;text-align:center;">Voting: {{ pollProgress.answered }} / {{ pollProgress.total }}</div>
+              </template>
+              <!-- Timer -->
+              <template v-if="currentSlide.type==='timer'">
+                <div style="display:flex;align-items:center;justify-content:center;min-height:250px;">
+                  <div :style="{fontSize:'5rem',fontWeight:'bold',color:timerSeconds<=10&&timerRunning?'#ef4444':'var(--edps-blue)',letterSpacing:'4px'}">{{ timerDisplay }}</div>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <!-- Drawing overlay (sender mode — draw on full presentation) -->
+          <DrawingOverlay ref="remoteDrawing" :active="drawingActive" :sendMode="true" :strokes="drawStrokes"
+            @stroke="onDrawStroke" @clear="onDrawClear" @pointer="onDrawPointer" />
         </div>
-        <!-- Drawing overlay (sender mode) -->
-        <DrawingOverlay ref="remoteDrawing" :active="drawingActive" :sendMode="true" :strokes="drawStrokes"
-          @stroke="onDrawStroke" @clear="onDrawClear" @pointer="onDrawPointer" />
       </div>
     </div>
 
-    <!-- Remote controls -->
-    <div style="padding:0.75rem;background:rgba(255,255,255,0.05);flex-shrink:0;">
+    <!-- Speaker notes (expandable panel above controls) -->
+    <div v-if="remoteShowNotes && currentSlide.notes" style="position:fixed;bottom:110px;left:0;right:0;z-index:10001;padding:0.75rem 1rem;background:rgba(0,0,0,0.85);color:#e2e8f0;font-size:0.85rem;line-height:1.4;max-height:120px;overflow-y:auto;">
+      📝 {{ currentSlide.notes }}
+    </div>
+
+    <!-- Floating control bar -->
+    <div style="position:fixed;bottom:0;left:0;right:0;z-index:10001;background:rgba(15,23,42,0.92);backdrop-filter:blur(8px);padding:0.5rem 0.75rem;border-top:1px solid rgba(255,255,255,0.1);">
       <!-- Navigation row -->
-      <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">
-        <button @click="prevSlide" :disabled="currentIndex===0" style="flex:1;padding:1rem;font-size:1.1rem;border-radius:12px;background:var(--edps-blue);color:white;border:none;cursor:pointer;opacity:currentIndex===0?0.3:1;" aria-label="Previous slide">◀ Prev</button>
-        <button @click="toggleVisibility" :style="{flex:1,padding:'1rem',fontSize:'1.1rem',borderRadius:'12px',border:'none',cursor:'pointer',background:isSlideVisible?'#ef4444':'#10b981',color:'white'}" :aria-label="isSlideVisible?'Stop':'Start'">{{ isSlideVisible ? '⏹ Stop' : '▶ Live' }}</button>
-        <button @click="nextSlide" :disabled="currentIndex===slides.length-1" style="flex:1;padding:1rem;font-size:1.1rem;border-radius:12px;background:var(--edps-blue);color:white;border:none;cursor:pointer;opacity:currentIndex>=slides.length-1?0.3:1;" aria-label="Next slide">Next ▶</button>
+      <div style="display:flex;gap:0.4rem;margin-bottom:0.4rem;">
+        <button @click="prevSlide" :disabled="currentIndex===0" style="flex:1;padding:0.75rem;font-size:1rem;border-radius:10px;background:var(--edps-blue);color:white;border:none;cursor:pointer;" :style="{opacity:currentIndex===0?0.3:1}" aria-label="Previous slide">◀</button>
+        <button @click="toggleVisibility" :style="{flex:2,padding:'0.75rem',fontSize:'0.9rem',borderRadius:'10px',border:'none',cursor:'pointer',fontWeight:'bold',background:isSlideVisible?'#ef4444':'#10b981',color:'white'}">{{ isSlideVisible ? '⏹ Stop' : '▶ Go Live' }}</button>
+        <button @click="nextSlide" :disabled="currentIndex>=slides.length-1" style="flex:1;padding:0.75rem;font-size:1rem;border-radius:10px;background:var(--edps-blue);color:white;border:none;cursor:pointer;" :style="{opacity:currentIndex>=slides.length-1?0.3:1}" aria-label="Next slide">▶</button>
       </div>
       <!-- Tools row -->
-      <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
-        <button @click="drawingActive=!drawingActive" :style="{padding:'0.6rem 1rem',borderRadius:'10px',border:'none',cursor:'pointer',fontSize:'0.85rem',fontWeight:'bold',background:drawingActive?'#ef4444':'rgba(255,255,255,0.15)',color:'white'}">{{ drawingActive ? '✏️ Drawing ON' : '✏️ Draw' }}</button>
-        <button @click="toggleFreeze" :style="{padding:'0.6rem 1rem',borderRadius:'10px',border:'none',cursor:'pointer',fontSize:'0.85rem',background:frozen?'#f59e0b':'rgba(255,255,255,0.15)',color:'white'}">{{ frozen ? '❄️ Frozen' : '🧊 Freeze' }}</button>
-        <button v-if="handRaisedCount>0" @click="clearHands" style="padding:0.6rem 1rem;border-radius:10px;border:none;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.15);color:white;">✋ {{ handRaisedCount }}</button>
-        <button v-if="currentSlide.type==='timer' && !timerRunning" @click="startTimer" style="padding:0.6rem 1rem;border-radius:10px;border:none;cursor:pointer;font-size:0.85rem;background:#10b981;color:white;">▶ Timer</button>
-        <button v-if="currentSlide.type==='timer' && timerRunning" @click="pauseTimer" style="padding:0.6rem 1rem;border-radius:10px;border:none;cursor:pointer;font-size:0.85rem;background:#f59e0b;color:white;">⏸ Pause</button>
-        <button @click="openProjector" style="padding:0.6rem 1rem;border-radius:10px;border:none;cursor:pointer;font-size:0.85rem;background:rgba(255,255,255,0.15);color:white;">📽 Projector</button>
+      <div style="display:flex;gap:0.3rem;flex-wrap:wrap;align-items:center;">
+        <button @click="drawingActive=!drawingActive" :style="{padding:'0.5rem 0.7rem',borderRadius:'8px',border:'none',cursor:'pointer',fontSize:'0.8rem',fontWeight:'bold',background:drawingActive?'#ef4444':'rgba(255,255,255,0.12)',color:'white'}">✏️</button>
+        <button @click="toggleFreeze" :style="{padding:'0.5rem 0.7rem',borderRadius:'8px',border:'none',cursor:'pointer',fontSize:'0.8rem',background:frozen?'#f59e0b':'rgba(255,255,255,0.12)',color:'white'}">{{ frozen ? '❄️' : '🧊' }}</button>
+        <button v-if="handRaisedCount>0" @click="clearHands" style="padding:0.5rem 0.7rem;border-radius:8px;border:none;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.12);color:white;">✋{{ handRaisedCount }}</button>
+        <button v-if="currentSlide.type==='timer'" @click="timerRunning?pauseTimer():startTimer()" :style="{padding:'0.5rem 0.7rem',borderRadius:'8px',border:'none',cursor:'pointer',fontSize:'0.8rem',background:timerRunning?'#f59e0b':'#10b981',color:'white'}">{{ timerRunning ? '⏸' : '▶' }}</button>
+        <button v-if="currentSlide.type==='timer'" @click="resetTimer" style="padding:0.5rem 0.7rem;border-radius:8px;border:none;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.12);color:white;">↺</button>
+        <button @click="openWheel" style="padding:0.5rem 0.7rem;border-radius:8px;border:none;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.12);color:white;">🎡</button>
+        <button @click="openLeaderboard" style="padding:0.5rem 0.7rem;border-radius:8px;border:none;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.12);color:white;">🏆</button>
+        <button @click="showQR=!showQR" style="padding:0.5rem 0.7rem;border-radius:8px;border:none;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.12);color:white;">📱</button>
+        <button v-if="currentSlide.notes" @click="remoteShowNotes=!remoteShowNotes" :style="{padding:'0.5rem 0.7rem',borderRadius:'8px',border:'none',cursor:'pointer',fontSize:'0.8rem',background:remoteShowNotes?'var(--edps-gold)':'rgba(255,255,255,0.12)',color:'white'}">📝</button>
+        <span style="flex:1;"></span>
+        <span style="font-size:0.7rem;color:rgba(255,255,255,0.5);">{{ currentIndex+1 }}/{{ slides.length }}</span>
+        <span :style="{width:'6px',height:'6px',borderRadius:'50%',background:connected?'#10b981':'#ef4444',flexShrink:0}"></span>
+        <button @click="remoteMode=false" style="padding:0.5rem 0.7rem;border-radius:8px;border:none;cursor:pointer;font-size:0.75rem;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);">✕</button>
       </div>
     </div>
   </div>
@@ -985,6 +1051,7 @@ export default {
       drawingActive: false,
       drawStrokes: [],
       drawPointer: { x: 0, y: 0, visible: false },
+      remoteShowNotes: false,
       fullscreenWheelRotation: 0,
       wheelSpinState: false,
       fullscreenWheelWinner: null,

@@ -769,8 +769,8 @@ io.on('connection', (socket) => {
     socket.on('draw:stroke', (data) => {
         if (socket.user.role !== 'Trainer') return;
         if (!data || !data.slideId || !Array.isArray(data.points)) return;
-        // Broadcast to all OTHER clients (not back to sender)
-        socket.broadcast.emit('draw:stroke', {
+        // Broadcast to ALL clients (including other trainer windows on different devices)
+        io.emit('draw:stroke', {
             slideId: data.slideId,
             color: String(data.color || '#ef4444').slice(0, 20),
             width: Math.max(1, Math.min(Number(data.width) || 3, 20)),
@@ -783,7 +783,7 @@ io.on('connection', (socket) => {
     });
     socket.on('draw:pointer', (data) => {
         if (socket.user.role !== 'Trainer') return;
-        socket.broadcast.emit('draw:pointer', {
+        io.emit('draw:pointer', {
             slideId: data?.slideId,
             x: Number(data?.x) || 0,
             y: Number(data?.y) || 0,
