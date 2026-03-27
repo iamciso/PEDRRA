@@ -1,0 +1,14 @@
+{
+  "name": "PEDRRA Training Platform",
+  "short_name": "PEDRRA",
+  "description": "Interactive training platform for data breach risk assessment",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1b4293",
+  "theme_color": "#1b4293",
+  "orientation": "any",
+  "icons": [
+    { "src": "/logo.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/logo.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

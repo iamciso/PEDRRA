@@ -245,6 +245,8 @@
           <button class="secondary" @click="importSlides" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;" title="Import slides from JSON file">📥 JSON</button>
           <button class="secondary" @click="importPptx" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;" title="Import slides from PowerPoint file">📊 PPTX</button>
           <button class="secondary" @click="exportSlides" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;" title="Export slides to JSON file">📤 Export</button>
+          <button class="secondary" @click="saveAsTemplate" style="width:auto;padding:0.5rem 0.8rem;font-size:0.82rem;" title="Save current slides as reusable template">💾 Save Template</button>
+          <button class="secondary" @click="loadTemplate" style="width:auto;padding:0.5rem 0.8rem;font-size:0.82rem;" title="Load a saved template">📂 Load Template</button>
           <button class="secondary" @click="toggleAllCollapsed" style="width:auto;padding:0.5rem 0.8rem;font-size:0.82rem;">{{ allCollapsed ? '▼ Expand All' : '▲ Collapse All' }}</button>
           <button @click="saveSlides" style="width: auto; padding: 0.5rem 1rem;">Save Changes</button>
           <label style="font-size:0.8rem;color:#64748b;cursor:pointer;display:flex;align-items:center;gap:0.3rem;margin-left:0.5rem;">
@@ -2035,6 +2037,31 @@ export default {
       w.document.write(html);
       w.document.close();
       w.onload = () => w.print();
+    },
+    // #6 — Session templates (save/load to localStorage)
+    saveAsTemplate() {
+      const name = prompt('Template name:');
+      if (!name) return;
+      const templates = JSON.parse(localStorage.getItem('pedrra_templates') || '{}');
+      templates[name] = this.editSlides.map(s => {
+        const { _collapsed, _showCanvas, _showPreview, ...clean } = s;
+        return clean;
+      });
+      localStorage.setItem('pedrra_templates', JSON.stringify(templates));
+      this.userMessage = `Template "${name}" saved!`;
+      setTimeout(() => this.userMessage = '', 3000);
+    },
+    loadTemplate() {
+      const templates = JSON.parse(localStorage.getItem('pedrra_templates') || '{}');
+      const names = Object.keys(templates);
+      if (names.length === 0) return this.showError('No saved templates. Save one first with "Save Template".');
+      const name = prompt(`Available templates:\n${names.map((n, i) => `${i + 1}. ${n}`).join('\n')}\n\nType the template name to load:`);
+      if (!name || !templates[name]) return;
+      if (!confirm(`Load template "${name}"? This will REPLACE all current slides.`)) return;
+      this.saveUndoState();
+      this.editSlides = JSON.parse(JSON.stringify(templates[name])).map(s => ({ ...s, _collapsed: true, _showCanvas: !!(s.elements && s.elements.length) }));
+      this.saveMessage = `Template "${name}" loaded. Click "Save Changes" to persist.`;
+      setTimeout(() => this.saveMessage = '', 5000);
     },
     // #9 — i18n
     t(key, params) { return t(key, params); },
