@@ -287,14 +287,24 @@
         <template v-if="slide.type === 'poll'">
           <input v-model="slide.question" placeholder="Poll Question" />
           <div style="margin-top: 0.5rem;">
-            <strong>Poll Options (Select the correct answer button):</strong>
-            <div v-for="(opt, oIndex) in slide.options" :key="oIndex" style="display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center;">
-              <input type="radio" :value="slide.options[oIndex]" v-model="slide.correctOption" name="correctOpt" title="Mark as Correct Answer" style="width: auto; margin: 0; transform: scale(1.2);" />
+            <strong>Poll Options <span style="font-weight:normal;font-size:0.8rem;color:#94a3b8;">(drag ≡ to reorder, radio = correct answer)</span>:</strong>
+            <div v-for="(opt, oIndex) in slide.options" :key="oIndex" style="display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center;"
+              draggable="true" @dragstart="pollDragStart(oIndex, $event)" @dragover.prevent @drop="pollDrop(slide, oIndex, $event)" @dragend="pollDragEnd">
+              <span style="cursor:grab;color:#94a3b8;font-size:1rem;user-select:none;" :style="{opacity: pollDragIdx===oIndex?0.3:1}">≡</span>
+              <input type="radio" :value="slide.options[oIndex]" v-model="slide.correctOption" :name="'correctOpt-'+slide.id" title="Mark as Correct Answer" style="width: auto; margin: 0; transform: scale(1.2);" />
               <input v-model="slide.options[oIndex]" placeholder="Option text" style="margin-bottom: 0; flex: 1;" />
               <button class="danger" style="width: auto; margin-bottom: 0;" @click="slide.options.splice(oIndex, 1)">X</button>
             </div>
             <button class="secondary" style="width: auto; margin-top: 0.5rem; font-size: 0.8rem;" @click="slide.options.push('')">+ Add Option</button>
           </div>
+          <!-- Poll preview -->
+          <details style="margin-top:0.75rem;">
+            <summary style="cursor:pointer;font-size:0.8rem;color:#64748b;">👁 Preview how attendees will see this poll</summary>
+            <div style="margin-top:0.5rem;padding:1rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;max-width:500px;">
+              <div style="font-weight:bold;color:var(--edps-blue);font-size:1rem;margin-bottom:0.75rem;">{{ slide.question || 'Your question here...' }}</div>
+              <div v-for="opt in slide.options" :key="opt" style="padding:0.6rem 1rem;margin-bottom:0.4rem;background:white;border:2px solid var(--edps-blue);border-radius:6px;color:var(--edps-blue);font-weight:500;cursor:default;">{{ opt || 'Option...' }}</div>
+            </div>
+          </details>
         </template>
         
         <!-- Survey Slide Edit -->
@@ -613,7 +623,7 @@
             <template v-if="currentSlide.type === 'content'">
               <template v-if="currentSlide.elements && currentSlide.elements.length">
                 <div style="position:relative;width:100%;min-height:300px;">
-                  <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden',opacity:el.opacity??1}">
+                  <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden',opacity:el.opacity??1,transform:el.rotation?`rotate(${el.rotation}deg)`:'none',filter:el.shadow?'drop-shadow(2px 4px 6px rgba(0,0,0,0.3))':'none'}">
                     <span v-if="el.kind==='text'" :style="{fontSize:el.fontSize+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block'}" v-html="renderMd(el.content)"></span>
                     <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" />
                     <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
@@ -860,6 +870,7 @@ export default {
       fullscreenHandNotifs: [],
       showTemplateMenu: false,
       showWheel: false,
+      pollDragIdx: -1,
       showLeaderboard: false,
       slideEnteredAt: Date.now(),
       slideElapsedSeconds: 0,
@@ -1215,6 +1226,15 @@ export default {
         this.editSlides.push({ ...base, id, type: 'content', title: 'Content Slide', subtitle: '', content: '', image: '', video: '' });
       }
     },
+    // Poll option drag reorder
+    pollDragStart(idx, e) { this.pollDragIdx = idx; e.dataTransfer.effectAllowed = 'move'; },
+    pollDrop(slide, targetIdx, e) {
+      if (this.pollDragIdx < 0 || this.pollDragIdx === targetIdx) return;
+      const opt = slide.options.splice(this.pollDragIdx, 1)[0];
+      slide.options.splice(targetIdx, 0, opt);
+      this.pollDragIdx = -1;
+    },
+    pollDragEnd() { this.pollDragIdx = -1; },
     removeSlide(index) {
       if (!confirm(`Delete slide "${this.editSlides[index]?.title || 'Untitled'}"? This cannot be undone.`)) return;
       this.saveUndoState();

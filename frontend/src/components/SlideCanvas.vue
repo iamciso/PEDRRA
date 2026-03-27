@@ -80,8 +80,10 @@
         </select>
         <input type="number" v-model.number="sel.fontSize" @change="emit" min="8" max="120" style="width:46px;padding:0.25rem;font-size:0.8rem;border:1px solid #cbd5e1;border-radius:4px;" />
         <input type="color" v-model="sel.color" @input="emit" style="width:26px;height:24px;padding:1px;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;" />
-        <!-- EDPS color palette -->
-        <span v-for="c in edpsColors" :key="c" @click="sel.color=c; emit()" :style="{display:'inline-block',width:'16px',height:'16px',borderRadius:'3px',background:c,border:'1px solid #aaa',cursor:'pointer',verticalAlign:'middle'}" :title="c"></span>
+        <!-- EDPS color palette + recent colors -->
+        <span v-for="c in edpsColors" :key="'edps-'+c" @click="sel.color=c; addRecentColor(c); emit()" :style="{display:'inline-block',width:'14px',height:'14px',borderRadius:'2px',background:c,border:'1px solid #aaa',cursor:'pointer',verticalAlign:'middle'}" :title="c"></span>
+        <span v-if="recentColors.length" style="width:1px;height:14px;background:#ddd;margin:0 2px;display:inline-block;vertical-align:middle;"></span>
+        <span v-for="c in recentColors" :key="'rc-'+c" @click="sel.color=c; emit()" :style="{display:'inline-block',width:'14px',height:'14px',borderRadius:'2px',background:c,border:'1px solid #ccc',cursor:'pointer',verticalAlign:'middle'}" :title="'Recent: '+c"></span>
         <button @click="toggleBold" :style="{fontWeight:'bold',background:sel.bold?'var(--primary)':'#f1f5f9',color:sel.bold?'white':'#334155'}" class="secondary" style="width:26px;padding:0.2rem;font-size:0.85rem;">B</button>
         <button @click="toggleItalic" :style="{fontStyle:'italic',background:sel.italic?'var(--primary)':'#f1f5f9',color:sel.italic?'white':'#334155'}" class="secondary" style="width:26px;padding:0.2rem;font-size:0.85rem;">I</button>
         <button @click="toggleUnderline" :style="{textDecoration:'underline',background:sel.underline?'var(--primary)':'#f1f5f9',color:sel.underline?'white':'#334155'}" class="secondary" style="width:26px;padding:0.2rem;font-size:0.85rem;">U</button>
@@ -106,19 +108,22 @@
 
       <span style="flex:1;"></span>
 
-      <!-- Position/size + opacity inputs -->
+      <!-- Position/size + opacity + rotation + shadow inputs -->
       <template v-if="sel">
         <span style="font-size:0.7rem;color:#64748b;">x</span>
-        <input type="number" v-model.number="sel.x" @change="emit" style="width:42px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" />
+        <input type="number" v-model.number="sel.x" @change="emit" style="width:40px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" />
         <span style="font-size:0.7rem;color:#64748b;">y</span>
-        <input type="number" v-model.number="sel.y" @change="emit" style="width:42px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" />
+        <input type="number" v-model.number="sel.y" @change="emit" style="width:40px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" />
         <span style="font-size:0.7rem;color:#64748b;">w</span>
-        <input type="number" v-model.number="sel.w" @change="emit" min="20" style="width:42px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" />
+        <input type="number" v-model.number="sel.w" @change="emit" min="20" style="width:40px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" />
         <span style="font-size:0.7rem;color:#64748b;">h</span>
-        <input type="number" v-model.number="sel.h" @change="emit" min="10" style="width:42px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" />
-        <span style="font-size:0.7rem;color:#64748b;margin-left:4px;" title="Opacity">⊘</span>
-        <input type="range" v-model.number="sel.opacity" @input="emit" min="0" max="1" step="0.05" style="width:50px;height:14px;cursor:pointer;" title="Opacity" />
+        <input type="number" v-model.number="sel.h" @change="emit" min="10" style="width:40px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" />
+        <span style="font-size:0.7rem;color:#64748b;" title="Rotation">⟳</span>
+        <input type="number" v-model.number="sel.rotation" @change="emit" min="0" max="359" style="width:38px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" title="Rotation (degrees)" />°
+        <span style="font-size:0.7rem;color:#64748b;" title="Opacity">⊘</span>
+        <input type="range" v-model.number="sel.opacity" @input="emit" min="0" max="1" step="0.05" style="width:45px;height:14px;cursor:pointer;" title="Opacity" />
         <span style="font-size:0.68rem;color:#94a3b8;">{{ Math.round((sel.opacity ?? 1) * 100) }}%</span>
+        <button @click="toggleShadow" :class="sel.shadow?'':'secondary'" style="width:auto;padding:0.15rem 0.4rem;font-size:0.72rem;" title="Toggle shadow">◐</button>
       </template>
 
       <!-- Layer & action controls -->
@@ -192,6 +197,11 @@
                 <div v-for="handle in ['nw','ne','sw','se']" :key="handle" :style="handlePos(handle)" @mousedown.stop="startResize(idx, $event, handle)"></div>
                 <div style="position:absolute;top:50%;right:-6px;width:12px;height:12px;background:#4a90d9;border-radius:50%;transform:translateY(-50%);cursor:e-resize;z-index:10;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);" @mousedown.stop="startResize(idx, $event,'e')"></div>
                 <div style="position:absolute;bottom:-6px;left:50%;width:12px;height:12px;background:#4a90d9;border-radius:50%;transform:translateX(-50%);cursor:s-resize;z-index:10;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);" @mousedown.stop="startResize(idx, $event,'s')"></div>
+                <!-- Rotation handle -->
+                <div style="position:absolute;top:-28px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;z-index:10;">
+                  <div style="width:14px;height:14px;background:#f59e0b;border-radius:50%;cursor:grab;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);" @mousedown.stop="startRotate(idx, $event)"></div>
+                  <div style="width:1px;height:12px;background:#f59e0b;"></div>
+                </div>
               </template>
             </template>
           </div>
@@ -253,6 +263,7 @@ export default {
       mediaPickerFilter: 'all',
       clipboard: null,
       replaceTarget: -1,
+      recentColors: [],
       undoStack: [],
       redoStack: [],
       maxUndo: 30,
@@ -343,7 +354,7 @@ export default {
     },
 
     elStyle(el, idx) {
-      return {
+      const s = {
         position: 'absolute',
         left: el.x + 'px', top: el.y + 'px',
         width: el.w + 'px', height: el.h + 'px',
@@ -352,6 +363,9 @@ export default {
         cursor: 'move',
         boxSizing: 'border-box',
       };
+      if (el.rotation) s.transform = `rotate(${el.rotation}deg)`;
+      if (el.shadow) s.filter = 'drop-shadow(2px 4px 6px rgba(0,0,0,0.3))';
+      return s;
     },
     textStyle(el) {
       return {
@@ -489,6 +503,10 @@ export default {
     toggleBold() { if (this.sel) { this.sel.bold = !this.sel.bold; this.emit(); } },
     toggleItalic() { if (this.sel) { this.sel.italic = !this.sel.italic; this.emit(); } },
     toggleUnderline() { if (this.sel) { this.sel.underline = !this.sel.underline; this.emit(); } },
+    toggleShadow() { if (this.sel) { this.sel.shadow = !this.sel.shadow; this.emit(); } },
+    addRecentColor(c) {
+      this.recentColors = [c, ...this.recentColors.filter(x => x !== c)].slice(0, 5);
+    },
 
     bringForward() {
       if (this.selIdx < 0 || this.selIdx >= this.localEls.length - 1) return;
@@ -565,6 +583,15 @@ export default {
       this.drag = { type: 'move', idx, startX: e.clientX, startY: e.clientY, origX: el.x, origY: el.y, altKey: e.altKey };
       e.preventDefault();
     },
+    startRotate(idx, e) {
+      this.selIdx = idx;
+      const el = this.localEls[idx];
+      const rect = this.$refs.canvas.getBoundingClientRect();
+      const cx = rect.left + (el.x + el.w / 2) * this.scale;
+      const cy = rect.top + (el.y + el.h / 2) * this.scale;
+      this.drag = { type: 'rotate', idx, cx, cy, origRotation: el.rotation || 0, startAngle: Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI) };
+      e.preventDefault();
+    },
     startResize(idx, e, dir) {
       const el = this.localEls[idx];
       this.drag = { type: 'resize', idx, dir, startX: e.clientX, startY: e.clientY, origW: el.w, origH: el.h, origX: el.x, origY: el.y, aspect: el.w / (el.h || 1) };
@@ -611,8 +638,7 @@ export default {
         }
         el.x = newX;
         el.y = newY;
-      } else {
-        // Resize — #2 fix: handle all directions correctly
+      } else if (this.drag.type === 'resize') {
         const dir = this.drag.dir;
         let newW = this.drag.origW, newH = this.drag.origH;
         let newX = this.drag.origX, newY = this.drag.origY;
@@ -638,6 +664,14 @@ export default {
         el.h = newH;
         el.x = Math.max(0, newX);
         el.y = Math.max(0, newY);
+      } else if (this.drag.type === 'rotate') {
+        const angle = Math.atan2(e.clientY - this.drag.cy, e.clientX - this.drag.cx) * (180 / Math.PI);
+        let rot = Math.round(this.drag.origRotation + (angle - this.drag.startAngle));
+        rot = ((rot % 360) + 360) % 360;
+        // Snap to 0/45/90/135/180/225/270/315 if within 5 degrees
+        const snapAngles = [0, 45, 90, 135, 180, 225, 270, 315];
+        for (const sa of snapAngles) { if (Math.abs(rot - sa) < 5) { rot = sa; break; } }
+        el.rotation = rot;
       }
     },
     stopDrag() {
