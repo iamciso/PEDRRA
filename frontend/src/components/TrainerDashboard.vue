@@ -313,7 +313,7 @@
               {{ (slide.elements && slide.elements.length) || 0 }} element(s) — click to open editor
             </div>
             <div v-if="slide._showCanvas" style="margin-top:0.3rem;">
-              <SlideCanvas v-model="slide.elements" :slideTitle="slide.title" :slideSubtitle="slide.subtitle" :background="slide.background || ''" @update:modelValue="syncTextFromElements(slide)" @update:slideTitle="v => slide.title = v" @update:slideSubtitle="v => slide.subtitle = v" @update:background="v => { slide.background = v; hasUnsavedChanges = true; }" />
+              <SlideCanvas :modelValue="slide.elements" :slideTitle="slide.title" :slideSubtitle="slide.subtitle" :background="slide.background || ''" @update:modelValue="v => { slide.elements = v; syncTextFromElements(slide); }" @update:slideTitle="v => slide.title = v" @update:slideSubtitle="v => slide.subtitle = v" @update:background="v => { slide.background = v; hasUnsavedChanges = true; }" />
             </div>
           </div>
         </template>
