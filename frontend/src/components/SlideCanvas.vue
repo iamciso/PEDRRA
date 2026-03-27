@@ -48,6 +48,18 @@
       <!-- #14 — Preview toggle -->
       <button @click="previewMode=!previewMode" :class="previewMode?'':'secondary'" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;" :title="previewMode?'Exit preview':'Preview slide'">👁</button>
 
+      <span style="width:1px;height:24px;background:#cbd5e1;margin:0 0.2rem;"></span>
+
+      <!-- Undo/Redo -->
+      <button @click="undo" class="secondary" :disabled="undoStack.length===0" style="width:auto;padding:0.3rem 0.5rem;font-size:0.82rem;" title="Undo (Ctrl+Z)">↩</button>
+      <button @click="redo" class="secondary" :disabled="redoStack.length===0" style="width:auto;padding:0.3rem 0.5rem;font-size:0.82rem;" title="Redo (Ctrl+Y)">↪</button>
+
+      <!-- Zoom -->
+      <span style="width:1px;height:24px;background:#cbd5e1;margin:0 0.2rem;"></span>
+      <button @click="zoomOut" class="secondary" style="width:auto;padding:0.3rem 0.4rem;font-size:0.82rem;" title="Zoom out (Ctrl+-)">−</button>
+      <span style="font-size:0.72rem;color:#64748b;min-width:36px;text-align:center;">{{ Math.round(scale * 100) }}%</span>
+      <button @click="zoomIn" class="secondary" style="width:auto;padding:0.3rem 0.4rem;font-size:0.82rem;" title="Zoom in (Ctrl++)">+</button>
+
       <!-- Hidden file input -->
       <input type="file" ref="fileInput" :accept="uploadKind==='image' ? 'image/png,image/jpeg,image/gif,image/webp' : 'video/mp4,video/webm'" style="display:none;" @change="onFileUpload" />
       <span v-if="uploading" style="font-size:0.8rem;color:#64748b;">⏳ Uploading...</span>
@@ -94,7 +106,7 @@
 
       <span style="flex:1;"></span>
 
-      <!-- Position/size inputs (editable) -->
+      <!-- Position/size + opacity inputs -->
       <template v-if="sel">
         <span style="font-size:0.7rem;color:#64748b;">x</span>
         <input type="number" v-model.number="sel.x" @change="emit" style="width:42px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" />
@@ -104,6 +116,9 @@
         <input type="number" v-model.number="sel.w" @change="emit" min="20" style="width:42px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" />
         <span style="font-size:0.7rem;color:#64748b;">h</span>
         <input type="number" v-model.number="sel.h" @change="emit" min="10" style="width:42px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" />
+        <span style="font-size:0.7rem;color:#64748b;margin-left:4px;" title="Opacity">⊘</span>
+        <input type="range" v-model.number="sel.opacity" @input="emit" min="0" max="1" step="0.05" style="width:50px;height:14px;cursor:pointer;" title="Opacity" />
+        <span style="font-size:0.68rem;color:#94a3b8;">{{ Math.round((sel.opacity ?? 1) * 100) }}%</span>
       </template>
 
       <!-- Layer & action controls -->
@@ -117,7 +132,7 @@
     </div>
 
     <!-- Canvas wrapper -->
-    <div style="overflow:auto;border:1px solid #e2e8f0;border-radius:0 0 8px 8px;background:#888;display:flex;align-items:center;justify-content:center;min-height:380px;">
+    <div @wheel="onWheel" style="overflow:auto;border:1px solid #e2e8f0;border-radius:0 0 8px 8px;background:#888;display:flex;align-items:center;justify-content:center;min-height:380px;">
       <div :style="canvasWrapStyle">
         <div ref="canvas"
           :style="{position:'relative',width:W+'px',height:H+'px',background: slideBg || 'white',backgroundSize:'cover',backgroundPosition:'center',overflow:'hidden',transformOrigin:'top left',transform:`scale(${scale})`}"
@@ -237,7 +252,10 @@ export default {
       showMediaPicker: false,
       mediaPickerFilter: 'all',
       clipboard: null,
-      replaceTarget: -1, // index of element being replaced
+      replaceTarget: -1,
+      undoStack: [],
+      redoStack: [],
+      maxUndo: 30,
       guides: { vCenter: false, hCenter: false },
       bgOptions: [
         { label: 'Template Default', value: '', preview: 'linear-gradient(135deg,#ddd,#eee)' },
@@ -330,6 +348,7 @@ export default {
         left: el.x + 'px', top: el.y + 'px',
         width: el.w + 'px', height: el.h + 'px',
         zIndex: el.zIndex || (idx + 10),
+        opacity: el.opacity ?? 1,
         cursor: 'move',
         boxSizing: 'border-box',
       };
@@ -629,18 +648,57 @@ export default {
       }
     },
 
+    // Undo/Redo
+    _saveUndoSnapshot() {
+      this.undoStack.push(JSON.stringify(this.localEls));
+      if (this.undoStack.length > this.maxUndo) this.undoStack.shift();
+      this.redoStack = [];
+    },
+    undo() {
+      if (this.undoStack.length === 0) return;
+      this.redoStack.push(JSON.stringify(this.localEls));
+      this.localEls = JSON.parse(this.undoStack.pop());
+      this.selIdx = -1;
+      this.multiSelIndices = [];
+      this.editingIdx = -1;
+      this.$emit('update:modelValue', JSON.parse(JSON.stringify(this.localEls)));
+    },
+    redo() {
+      if (this.redoStack.length === 0) return;
+      this.undoStack.push(JSON.stringify(this.localEls));
+      this.localEls = JSON.parse(this.redoStack.pop());
+      this.selIdx = -1;
+      this.multiSelIndices = [];
+      this.editingIdx = -1;
+      this.$emit('update:modelValue', JSON.parse(JSON.stringify(this.localEls)));
+    },
+
+    // Zoom
+    zoomIn() { this.scale = Math.min(1.5, this.scale + 0.1); },
+    zoomOut() { this.scale = Math.max(0.25, this.scale - 0.1); },
+    onWheel(e) {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        if (e.deltaY < 0) this.zoomIn();
+        else this.zoomOut();
+      }
+    },
+
     onKeyDown(e) {
       if (this.editingIdx >= 0) return;
-      if (e.key === 'Delete' || e.key === 'Backspace') { this.deleteSelected(); e.preventDefault(); }
+      if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) { this.undo(); e.preventDefault(); }
+      else if ((e.key === 'y' && (e.ctrlKey || e.metaKey)) || (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)) { this.redo(); e.preventDefault(); }
+      else if (e.key === 'Delete' || e.key === 'Backspace') { this.deleteSelected(); e.preventDefault(); }
       else if (e.key === 'd' && (e.ctrlKey || e.metaKey)) { this.duplicateEl(); e.preventDefault(); }
       else if (e.key === 'c' && (e.ctrlKey || e.metaKey)) { this.copyEl(); e.preventDefault(); }
       else if (e.key === 'v' && (e.ctrlKey || e.metaKey)) { this.pasteEl(); e.preventDefault(); }
       else if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
-        // Select all
         this.multiSelIndices = this.localEls.map((_, i) => i);
         if (this.localEls.length > 0) this.selIdx = 0;
         e.preventDefault();
       }
+      else if (e.key === '=' && (e.ctrlKey || e.metaKey)) { this.zoomIn(); e.preventDefault(); }
+      else if (e.key === '-' && (e.ctrlKey || e.metaKey)) { this.zoomOut(); e.preventDefault(); }
       else if (e.key === 'Escape') { this.deselect(); }
       else if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key) && this.selIdx >= 0) {
         const step = e.shiftKey ? 10 : 1;
@@ -655,6 +713,7 @@ export default {
     },
 
     emit() {
+      this._saveUndoSnapshot();
       this.$emit('update:modelValue', JSON.parse(JSON.stringify(this.localEls)));
     },
   },
