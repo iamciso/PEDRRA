@@ -278,7 +278,7 @@
               {{ (slide.elements && slide.elements.length) || 0 }} element(s) — click to open editor
             </div>
             <div v-if="slide._showCanvas" style="margin-top:0.3rem;">
-              <SlideCanvas v-model="slide.elements" :slideTitle="slide.title" @update:modelValue="syncTextFromElements(slide)" />
+              <SlideCanvas v-model="slide.elements" :slideTitle="slide.title" :slideSubtitle="slide.subtitle" @update:modelValue="syncTextFromElements(slide)" @update:slideTitle="v => slide.title = v" @update:slideSubtitle="v => slide.subtitle = v" />
             </div>
           </div>
         </template>
@@ -334,6 +334,25 @@
             </div>
             <button class="secondary" style="width: auto; margin-top: 0.5rem; font-size: 0.8rem;" @click="slide.questions.push({text: '', type: 'text', options: []})">+ Add Question</button>
           </div>
+          <!-- Survey preview -->
+          <details style="margin-top:0.75rem;">
+            <summary style="cursor:pointer;font-size:0.8rem;color:#64748b;">👁 Preview how attendees will see this survey</summary>
+            <div style="margin-top:0.5rem;padding:1rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;max-width:500px;">
+              <div v-if="slide.description" style="font-size:0.9rem;color:#555;margin-bottom:0.75rem;">{{ slide.description }}</div>
+              <div v-for="(q, qi) in slide.questions" :key="qi" style="padding:0.6rem;background:white;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:0.5rem;">
+                <label style="display:block;font-weight:bold;margin-bottom:0.4rem;color:var(--edps-blue);font-size:0.85rem;">{{ q.text || 'Question...' }}</label>
+                <textarea v-if="q.type==='text'||!q.type" disabled rows="2" placeholder="Text answer..." style="width:100%;padding:0.3rem;border:1px solid #cbd5e1;border-radius:4px;font-size:0.8rem;box-sizing:border-box;opacity:0.6;"></textarea>
+                <div v-if="q.type==='rating'" style="display:flex;gap:0.8rem;margin-top:0.2rem;">
+                  <span v-for="n in 5" :key="n" style="display:flex;flex-direction:column;align-items:center;font-size:0.85rem;color:#64748b;"><span style="width:16px;height:16px;border:2px solid #cbd5e1;border-radius:50%;margin-bottom:2px;"></span>{{ n }}</span>
+                </div>
+                <select v-if="q.type==='choice'" disabled style="width:100%;padding:0.3rem;border:1px solid #cbd5e1;border-radius:4px;font-size:0.8rem;opacity:0.6;">
+                  <option>Select an option...</option>
+                  <option v-for="opt in q.options" :key="opt">{{ opt }}</option>
+                </select>
+              </div>
+              <button disabled style="background:var(--edps-blue);color:white;border:none;padding:0.5rem;font-size:0.85rem;border-radius:6px;width:100%;opacity:0.6;">Submit Response</button>
+            </div>
+          </details>
         </template>
 
         <!-- Timer Slide Edit -->

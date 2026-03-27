@@ -79,7 +79,7 @@
           <option v-for="f in fonts" :key="f" :value="f">{{ f }}</option>
         </select>
         <input type="number" v-model.number="sel.fontSize" @change="emit" min="8" max="120" style="width:46px;padding:0.25rem;font-size:0.8rem;border:1px solid #cbd5e1;border-radius:4px;" />
-        <input type="color" v-model="sel.color" @input="emit" style="width:26px;height:24px;padding:1px;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;" />
+        <input type="color" v-model="sel.color" @input="emit" @change="addRecentColor(sel.color)" style="width:26px;height:24px;padding:1px;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;" />
         <!-- EDPS color palette + recent colors -->
         <span v-for="c in edpsColors" :key="'edps-'+c" @click="sel.color=c; addRecentColor(c); emit()" :style="{display:'inline-block',width:'14px',height:'14px',borderRadius:'2px',background:c,border:'1px solid #aaa',cursor:'pointer',verticalAlign:'middle'}" :title="c"></span>
         <span v-if="recentColors.length" style="width:1px;height:14px;background:#ddd;margin:0 2px;display:inline-block;vertical-align:middle;"></span>
@@ -101,9 +101,13 @@
 
       <!-- Image/video src + replace button -->
       <template v-if="sel && (sel.kind==='image'||sel.kind==='video')">
-        <input v-model="sel.src" @change="emit" placeholder="URL..." style="flex:1;min-width:140px;padding:0.3rem 0.5rem;font-size:0.82rem;border:1px solid #cbd5e1;border-radius:4px;margin-bottom:0;" />
+        <input v-model="sel.src" @change="emit" placeholder="URL..." style="flex:1;min-width:120px;padding:0.3rem 0.5rem;font-size:0.82rem;border:1px solid #cbd5e1;border-radius:4px;margin-bottom:0;" />
         <button @click="triggerUpload(sel.kind); replaceTarget=selIdx" class="secondary" style="width:auto;padding:0.2rem 0.5rem;font-size:0.78rem;" title="Replace from file">📤</button>
         <button @click="openMediaPicker(sel.kind); replaceTarget=selIdx" class="secondary" style="width:auto;padding:0.2rem 0.5rem;font-size:0.78rem;" title="Replace from library">📂</button>
+        <template v-if="sel.kind==='image'">
+          <span style="font-size:0.7rem;color:#64748b;" title="Border radius">⊙</span>
+          <input type="number" v-model.number="sel.borderRadius" @change="emit" min="0" max="200" style="width:36px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" title="Border radius (px)" />
+        </template>
       </template>
 
       <span style="flex:1;"></span>
@@ -128,6 +132,9 @@
 
       <!-- Layer & action controls -->
       <template v-if="sel">
+        <button @click="centerH" class="secondary" title="Center horizontally" style="width:auto;padding:0.2rem 0.4rem;font-size:0.78rem;">⇔</button>
+        <button @click="centerV" class="secondary" title="Center vertically" style="width:auto;padding:0.2rem 0.4rem;font-size:0.78rem;">⇕</button>
+        <button @click="toggleLock" :class="sel.locked?'':'secondary'" style="width:auto;padding:0.2rem 0.4rem;font-size:0.78rem;" :title="sel.locked?'Unlock position':'Lock position'">{{ sel.locked ? '🔒' : '🔓' }}</button>
         <button @click="bringForward" class="secondary" title="Bring forward" style="width:auto;padding:0.2rem 0.4rem;font-size:0.78rem;">↑</button>
         <button @click="sendBackward" class="secondary" title="Send backward" style="width:auto;padding:0.2rem 0.4rem;font-size:0.78rem;">↓</button>
         <button @click="duplicateEl" class="secondary" title="Duplicate (Ctrl+D)" style="width:auto;padding:0.2rem 0.4rem;font-size:0.78rem;">📋</button>
@@ -157,10 +164,19 @@
           <div v-if="guides.vCenter" style="position:absolute;top:0;bottom:0;left:50%;width:1px;background:#3b82f6;z-index:200;pointer-events:none;opacity:0.8;"></div>
           <div v-if="guides.hCenter" style="position:absolute;left:0;right:0;top:50%;height:1px;background:#3b82f6;z-index:200;pointer-events:none;opacity:0.8;"></div>
 
-          <!-- EDPS header -->
-          <div style="position:absolute;top:0;left:0;right:0;height:74px;display:flex;align-items:center;padding:0 2rem;gap:1rem;z-index:0;pointer-events:none;">
-            <img src="/template/edps_logo.png" style="height:38px;" onerror="this.src='/logo.png'; this.onerror=null;" />
-            <span style="color:var(--edps-blue,#254A9A);font-weight:bold;font-size:1rem;">{{ slideTitle }}</span>
+          <!-- EDPS header with editable title/subtitle -->
+          <div style="position:absolute;top:0;left:0;right:0;z-index:5;">
+            <div style="display:flex;align-items:center;padding:1rem 2rem 0.3rem;gap:1rem;">
+              <img src="/template/edps_logo.png" style="height:38px;pointer-events:none;" onerror="this.src='/logo.png'; this.onerror=null;" />
+              <input v-if="editingTitle" ref="titleInput" :value="slideTitle" @input="$emit('update:slideTitle', $event.target.value)" @blur="editingTitle=false" @keyup.enter="editingTitle=false"
+                style="flex:1;color:var(--edps-blue,#254A9A);font-weight:bold;font-size:1.1rem;border:1px dashed var(--edps-blue);border-radius:4px;padding:0.2rem 0.4rem;background:rgba(255,255,255,0.9);margin:0;" />
+              <span v-else @dblclick="editingTitle=true; $nextTick(()=>$refs.titleInput?.focus())" style="flex:1;color:var(--edps-blue,#254A9A);font-weight:bold;font-size:1.1rem;cursor:text;min-height:1.4em;padding:0.2rem 0;" :title="'Double-click to edit title'">{{ slideTitle || 'Click to add title...' }}</span>
+            </div>
+            <div style="padding:0 2rem 0.3rem 5.5rem;">
+              <input v-if="editingSubtitle" ref="subtitleInput" :value="slideSubtitle" @input="$emit('update:slideSubtitle', $event.target.value)" @blur="editingSubtitle=false" @keyup.enter="editingSubtitle=false"
+                style="width:100%;color:var(--edps-blue,#254A9A);font-size:0.85rem;border:1px dashed #94a3b8;border-radius:4px;padding:0.15rem 0.4rem;background:rgba(255,255,255,0.9);margin:0;" />
+              <span v-else @dblclick="editingSubtitle=true; $nextTick(()=>$refs.subtitleInput?.focus())" style="color:var(--edps-blue,#254A9A);font-size:0.85rem;cursor:text;min-height:1.2em;display:block;opacity:0.7;" :title="'Double-click to edit subtitle'">{{ slideSubtitle || 'Double-click to add subtitle...' }}</span>
+            </div>
           </div>
 
           <!-- Elements -->
@@ -169,6 +185,7 @@
             :key="el.id"
             :style="elStyle(el, idx)"
             @mousedown.stop="onElMouseDown(idx, $event)"
+            :title="elTooltip(el)"
           >
             <!-- Text (show markdown preview when not editing) -->
             <div v-if="el.kind==='text' && editingIdx!==idx" @dblclick.stop="startEdit(idx)"
@@ -181,7 +198,7 @@
               placeholder="Type here... (supports **Markdown**)"></textarea>
 
             <!-- Image -->
-            <img v-if="el.kind==='image'" :src="resolveElUrl(el.src)" style="width:100%;height:100%;object-fit:contain;pointer-events:none;" @error="$event.target.style.opacity='0.3'" />
+            <img v-if="el.kind==='image'" :src="resolveElUrl(el.src)" :style="{width:'100%',height:'100%',objectFit:'contain',pointerEvents:'none',borderRadius:(el.borderRadius||0)+'px'}" @error="$event.target.style.opacity='0.3'" />
 
             <!-- Video -->
             <video v-if="el.kind==='video' && isLocalVideo(el.src)" :src="resolveElUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;pointer-events:none;"></video>
@@ -233,9 +250,10 @@ export default {
   props: {
     modelValue: { type: Array, default: () => [] },
     slideTitle: { type: String, default: '' },
+    slideSubtitle: { type: String, default: '' },
     background: { type: String, default: '' },
   },
-  emits: ['update:modelValue', 'update:background'],
+  emits: ['update:modelValue', 'update:background', 'update:slideTitle', 'update:slideSubtitle'],
   data() {
     const W = 1024, H = 576;
     return {
@@ -264,6 +282,8 @@ export default {
       clipboard: null,
       replaceTarget: -1,
       recentColors: [],
+      editingTitle: false,
+      editingSubtitle: false,
       undoStack: [],
       redoStack: [],
       maxUndo: 30,
@@ -504,6 +524,16 @@ export default {
     toggleItalic() { if (this.sel) { this.sel.italic = !this.sel.italic; this.emit(); } },
     toggleUnderline() { if (this.sel) { this.sel.underline = !this.sel.underline; this.emit(); } },
     toggleShadow() { if (this.sel) { this.sel.shadow = !this.sel.shadow; this.emit(); } },
+    toggleLock() { if (this.sel) { this.sel.locked = !this.sel.locked; this.emit(); } },
+    centerH() { if (this.sel) { this.sel.x = Math.round((this.W - this.sel.w) / 2); this.emit(); } },
+    centerV() { if (this.sel) { this.sel.y = Math.round((this.H - this.sel.h) / 2); this.emit(); } },
+    elTooltip(el) {
+      if (el.kind === 'text') return 'Text: ' + (el.content || '(empty)').substring(0, 40);
+      if (el.kind === 'image') return 'Image: ' + (el.src || '').split('/').pop();
+      if (el.kind === 'video') return 'Video: ' + (el.src || '').split('/').pop();
+      if (el.kind === 'shape') return 'Shape: ' + (el.shape || 'rect');
+      return el.kind;
+    },
     addRecentColor(c) {
       this.recentColors = [c, ...this.recentColors.filter(x => x !== c)].slice(0, 5);
     },
@@ -580,6 +610,7 @@ export default {
     startDrag(idx, e) {
       this.selIdx = idx;
       const el = this.localEls[idx];
+      if (el.locked) { e.preventDefault(); return; } // Don't drag locked elements
       this.drag = { type: 'move', idx, startX: e.clientX, startY: e.clientY, origX: el.x, origY: el.y, altKey: e.altKey };
       e.preventDefault();
     },
