@@ -239,7 +239,7 @@
 import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 import { authFetch } from '../auth.js';
 import { baseUrl } from '../config.js';
-import { marked } from 'marked';
+import { renderMarkdown } from '../utils/safeMd.js';
 import MediaPicker from './MediaPicker.vue';
 
 let _nextZIndex = 100;
@@ -351,7 +351,7 @@ export default {
     // #5 — Markdown preview in canvas
     renderMdPreview(text) {
       if (!text) return '';
-      try { return marked.parse(text, { breaks: true }); } catch { return text; }
+      return renderMarkdown(text);
     },
 
     resolveElUrl(url) {

@@ -12,6 +12,9 @@ const db = require('./db.js');
 require('dotenv').config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'pedrra-training-platform-default-secret-key';
+if (!process.env.JWT_SECRET) {
+    console.warn('⚠️  WARNING: JWT_SECRET not set. Using default secret — NOT SAFE FOR PRODUCTION. Set JWT_SECRET env var.');
+}
 
 const app = express();
 // Trust proxy when behind reverse proxy (Render, Heroku, etc.)
@@ -46,7 +49,6 @@ const ALLOWED_MIMETYPES = [
     'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml',
     'video/mp4', 'video/webm',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
-    'application/octet-stream', // fallback for some browsers
 ];
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadsDir),
@@ -515,7 +517,8 @@ io.on('connection', (socket) => {
         saveState();
     });
 
-    socket.on('poll:answer', ({ slideId, username, answer }) => {
+    socket.on('poll:answer', ({ slideId, answer }) => {
+        const username = socket.user.username;
         const stmt = db.prepare('INSERT OR REPLACE INTO answers (slide_id, username, answer) VALUES (?, ?, ?)');
         stmt.run([slideId, username, answer], function(err) {
             if (!err) sendPollResults(slideId);

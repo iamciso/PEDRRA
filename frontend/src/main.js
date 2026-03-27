@@ -3,6 +3,7 @@ import './style.css'
 import App from './App.vue'
 import { createRouter, createWebHistory } from 'vue-router'
 
+import { getUser } from './auth.js'
 import Login from './components/Login.vue'
 import TrainerDashboard from './components/TrainerDashboard.vue'
 import AttendeeView from './components/AttendeeView.vue'
@@ -22,13 +23,9 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const requiredRole = to.meta?.requiresRole;
   if (!requiredRole) return next();
-  try {
-    const user = JSON.parse(localStorage.getItem('user'));
-    if (!user || user.role !== requiredRole) return next('/');
-    next();
-  } catch {
-    next('/');
-  }
+  const user = getUser();
+  if (!user || user.role !== requiredRole) return next('/');
+  next();
 })
 
 createApp(App).use(router).mount('#app')

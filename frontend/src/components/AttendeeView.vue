@@ -232,9 +232,9 @@
 <script>
 import { io } from 'socket.io-client';
 import { baseUrl } from '../config.js';
-import { marked } from 'marked';
-import { getToken, getTokenForRole, clearAuth } from '../auth.js';
+import { getUser, getToken, getTokenForRole, clearAuth } from '../auth.js';
 import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
+import { renderMarkdown } from '../utils/safeMd.js';
 
 const W = 1024, H = 576;
 export default {
@@ -331,7 +331,7 @@ export default {
     },
   },
   async mounted() {
-    this.user = JSON.parse(localStorage.getItem('user'));
+    this.user = getUser();
     if (!this.user || this.user.role !== 'Attendee') { this.$router.push('/'); return; }
 
     // Generate binary pattern once
@@ -459,7 +459,7 @@ export default {
     },
     renderMd(text) {
       if (!text) return '';
-      try { return marked.parse(text, { breaks: true }); } catch { return text; }
+      return renderMarkdown(text);
     },
     toggleHandRaise() {
       this.handRaised = !this.handRaised;

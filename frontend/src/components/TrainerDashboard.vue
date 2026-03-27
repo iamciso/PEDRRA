@@ -835,9 +835,9 @@
 <script>
 import { io } from 'socket.io-client';
 import { baseUrl } from '../config.js';
-import { authFetch, authHeaders, getToken, getTokenForRole, clearAuth } from '../auth.js';
-import { marked } from 'marked';
+import { authFetch, authHeaders, getUser, getToken, getTokenForRole, clearAuth } from '../auth.js';
 import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
+import { renderMarkdown } from '../utils/safeMd.js';
 import SurveyResults from './SurveyResults.vue';
 import MediaManager from './MediaManager.vue';
 import SlideCanvas from './SlideCanvas.vue';
@@ -926,10 +926,6 @@ export default {
       timerInterval: null
     }
   },
-  watch: {
-    autoSaveEnabled() { this._setupAutoSave(); },
-    editSlides: { handler() { this.hasUnsavedChanges = true; }, deep: true },
-  },
   computed: {
     currentSlide() {
       return this.slides[this.currentIndex] || {};
@@ -979,7 +975,7 @@ export default {
     }
   },
   async mounted() {
-    this.user = JSON.parse(localStorage.getItem('user'));
+    this.user = getUser();
     if (!this.user || this.user.role !== 'Trainer') {
       this.$router.push('/');
       return;
@@ -1081,6 +1077,8 @@ export default {
     clearInterval(this.slideElapsedInterval);
   },
   watch: {
+    autoSaveEnabled() { this._setupAutoSave(); },
+    editSlides: { handler() { this.hasUnsavedChanges = true; }, deep: true },
     currentIndex() {
       if (!this.socket) return;
       const slide = this.currentSlide;
@@ -1540,7 +1538,7 @@ export default {
     },
     renderMd(text) {
       if (!text) return '';
-      try { return marked.parse(text, { breaks: true }); } catch { return text; }
+      return renderMarkdown(text);
     },
     resolveUrl(url) {
       if (!url) return '';
