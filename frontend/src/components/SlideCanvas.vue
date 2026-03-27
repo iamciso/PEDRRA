@@ -147,9 +147,11 @@
     <div @wheel="onWheel" style="overflow:auto;border:1px solid #e2e8f0;border-radius:0 0 8px 8px;background:#888;display:flex;align-items:center;justify-content:center;min-height:380px;">
       <div :style="canvasWrapStyle">
         <div ref="canvas"
-          :style="{position:'relative',width:W+'px',height:H+'px',background: slideBg || 'white',backgroundSize:'cover',backgroundPosition:'center',overflow:'hidden',transformOrigin:'top left',transform:`scale(${scale})`}"
+          :style="{position:'relative',width:W+'px',height:H+'px',background: slideBg || 'white',backgroundSize:'cover',backgroundPosition:'center',overflow:'hidden',transformOrigin:'top left',transform:`scale(${scale})`,touchAction:'none'}"
           @mouseup="stopDrag"
           @mousemove="onMouseMove"
+          @touchmove.prevent="onTouchMove"
+          @touchend.prevent="stopDrag"
           @click.self="deselect"
         >
           <!-- #10 — Grid overlay -->
@@ -170,12 +172,12 @@
               <img src="/template/edps_logo.png" style="height:38px;pointer-events:none;" onerror="this.src='/logo.png'; this.onerror=null;" alt="EDPS logo" />
               <input v-if="editingTitle" ref="titleInput" :value="slideTitle" @input="$emit('update:slideTitle', $event.target.value)" @blur="editingTitle=false" @keyup.enter="editingTitle=false"
                 style="flex:1;color:var(--edps-blue,#254A9A);font-weight:bold;font-size:1.1rem;border:1px dashed var(--edps-blue);border-radius:4px;padding:0.2rem 0.4rem;background:rgba(255,255,255,0.9);margin:0;" />
-              <span v-else @dblclick="editingTitle=true; $nextTick(()=>$refs.titleInput?.focus())" style="flex:1;color:var(--edps-blue,#254A9A);font-weight:bold;font-size:1.1rem;cursor:text;min-height:1.4em;padding:0.2rem 0;" :title="'Double-click to edit title'">{{ slideTitle || 'Click to add title...' }}</span>
+              <span v-else @dblclick="editingTitle=true; $nextTick(()=>$refs.titleInput?.focus())" @touchend.prevent="onTapTitle" style="flex:1;color:var(--edps-blue,#254A9A);font-weight:bold;font-size:1.1rem;cursor:text;min-height:1.4em;padding:0.2rem 0;" :title="'Tap or double-click to edit title'">{{ slideTitle || 'Tap to add title...' }}</span>
             </div>
             <div style="padding:0 2rem 0.3rem 5.5rem;">
               <input v-if="editingSubtitle" ref="subtitleInput" :value="slideSubtitle" @input="$emit('update:slideSubtitle', $event.target.value)" @blur="editingSubtitle=false" @keyup.enter="editingSubtitle=false"
                 style="width:100%;color:var(--edps-blue,#254A9A);font-size:0.85rem;border:1px dashed #94a3b8;border-radius:4px;padding:0.15rem 0.4rem;background:rgba(255,255,255,0.9);margin:0;" />
-              <span v-else @dblclick="editingSubtitle=true; $nextTick(()=>$refs.subtitleInput?.focus())" style="color:var(--edps-blue,#254A9A);font-size:0.85rem;cursor:text;min-height:1.2em;display:block;opacity:0.7;" :title="'Double-click to edit subtitle'">{{ slideSubtitle || 'Double-click to add subtitle...' }}</span>
+              <span v-else @dblclick="editingSubtitle=true; $nextTick(()=>$refs.subtitleInput?.focus())" @touchend.prevent="onTapSubtitle" style="color:var(--edps-blue,#254A9A);font-size:0.85rem;cursor:text;min-height:1.2em;display:block;opacity:0.7;" :title="'Tap or double-click to edit subtitle'">{{ slideSubtitle || 'Tap to add subtitle...' }}</span>
             </div>
           </div>
 
@@ -185,12 +187,13 @@
             :key="el.id"
             :style="elStyle(el, idx)"
             @mousedown.stop="onElMouseDown(idx, $event)"
+            @touchstart.stop.prevent="onElTouchStart(idx, $event)"
             :title="elTooltip(el)"
           >
             <!-- Text (show markdown preview when not editing) -->
             <div v-if="el.kind==='text' && editingIdx!==idx" @dblclick.stop="startEdit(idx)"
               :style="{...textStyle(el), width:'100%', height:'100%', overflow:'hidden', cursor: selIdx===idx ? 'move' : 'default', wordWrap:'break-word', whiteSpace:'pre-wrap', opacity: el.content ? 1 : 0.4}"
-              v-html="renderMdPreview(el.content) || '<em style=&quot;color:#94a3b8&quot;>Double-click to edit...</em>'"></div>
+              v-html="renderMdPreview(el.content) || '<em style=&quot;color:#94a3b8&quot;>Tap or double-click to edit...</em>'"></div>
 
             <!-- Textarea overlay for editing -->
             <textarea v-if="el.kind==='text' && editingIdx===idx" :value="el.content" @input="el.content=$event.target.value" @blur="stopEdit" @mousedown.stop ref="editTextarea"
@@ -211,13 +214,13 @@
             <template v-if="!previewMode && selectedIndices.includes(idx)">
               <div :style="{position:'absolute',inset:'-2px',border: selIdx===idx ? '2px solid var(--edps-blue,#254A9A)' : '2px dashed #60a5fa',pointerEvents:'none'}"></div>
               <template v-if="selIdx===idx">
-                <div v-for="handle in ['nw','ne','sw','se']" :key="handle" :style="handlePos(handle)" @mousedown.stop="startResize(idx, $event, handle)"></div>
-                <div style="position:absolute;top:50%;right:-6px;width:12px;height:12px;background:#4a90d9;border-radius:50%;transform:translateY(-50%);cursor:e-resize;z-index:10;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);" @mousedown.stop="startResize(idx, $event,'e')"></div>
-                <div style="position:absolute;bottom:-6px;left:50%;width:12px;height:12px;background:#4a90d9;border-radius:50%;transform:translateX(-50%);cursor:s-resize;z-index:10;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);" @mousedown.stop="startResize(idx, $event,'s')"></div>
+                <div v-for="handle in ['nw','ne','sw','se']" :key="handle" :style="handlePos(handle)" @mousedown.stop="startResize(idx, $event, handle)" @touchstart.stop.prevent="startResize(idx, touchToMouse($event), handle)"></div>
+                <div style="position:absolute;top:50%;right:-10px;width:20px;height:20px;background:#4a90d9;border-radius:50%;transform:translateY(-50%);cursor:e-resize;z-index:10;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);" @mousedown.stop="startResize(idx, $event,'e')" @touchstart.stop.prevent="startResize(idx, touchToMouse($event),'e')"></div>
+                <div style="position:absolute;bottom:-10px;left:50%;width:20px;height:20px;background:#4a90d9;border-radius:50%;transform:translateX(-50%);cursor:s-resize;z-index:10;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);" @mousedown.stop="startResize(idx, $event,'s')" @touchstart.stop.prevent="startResize(idx, touchToMouse($event),'s')"></div>
                 <!-- Rotation handle -->
-                <div style="position:absolute;top:-28px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;z-index:10;">
-                  <div style="width:14px;height:14px;background:#f59e0b;border-radius:50%;cursor:grab;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);" @mousedown.stop="startRotate(idx, $event)"></div>
-                  <div style="width:1px;height:12px;background:#f59e0b;"></div>
+                <div style="position:absolute;top:-34px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;z-index:10;">
+                  <div style="width:22px;height:22px;background:#f59e0b;border-radius:50%;cursor:grab;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);" @mousedown.stop="startRotate(idx, $event)" @touchstart.stop.prevent="startRotate(idx, touchToMouse($event))"></div>
+                  <div style="width:1px;height:10px;background:#f59e0b;"></div>
                 </div>
               </template>
             </template>
@@ -227,7 +230,7 @@
     </div>
 
     <div style="display:flex;justify-content:space-between;margin-top:0.3rem;font-size:0.72rem;color:#94a3b8;">
-      <span>Dbl-click text to edit · Del delete · Ctrl+D duplicate · Ctrl+C/V copy · Shift+click multi-select · Alt disables snap · Arrows move (Shift=10px)</span>
+      <span>Tap/dbl-click text to edit · Del delete · Ctrl+D duplicate · Ctrl+C/V copy · Drag to move/resize · Touch supported</span>
     </div>
 
     <!-- Media Picker Modal -->
@@ -346,19 +349,55 @@ export default {
     },
   },
   mounted() {
+    this._isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     window.addEventListener('mouseup', this.stopDrag);
+    window.addEventListener('touchend', this.stopDrag);
     this.fitScale();
     window.addEventListener('resize', this.fitScale);
     document.addEventListener('click', this.closeMenus);
   },
   beforeUnmount() {
     window.removeEventListener('mouseup', this.stopDrag);
+    window.removeEventListener('touchend', this.stopDrag);
     window.removeEventListener('resize', this.fitScale);
     document.removeEventListener('click', this.closeMenus);
   },
   methods: {
     toEmbedUrl,
     isLocalVideo,
+
+    // ── TOUCH SUPPORT ──────────────────────────────────────────
+    // Convert a TouchEvent to a mouse-like object with clientX/clientY
+    touchToMouse(e) {
+      const t = e.touches?.[0] || e.changedTouches?.[0];
+      return t ? { clientX: t.clientX, clientY: t.clientY, preventDefault() {}, button: 0 } : e;
+    },
+    onElTouchStart(idx, e) {
+      const now = Date.now();
+      // Double-tap detection: if same element tapped within 400ms, start edit
+      if (this._lastTapIdx === idx && now - (this._lastTapTime || 0) < 400) {
+        if (this.localEls[idx]?.kind === 'text') {
+          this.startEdit(idx);
+          this._lastTapTime = 0;
+          return;
+        }
+      }
+      this._lastTapIdx = idx;
+      this._lastTapTime = now;
+      this.multiSelIndices = [];
+      this.startDrag(idx, this.touchToMouse(e));
+    },
+    onTouchMove(e) {
+      this.onMouseMove(this.touchToMouse(e));
+    },
+    onTapTitle() {
+      this.editingTitle = true;
+      this.$nextTick(() => this.$refs.titleInput?.focus());
+    },
+    onTapSubtitle() {
+      this.editingSubtitle = true;
+      this.$nextTick(() => this.$refs.subtitleInput?.focus());
+    },
 
     // #5 — Markdown preview in canvas
     renderMdPreview(text) {
@@ -421,11 +460,13 @@ export default {
     },
 
     handlePos(corner) {
-      const base = { position: 'absolute', width: '14px', height: '14px', background: 'var(--edps-blue,#254A9A)', borderRadius: '50%', zIndex: 10, border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' };
-      if (corner === 'nw') return { ...base, top: '-7px', left: '-7px', cursor: 'nw-resize' };
-      if (corner === 'ne') return { ...base, top: '-7px', right: '-7px', cursor: 'ne-resize' };
-      if (corner === 'sw') return { ...base, bottom: '-7px', left: '-7px', cursor: 'sw-resize' };
-      return { ...base, bottom: '-7px', right: '-7px', cursor: 'se-resize' };
+      const sz = this._isTouch ? '22px' : '14px';
+      const off = this._isTouch ? '-11px' : '-7px';
+      const base = { position: 'absolute', width: sz, height: sz, background: 'var(--edps-blue,#254A9A)', borderRadius: '50%', zIndex: 10, border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' };
+      if (corner === 'nw') return { ...base, top: off, left: off, cursor: 'nw-resize' };
+      if (corner === 'ne') return { ...base, top: off, right: off, cursor: 'ne-resize' };
+      if (corner === 'sw') return { ...base, bottom: off, left: off, cursor: 'sw-resize' };
+      return { ...base, bottom: off, right: off, cursor: 'se-resize' };
     },
 
     _newZIndex() { return _nextZIndex++; },
