@@ -666,6 +666,7 @@ app.get('/api/quiz/leaderboard', (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         // Add avatar info
         db.all('SELECT username, display_name, avatar FROM users', (err2, users) => {
+            if (err2) return res.status(500).json({ error: err2.message });
             const userMap = {};
             (users || []).forEach(u => { userMap[u.username] = u; });
             const result = rows.map(r => ({

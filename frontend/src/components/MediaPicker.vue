@@ -4,7 +4,7 @@
       <!-- Header -->
       <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.5rem;border-bottom:1px solid #e2e8f0;">
         <h3 style="margin:0;color:var(--edps-blue, #1b4293);">📂 Media Library — Select a file</h3>
-        <button @click="$emit('close')" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#94a3b8;padding:0;">✕</button>
+        <button @click="$emit('close')" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#94a3b8;padding:0;" aria-label="Close media picker">✕</button>
       </div>
 
       <!-- Filter tabs -->
@@ -28,7 +28,7 @@
             @mouseleave="$event.currentTarget.style.borderColor='#e2e8f0';$event.currentTarget.style.boxShadow='none'"
           >
             <div style="width:100%;height:90px;background:#f8fafc;display:flex;align-items:center;justify-content:center;overflow:hidden;">
-              <img v-if="isImage(file.filename)" :src="resolveUrl(file.url)" style="width:100%;height:100%;object-fit:cover;" />
+              <img v-if="isImage(file.filename)" :src="resolveUrl(file.url)" style="width:100%;height:100%;object-fit:cover;" :alt="cleanFilename(file.filename)" />
               <span v-else style="font-size:2.5rem;">🎬</span>
             </div>
             <div style="padding:0.4rem 0.5rem;font-size:0.72rem;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" :title="file.filename">{{ cleanFilename(file.filename) }}</div>

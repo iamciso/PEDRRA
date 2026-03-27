@@ -15,21 +15,21 @@
       <div v-if="entries.length >= 1" class="podium-container">
         <div v-if="entries[1]" class="podium-place silver" style="animation-delay:0.2s;">
           <div class="podium-rank">🥈</div>
-          <img v-if="entries[1].avatar" :src="resolveUrl(entries[1].avatar)" class="podium-avatar" />
+          <img v-if="entries[1].avatar" :src="resolveUrl(entries[1].avatar)" class="podium-avatar" :alt="(entries[1].display_name || entries[1].username) + ' avatar'" />
           <div v-else class="podium-avatar" style="display:flex;align-items:center;justify-content:center;font-size:1.5rem;">2</div>
           <div class="podium-name">{{ entries[1].display_name || entries[1].username }}</div>
           <div class="podium-points">{{ entries[1].total_points || 0 }} pts</div>
         </div>
         <div class="podium-place gold" style="animation-delay:0s;">
           <div class="podium-rank">🥇</div>
-          <img v-if="entries[0].avatar" :src="resolveUrl(entries[0].avatar)" class="podium-avatar" />
+          <img v-if="entries[0].avatar" :src="resolveUrl(entries[0].avatar)" class="podium-avatar" :alt="(entries[0].display_name || entries[0].username) + ' avatar'" />
           <div v-else class="podium-avatar" style="display:flex;align-items:center;justify-content:center;font-size:1.5rem;">1</div>
           <div class="podium-name">{{ entries[0].display_name || entries[0].username }}</div>
           <div class="podium-points">{{ entries[0].total_points || 0 }} pts</div>
         </div>
         <div v-if="entries[2]" class="podium-place bronze" style="animation-delay:0.4s;">
           <div class="podium-rank">🥉</div>
-          <img v-if="entries[2].avatar" :src="resolveUrl(entries[2].avatar)" class="podium-avatar" />
+          <img v-if="entries[2].avatar" :src="resolveUrl(entries[2].avatar)" class="podium-avatar" :alt="(entries[2].display_name || entries[2].username) + ' avatar'" />
           <div v-else class="podium-avatar" style="display:flex;align-items:center;justify-content:center;font-size:1.5rem;">3</div>
           <div class="podium-name">{{ entries[2].display_name || entries[2].username }}</div>
           <div class="podium-points">{{ entries[2].total_points || 0 }} pts</div>
@@ -39,7 +39,7 @@
       <!-- Rest of ranking -->
       <div v-for="(entry, i) in entries.slice(3)" :key="entry.username" :style="{display:'flex',alignItems:'center',gap:'1rem',padding:'0.6rem 1rem',borderRadius:'8px',marginBottom:'0.4rem',background:'#f8fafc',border:'1px solid #e2e8f0'}">
         <div style="width:28px;text-align:center;font-weight:bold;color:#94a3b8;font-size:0.9rem;">{{ i + 4 }}</div>
-        <img v-if="entry.avatar" :src="resolveUrl(entry.avatar)" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;" />
+        <img v-if="entry.avatar" :src="resolveUrl(entry.avatar)" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;" :alt="(entry.display_name || entry.username) + ' avatar'" />
         <div style="flex:1;min-width:0;">
           <div style="font-weight:600;font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ entry.display_name || entry.username }}</div>
           <div style="font-size:0.7rem;color:#94a3b8;">{{ entry.total_correct || 0 }} correct</div>
@@ -48,7 +48,7 @@
       </div>
 
       <div style="text-align:center;margin-top:1.5rem;">
-        <button @click="$emit('close')" class="secondary" style="width:auto;padding:0.5rem 2rem;border-radius:20px;">Close</button>
+        <button @click="$emit('close')" class="secondary" style="width:auto;padding:0.5rem 2rem;border-radius:20px;" aria-label="Close leaderboard">Close</button>
       </div>
     </div>
   </div>

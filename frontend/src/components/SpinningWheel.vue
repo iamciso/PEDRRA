@@ -17,7 +17,7 @@
       <!-- Winner display -->
       <div v-if="winner" style="margin-top:1.5rem;padding:1rem;background:#f0fdf4;border:2px solid #10b981;border-radius:12px;">
         <div style="display:flex;align-items:center;justify-content:center;gap:1rem;">
-          <img v-if="winner.avatar" :src="resolveUrl(winner.avatar)" style="width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid var(--edps-gold,#dea133);" />
+          <img v-if="winner.avatar" :src="resolveUrl(winner.avatar)" style="width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid var(--edps-gold,#dea133);" :alt="(winner.display_name || winner.username) + ' avatar'" />
           <div style="font-size:1.5rem;">🎉</div>
           <div>
             <div style="font-size:1.3rem;font-weight:bold;color:#166534;">{{ winner.display_name || winner.username }}</div>
@@ -27,8 +27,8 @@
       </div>
 
       <div style="margin-top:1.5rem;display:flex;gap:0.5rem;justify-content:center;">
-        <button @click="spin" :disabled="spinning || attendees.length < 2" style="padding:0.75rem 2rem;font-size:1rem;">🎡 Spin!</button>
-        <button @click="$emit('close')" class="secondary" style="width:auto;padding:0.75rem 1.5rem;">Close</button>
+        <button @click="spin" :disabled="spinning || attendees.length < 2" style="padding:0.75rem 2rem;font-size:1rem;" aria-label="Spin the wheel">🎡 Spin!</button>
+        <button @click="$emit('close')" class="secondary" style="width:auto;padding:0.75rem 1.5rem;" aria-label="Close spinning wheel">Close</button>
       </div>
     </div>
   </div>

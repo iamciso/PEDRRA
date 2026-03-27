@@ -1621,7 +1621,8 @@ export default {
         const pptx = new PptxGenJS();
         pptx.defineLayout({ name: 'WIDE', width: 13.33, height: 7.5 });
         pptx.layout = 'WIDE';
-        for (const s of this.slides) {
+        for (let si = 0; si < this.slides.length; si++) {
+          const s = this.slides[si];
           const slide = pptx.addSlide();
           // Blue bar at top
           slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: '100%', h: 0.6, fill: { color: '1b4293' } });
@@ -1633,9 +1634,9 @@ export default {
             if (s.subtitle) slide.addText(s.subtitle, { x: 5, y: 4, w: 7, h: 0.8, fontSize: 16, color: 'CCCCCC', align: 'center' });
           } else if (s.type === 'poll') {
             slide.addText(s.question || '', { x: 0.5, y: 1.2, w: 12, h: 0.6, fontSize: 22, bold: true, color: '1b4293' });
-            (s.options || []).forEach((opt, i) => {
-              slide.addShape(pptx.ShapeType.rect, { x: 1, y: 2.2 + i * 0.8, w: 10, h: 0.6, fill: { color: 'f1f5f9' }, line: { color: 'cbd5e1' } });
-              slide.addText(opt, { x: 1.2, y: 2.2 + i * 0.8, w: 9.5, h: 0.6, fontSize: 14, color: '334155' });
+            (s.options || []).forEach((opt, oi) => {
+              slide.addShape(pptx.ShapeType.rect, { x: 1, y: 2.2 + oi * 0.8, w: 10, h: 0.6, fill: { color: 'f1f5f9' }, line: { color: 'cbd5e1' } });
+              slide.addText(opt, { x: 1.2, y: 2.2 + oi * 0.8, w: 9.5, h: 0.6, fontSize: 14, color: '334155' });
             });
           } else {
             if (s.subtitle) slide.addText(s.subtitle, { x: 0.5, y: 0.8, w: 12, h: 0.4, fontSize: 14, color: '64748b' });
@@ -1648,7 +1649,7 @@ export default {
           }
           // Gold corner
           slide.addShape(pptx.ShapeType.rect, { x: 0, y: 7, w: '100%', h: 0.5, fill: { color: 'e6e6e6' } });
-          slide.addText(String(this.slides.indexOf(s) + 1), { x: 12.2, y: 6.5, w: 0.5, h: 0.5, fontSize: 10, color: 'FFFFFF', fill: { color: '1b4293' }, align: 'center', valign: 'middle' });
+          slide.addText(String(si + 1), { x: 12.2, y: 6.5, w: 0.5, h: 0.5, fontSize: 10, color: 'FFFFFF', fill: { color: '1b4293' }, align: 'center', valign: 'middle' });
         }
         await pptx.writeFile({ fileName: 'PEDRRA_Presentation.pptx' });
       } catch (e) { this.showError('PPTX export failed: ' + e.message); }
