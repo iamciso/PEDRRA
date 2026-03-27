@@ -11,9 +11,28 @@ const jwt = require('jsonwebtoken');
 const db = require('./db.js');
 require('dotenv').config();
 
+// ── LOGGER (#14) ─────────────────────────────────────────────
+const LOG_LEVEL = (process.env.LOG_LEVEL || 'info').toLowerCase();
+const LOG_LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
+const log = {
+    _write(level, ...args) {
+        if ((LOG_LEVELS[level] ?? 2) <= (LOG_LEVELS[LOG_LEVEL] ?? 2)) {
+            const ts = new Date().toISOString();
+            const prefix = `[${ts}] [${level.toUpperCase()}]`;
+            if (level === 'error') console.error(prefix, ...args);
+            else if (level === 'warn') console.warn(prefix, ...args);
+            else console.log(prefix, ...args);
+        }
+    },
+    error(...args) { this._write('error', ...args); },
+    warn(...args) { this._write('warn', ...args); },
+    info(...args) { this._write('info', ...args); },
+    debug(...args) { this._write('debug', ...args); },
+};
+
 const JWT_SECRET = process.env.JWT_SECRET || 'pedrra-training-platform-default-secret-key';
 if (!process.env.JWT_SECRET) {
-    console.warn('⚠️  WARNING: JWT_SECRET not set. Using default secret — NOT SAFE FOR PRODUCTION. Set JWT_SECRET env var.');
+    log.warn('JWT_SECRET not set. Using default secret — NOT SAFE FOR PRODUCTION. Set JWT_SECRET env var.');
 }
 
 const app = express();
@@ -75,13 +94,13 @@ try {
     presentationData = JSON.parse(fs.readFileSync(contentFilePath, 'utf8'));
     // Create backup on successful load
     try { fs.writeFileSync(contentFilePath + '.bak', JSON.stringify(presentationData, null, 2)); } catch (e) { /* ignore */ }
-    console.log(`Loaded ${presentationData.slides?.length || 0} slides from content.json`);
+    log.info(`Loaded ${presentationData.slides?.length || 0} slides from content.json`);
 } catch (e) {
-    console.error("Could not load content.json — starting with empty slides");
+    log.warn("Could not load content.json — starting with empty slides");
     // Try to restore from backup
     try {
         presentationData = JSON.parse(fs.readFileSync(contentFilePath + '.bak', 'utf8'));
-        console.log(`Restored ${presentationData.slides?.length || 0} slides from backup`);
+        log.info(`Restored ${presentationData.slides?.length || 0} slides from backup`);
     } catch (e2) { /* no backup available */ }
 }
 
@@ -90,15 +109,22 @@ const statePath = path.join(__dirname, 'state.json');
 let serverState = { currentSlideId: 1, presentationActive: false };
 try {
     serverState = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-    console.log('Restored presentation state from state.json');
+    log.info('Restored presentation state from state.json');
 } catch (e) { /* first run or missing file */ }
 let currentSlideId = serverState.currentSlideId || 1;
 let presentationActive = serverState.presentationActive || false;
+let freezeMode = serverState.freezeMode || false;
+let handRaisedUsers = new Set(serverState.handRaisedUsers || []);
+const timerState = serverState.timerState || {}; // { [slideId]: { startTime, duration, paused, pausedAt } }
 
 function saveState() {
     try {
-        fs.writeFileSync(statePath, JSON.stringify({ currentSlideId, presentationActive }, null, 2));
-    } catch (e) { console.error('Failed to save state:', e.message); }
+        fs.writeFileSync(statePath, JSON.stringify({
+            currentSlideId, presentationActive, freezeMode,
+            handRaisedUsers: Array.from(handRaisedUsers),
+            timerState,
+        }, null, 2));
+    } catch (e) { log.error('Failed to save state:', e.message); }
 }
 
 // JWT Authentication middleware
@@ -207,6 +233,55 @@ app.post('/api/users', authMiddleware('Trainer'), async (req, res) => {
         });
     } catch (e) {
         res.status(500).json({ error: 'Failed to hash password.' });
+    }
+});
+
+// Bulk user import from CSV (#10)
+app.post('/api/users/bulk', authMiddleware('Trainer'), async (req, res) => {
+    const { users } = req.body;
+    if (!Array.isArray(users) || users.length === 0) return res.status(400).json({ error: 'Users array required.' });
+    if (users.length > 200) return res.status(400).json({ error: 'Maximum 200 users per import.' });
+    const chars = require('./db.js').FICTIONAL_CHARACTERS;
+    const results = { created: 0, skipped: 0, errors: [] };
+    for (const u of users) {
+        if (!u.username) { results.skipped++; continue; }
+        try {
+            const password = u.password || u.username; // default password = username
+            const hashed = await bcrypt.hash(password, 10);
+            const pin = require('./db.js').generatePin();
+            const dname = u.display_name || chars[Math.floor(Math.random() * chars.length)];
+            await new Promise((resolve, reject) => {
+                db.run('INSERT INTO users (username, password, team, role, display_name, avatar, pin) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [u.username, hashed, u.team || '', u.role || 'Attendee', dname, u.avatar || '', pin],
+                    (err) => err ? reject(err) : resolve());
+            });
+            results.created++;
+        } catch (e) {
+            results.errors.push(`${u.username}: ${e.message}`);
+            results.skipped++;
+        }
+    }
+    res.json({ success: true, ...results });
+});
+
+// Consolidated session export (#2)
+app.get('/api/export/session', authMiddleware('Trainer'), async (req, res) => {
+    try {
+        const [users, answers, quizScores, slides] = await Promise.all([
+            dbAllAsync("SELECT username, team, role, display_name FROM users"),
+            dbAllAsync("SELECT slide_id, username, answer, answered_at FROM answers ORDER BY slide_id, username"),
+            dbAllAsync("SELECT username, slide_id, correct, time_ms, points FROM quiz_scores ORDER BY username"),
+            Promise.resolve(presentationData.slides),
+        ]);
+        res.json({
+            exportedAt: new Date().toISOString(),
+            slides: slides.map(s => ({ id: s.id, type: s.type, title: s.title })),
+            users: users.filter(u => u.role === 'Attendee'),
+            answers,
+            quizScores,
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to export session data' });
     }
 });
 
@@ -433,7 +508,7 @@ app.post('/api/import-pptx', authMiddleware('Trainer'), uploadPptx.single('file'
 
         res.json({ success: true, slides, imageCount: Object.keys(imageMap).length });
     } catch (err) {
-        console.error('PPTX import error:', err);
+        log.error('PPTX import error:', err.message);
         // Clean up uploaded file on error too
         try { if (req.file?.path) fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
         res.status(500).json({ error: 'Failed to parse PPTX file: ' + err.message });
@@ -477,9 +552,22 @@ io.use((socket, next) => {
     }
 });
 
-const timerState = {}; // { [slideId]: { startTime, duration, paused, pausedAt } }
-let freezeMode = false;
-let handRaisedUsers = new Set();
+// ── SOCKET RATE LIMITING (#13) ───────────────────────────────
+function createSocketRateLimiter(maxPerWindow = 30, windowMs = 5000) {
+    const hits = new Map();
+    return (socketId) => {
+        const now = Date.now();
+        const entry = hits.get(socketId);
+        if (!entry || now - entry.start > windowMs) {
+            hits.set(socketId, { start: now, count: 1 });
+            return false; // not limited
+        }
+        entry.count++;
+        if (entry.count > maxPerWindow) return true; // rate limited
+        return false;
+    };
+}
+const socketLimiter = createSocketRateLimiter(30, 5000); // 30 events per 5s
 
 function sendPollResults(slideId) {
     db.all('SELECT username, answer FROM answers WHERE slide_id = ?', [slideId], (err, rows) => {
@@ -501,6 +589,15 @@ function broadcastUserCount() {
 }
 
 io.on('connection', (socket) => {
+    // Apply socket rate limiting to all incoming events
+    socket.use((packet, next) => {
+        if (socketLimiter(socket.id)) {
+            log.warn(`Rate limited socket ${socket.user?.username || socket.id}`);
+            return next(new Error('Too many events. Slow down.'));
+        }
+        next();
+    });
+
     socket.emit('slide:current', currentSlideId);
     socket.emit('slide:visibility', presentationActive);
     broadcastUserCount();
@@ -556,7 +653,7 @@ io.on('connection', (socket) => {
         if (socket.user.role !== 'Trainer') return;
         if (!slideId) return;
         db.run('DELETE FROM answers WHERE slide_id = ?', [slideId], (err) => {
-            if (err) { console.error('poll:reset failed:', err.message); return; }
+            if (err) { log.error('poll:reset failed:', err.message); return; }
             io.emit(`poll:reset:${slideId}`);
             io.emit('poll:reset', Number(slideId));
             sendPollResults(slideId);
@@ -596,7 +693,7 @@ io.on('connection', (socket) => {
         const safePoints = Math.max(0, Math.min(Number(points) || 0, 10000));
         db.run('INSERT OR REPLACE INTO quiz_scores (username, slide_id, correct, time_ms, points) VALUES (?, ?, ?, ?, ?)',
             [socket.user.username, slideId, correct ? 1 : 0, safeTimeMs, safePoints], (err) => {
-            if (err) { console.error('quiz:score save failed:', err.message); return; }
+            if (err) { log.error('quiz:score save failed:', err.message); return; }
         });
         // Broadcast updated leaderboard
         db.all(`SELECT username, SUM(points) as total_points FROM quiz_scores GROUP BY username ORDER BY total_points DESC`, (err, rows) => {
@@ -629,6 +726,7 @@ io.on('connection', (socket) => {
         if (socket.user.role !== 'Trainer') return;
         freezeMode = !!frozen;
         io.emit('slide:freeze', freezeMode);
+        saveState();
     });
 
     // ── HAND RAISE ───────────────────────────────────────────
@@ -743,4 +841,4 @@ if (fs.existsSync(frontendPath)) {
 }
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => log.info(`Server running on port ${PORT}`));
