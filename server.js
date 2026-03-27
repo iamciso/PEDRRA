@@ -329,6 +329,8 @@ app.post('/api/slides', authMiddleware('Trainer'), validateSlides, (req, res) =>
         fs.writeFileSync(tmpPath, JSON.stringify(newData, null, 2));
         fs.renameSync(tmpPath, contentFilePath);
         presentationData = newData;
+        // Notify all connected clients that slides were updated
+        io.emit('slides:updated', presentationData.slides);
         res.json({ success: true, slides: presentationData.slides });
     } catch (err) {
         res.status(500).json({ error: 'Failed to write content.json' });
@@ -432,6 +434,8 @@ app.post('/api/import-pptx', authMiddleware('Trainer'), uploadPptx.single('file'
         res.json({ success: true, slides, imageCount: Object.keys(imageMap).length });
     } catch (err) {
         console.error('PPTX import error:', err);
+        // Clean up uploaded file on error too
+        try { if (req.file?.path) fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
         res.status(500).json({ error: 'Failed to parse PPTX file: ' + err.message });
     }
 });
@@ -500,7 +504,14 @@ io.on('connection', (socket) => {
     socket.emit('slide:current', currentSlideId);
     socket.emit('slide:visibility', presentationActive);
     broadcastUserCount();
-    socket.on('disconnect', () => { setTimeout(broadcastUserCount, 500); });
+    socket.on('disconnect', () => {
+        // Clean up hand-raise state for disconnected user
+        if (handRaisedUsers.delete(socket.user.username)) {
+            io.emit('hand:lowered', socket.user.username);
+            io.emit('hand:count', handRaisedUsers.size);
+        }
+        setTimeout(broadcastUserCount, 500);
+    });
 
     // Only trainers can control slides and visibility
     socket.on('slide:toggleVisibility', (active) => {
@@ -518,9 +529,11 @@ io.on('connection', (socket) => {
     });
 
     socket.on('poll:answer', ({ slideId, answer }) => {
+        if (!slideId || answer === undefined || answer === null) return;
+        const answerStr = String(answer).slice(0, 10000); // Limit answer size
         const username = socket.user.username;
         const stmt = db.prepare('INSERT OR REPLACE INTO answers (slide_id, username, answer) VALUES (?, ?, ?)');
-        stmt.run([slideId, username, answer], function(err) {
+        stmt.run([slideId, username, answerStr], function(err) {
             if (!err) sendPollResults(slideId);
         });
     });
@@ -541,7 +554,9 @@ io.on('connection', (socket) => {
 
     socket.on('poll:reset', (slideId) => {
         if (socket.user.role !== 'Trainer') return;
-        db.run('DELETE FROM answers WHERE slide_id = ?', [slideId], () => {
+        if (!slideId) return;
+        db.run('DELETE FROM answers WHERE slide_id = ?', [slideId], (err) => {
+            if (err) { console.error('poll:reset failed:', err.message); return; }
             io.emit(`poll:reset:${slideId}`);
             io.emit('poll:reset', Number(slideId));
             sendPollResults(slideId);
@@ -551,7 +566,8 @@ io.on('connection', (socket) => {
     // ── TIMER ──────────────────────────────────────────────────
     socket.on('timer:start', ({ slideId, duration }) => {
         if (socket.user.role !== 'Trainer') return;
-        timerState[slideId] = { startTime: Date.now(), duration, paused: false, pausedAt: null };
+        const dur = Math.max(1, Math.min(Number(duration) || 300, 7200)); // 1s to 2h
+        timerState[slideId] = { startTime: Date.now(), duration: dur, paused: false, pausedAt: null };
         io.emit(`timer:update:${slideId}`, timerState[slideId]);
     });
     socket.on('timer:pause', (slideId) => {
@@ -575,8 +591,11 @@ io.on('connection', (socket) => {
 
     // ── QUIZ ──────────────────────────────────────────────────
     socket.on('quiz:score', ({ slideId, correct, timeMs, points }) => {
+        if (!slideId) return;
+        const safeTimeMs = Math.max(0, Math.min(Number(timeMs) || 0, 600000));
+        const safePoints = Math.max(0, Math.min(Number(points) || 0, 10000));
         db.run('INSERT OR REPLACE INTO quiz_scores (username, slide_id, correct, time_ms, points) VALUES (?, ?, ?, ?, ?)',
-            [socket.user.username, slideId, correct ? 1 : 0, timeMs || 0, points || 0]);
+            [socket.user.username, slideId, correct ? 1 : 0, safeTimeMs, safePoints]);
         // Broadcast updated leaderboard
         db.all(`SELECT username, SUM(points) as total_points FROM quiz_scores GROUP BY username ORDER BY total_points DESC`, (err, rows) => {
             if (!err) io.emit('quiz:leaderboard', rows);

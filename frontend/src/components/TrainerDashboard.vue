@@ -1222,7 +1222,7 @@ export default {
       } catch(e) { this.showError(e.message); }
     },
     addSlide(type) {
-      const id = Date.now();
+      const id = Date.now() + Math.floor(Math.random() * 10000);
       const base = { ratingEnabled: false };
       if (type === 'poll') {
         this.editSlides.push({ ...base, id, type, title: 'New Poll', question: 'What is your question?', correctOption: '', options: ['Option 1', 'Option 2'] });
@@ -1260,9 +1260,9 @@ export default {
     duplicateSlide(index) {
       const original = this.editSlides[index];
       const clone = JSON.parse(JSON.stringify(original));
-      clone.id = Date.now();
+      clone.id = Date.now() + Math.floor(Math.random() * 10000);
       clone.title = clone.title + ' (Copy)';
-      if (clone.elements) clone.elements.forEach(el => { el.id = 'el_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5); });
+      if (clone.elements) clone.elements.forEach((el, i) => { el.id = 'el_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substr(2, 5); });
       this.editSlides.splice(index + 1, 0, clone);
     },
     moveSlide(index, direction) {
@@ -1553,6 +1553,7 @@ export default {
     exportPDF() {
       // Open a printable view of all slides in a new window
       const printWin = window.open('', '_blank');
+      if (!printWin) { this.showError('Pop-up blocked. Please allow pop-ups for this site to export PDF.'); return; }
       let html = `<html><head><title>PEDRRA Presentation</title>
         <style>
           body{font-family:'Segoe UI',sans-serif;margin:0;padding:0;}
@@ -1792,6 +1793,7 @@ export default {
       if (!this.analytics) return;
       const a = this.analytics;
       const w = window.open('', '_blank');
+      if (!w) { this.showError('Pop-up blocked. Please allow pop-ups to export the report.'); return; }
       let html = `<html><head><title>PEDRRA Analytics Report</title><style>body{font-family:'Segoe UI',sans-serif;padding:2rem;color:#333;}h1{color:#1b4293;}table{width:100%;border-collapse:collapse;margin:1rem 0;}th,td{padding:0.5rem;border:1px solid #e2e8f0;text-align:left;}th{background:#f1f5f9;}</style></head><body>`;
       html += `<h1>📈 PEDRRA Session Analytics Report</h1>`;
       html += `<p>Generated: ${new Date().toLocaleString()}</p>`;
@@ -1818,6 +1820,7 @@ export default {
       // Open a second window showing the attendee view
       const url = window.location.origin + '/attendee';
       this.presenterWindow = window.open(url, 'presenter', 'width=1024,height=576');
+      if (!this.presenterWindow) this.showError('Pop-up blocked. Please allow pop-ups for presenter mode.');
     },
     async loadSessionCode() {
       try {
@@ -1883,6 +1886,7 @@ export default {
       const attendees = this.usersList.filter(u => u.role === 'Attendee');
       if (!attendees.length) return this.showError('No attendees to print.');
       const w = window.open('', '_blank');
+      if (!w) { this.showError('Pop-up blocked. Please allow pop-ups to print PIN cards.'); return; }
       let html = `<html><head><title>PIN Cards</title><style>
         body{font-family:'Segoe UI',sans-serif;margin:0;padding:1rem;}
         .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;}
@@ -1911,6 +1915,7 @@ export default {
     // #7 — Export session results as PDF report
     exportSessionPDF() {
       const w = window.open('', '_blank');
+      if (!w) { this.showError('Pop-up blocked. Please allow pop-ups to export the report.'); return; }
       let html = `<html><head><title>PEDRRA Session Report</title><style>
         body{font-family:'Segoe UI',sans-serif;margin:2rem;color:#333;}
         h1{color:#254A9A;border-bottom:3px solid #F1C064;padding-bottom:0.5rem;}
