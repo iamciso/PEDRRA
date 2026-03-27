@@ -28,8 +28,16 @@ const FICTIONAL_CHARACTERS = [
     'Obelix', 'Lucky Luke', 'Zorro', 'Robin Hood', 'Peter Pan'
 ];
 
-function generatePin() {
-    return crypto.randomInt(1000, 9999).toString();
+function generatePin(existingPins) {
+    // Generate a unique 4-digit PIN, avoiding collisions
+    let pin;
+    const usedPins = new Set(existingPins || []);
+    let attempts = 0;
+    do {
+        pin = crypto.randomInt(1000, 9999).toString();
+        attempts++;
+    } while (usedPins.has(pin) && attempts < 100);
+    return pin;
 }
 
 const initDb = () => {

@@ -223,7 +223,13 @@ app.post('/api/users', authMiddleware('Trainer'), async (req, res) => {
     if (!username || !password) return res.status(400).json({ error: 'Username and password required.' });
     try {
         const hashed = await bcrypt.hash(password, 10);
-        const pin = require('./db.js').generatePin();
+        // Get existing PINs to avoid collisions
+        const existingPins = await new Promise((resolve, reject) => {
+            db.all('SELECT pin FROM users WHERE pin IS NOT NULL AND pin != ""', (err, rows) => {
+                if (err) reject(err); else resolve((rows || []).map(r => r.pin));
+            });
+        });
+        const pin = require('./db.js').generatePin(existingPins);
         const chars = require('./db.js').FICTIONAL_CHARACTERS;
         const dname = display_name || chars[Math.floor(Math.random() * chars.length)];
         db.run('INSERT INTO users (username, password, team, role, display_name, avatar, pin) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -232,7 +238,7 @@ app.post('/api/users', authMiddleware('Trainer'), async (req, res) => {
             res.json({ success: true, user: { id: this.lastID, username, team, role, display_name: dname, avatar: avatar || '', pin } });
         });
     } catch (e) {
-        res.status(500).json({ error: 'Failed to hash password.' });
+        res.status(500).json({ error: 'Failed to create user.' });
     }
 });
 
@@ -242,13 +248,21 @@ app.post('/api/users/bulk', authMiddleware('Trainer'), async (req, res) => {
     if (!Array.isArray(users) || users.length === 0) return res.status(400).json({ error: 'Users array required.' });
     if (users.length > 200) return res.status(400).json({ error: 'Maximum 200 users per import.' });
     const chars = require('./db.js').FICTIONAL_CHARACTERS;
+    // Get existing PINs to avoid collisions
+    const existingPins = await new Promise((resolve, reject) => {
+        db.all('SELECT pin FROM users WHERE pin IS NOT NULL AND pin != ""', (err, rows) => {
+            if (err) reject(err); else resolve((rows || []).map(r => r.pin));
+        });
+    });
+    const usedPins = new Set(existingPins);
     const results = { created: 0, skipped: 0, errors: [] };
     for (const u of users) {
         if (!u.username) { results.skipped++; continue; }
         try {
             const password = u.password || u.username; // default password = username
             const hashed = await bcrypt.hash(password, 10);
-            const pin = require('./db.js').generatePin();
+            const pin = require('./db.js').generatePin(Array.from(usedPins));
+            usedPins.add(pin);
             const dname = u.display_name || chars[Math.floor(Math.random() * chars.length)];
             await new Promise((resolve, reject) => {
                 db.run('INSERT INTO users (username, password, team, role, display_name, avatar, pin) VALUES (?, ?, ?, ?, ?, ?, ?)',

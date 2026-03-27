@@ -327,17 +327,24 @@ export default {
     modelValue: {
       immediate: true,
       handler(v) {
-        // Only sync from parent when data actually differs from local state.
-        // This prevents the selection/editing state from being destroyed when
-        // our own emit() round-trips back through the parent binding.
         const incoming = v || [];
-        if (this._lastEmittedJSON && this._lastEmittedJSON === JSON.stringify(incoming)) {
+        const incomingJSON = JSON.stringify(incoming);
+        // Skip if this is our own data round-tripping back from parent
+        if (this._lastEmittedJSON && this._lastEmittedJSON === incomingJSON) {
           return;
         }
-        this.localEls = JSON.parse(JSON.stringify(incoming));
-        this.selIdx = -1;
-        this.multiSelIndices = [];
-        this.editingIdx = -1;
+        // Check if this is a minor update (same element count/IDs) vs a full replacement
+        const prevIds = this.localEls.map(e => e.id).join(',');
+        const newIds = incoming.map(e => e.id).join(',');
+        const wasMinorUpdate = prevIds === newIds && prevIds.length > 0;
+
+        this.localEls = JSON.parse(incomingJSON);
+        // Only reset selection on major changes (different slides, import, etc.)
+        if (!wasMinorUpdate) {
+          this.selIdx = -1;
+          this.multiSelIndices = [];
+          this.editingIdx = -1;
+        }
         // Track max zIndex
         const maxZ = this.localEls.reduce((m, e) => Math.max(m, e.zIndex || 0), 0);
         if (maxZ >= _nextZIndex) _nextZIndex = maxZ + 1;
