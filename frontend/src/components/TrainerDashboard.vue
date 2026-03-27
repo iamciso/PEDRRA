@@ -6,7 +6,12 @@
       <div style="color: #64748b;">
         <span :style="{display:'inline-block',width:'8px',height:'8px',borderRadius:'50%',marginRight:'6px',background:connected?'#10b981':'#ef4444'}" :title="connected?'Connected':'Disconnected'"></span>
         {{ user?.username }} ({{ user?.team }}) |
-        <a href="#" @click.prevent="toggleDarkMode" style="text-decoration:none;margin:0 0.5rem;" :title="darkMode?'Switch to light mode':'Switch to dark mode'">{{ darkMode ? '☀️' : '🌙' }}</a> |
+        <a href="#" @click.prevent="toggleDarkMode" style="text-decoration:none;margin:0 0.5rem;" :title="darkMode?'Switch to light mode':'Switch to dark mode'">{{ darkMode ? '☀️' : '🌙' }}</a>
+        <select @change="changeLocale($event.target.value)" :value="locale" style="width:auto;margin:0;padding:0.1rem 0.3rem;font-size:0.75rem;border-radius:4px;">
+          <option v-for="l in availableLocales" :key="l.code" :value="l.code">{{ l.name }}</option>
+        </select> |
+        <a v-if="!notificationsEnabled" href="#" @click.prevent="enableNotifications" style="font-size:0.8rem;margin:0 0.3rem;" title="Enable desktop notifications">🔔</a>
+        <span v-else style="font-size:0.8rem;margin:0 0.3rem;opacity:0.5;" title="Notifications enabled">🔔✓</span> |
         <a href="#" @click.prevent="logout" style="color: var(--primary);">Log Out</a>
       </div>
     </div>
@@ -140,6 +145,15 @@
               <button @click="pauseTimer" class="secondary" style="width: auto; padding: 0.5rem 1.2rem; font-size:0.85rem; border-radius:20px;">⏸ Pause</button>
               <button @click="resumeTimer" class="secondary" style="width: auto; padding: 0.5rem 1.2rem; font-size:0.85rem; border-radius:20px;">▶ Resume</button>
               <button @click="resetTimer" class="danger" style="width: auto; padding: 0.5rem 1.2rem; font-size:0.85rem; border-radius:20px;">↺ Reset</button>
+            </div>
+            <div style="margin-top:0.75rem;display:flex;align-items:center;justify-content:center;gap:0.5rem;font-size:0.8rem;color:#64748b;">
+              <span>Sound:</span>
+              <select :value="timerSound" @change="setTimerSound($event.target.value)" style="width:auto;padding:0.2rem 0.4rem;font-size:0.8rem;margin:0;">
+                <option value="chime">🔔 Chime</option>
+                <option value="bell">🛎 Bell</option>
+                <option value="countdown">⏱ Countdown</option>
+                <option value="none">🔇 None</option>
+              </select>
             </div>
           </div>
         </div>
@@ -435,9 +449,22 @@
         <div v-if="userMessage" style="margin-top: 0.5rem; font-size: 0.9rem; color: #10b981;">{{ userMessage }}</div>
       </div>
 
-      <div style="display:flex;gap:0.5rem;margin:1rem 0;">
+      <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin:1rem 0;">
         <button class="secondary" @click="printPinCards" style="width:auto;padding:0.4rem 1rem;font-size:0.8rem;">🖨 Print PIN Cards</button>
         <button class="secondary" @click="exportSessionPDF" style="width:auto;padding:0.4rem 1rem;font-size:0.8rem;">📄 Session Report</button>
+        <button class="secondary" @click="exportFullSession" style="width:auto;padding:0.4rem 1rem;font-size:0.8rem;">📦 Export All Data</button>
+        <button class="secondary" @click="showBulkImport=!showBulkImport" style="width:auto;padding:0.4rem 1rem;font-size:0.8rem;">📋 Import CSV</button>
+      </div>
+
+      <!-- Bulk CSV Import (#10) -->
+      <div v-if="showBulkImport" style="background:#f8fafc;border:1px solid var(--border-color);border-radius:8px;padding:1rem;margin-bottom:1rem;">
+        <h4 style="margin:0 0 0.5rem;color:var(--primary);">Bulk Import Users from CSV</h4>
+        <p style="font-size:0.8rem;color:#64748b;margin:0 0 0.5rem;">Paste CSV with columns: <code>username</code> (required), <code>password</code>, <code>team</code>, <code>role</code>, <code>display_name</code>. First row = headers.</p>
+        <textarea v-model="bulkCsvText" rows="5" placeholder="username,password,team,role,display_name&#10;jdoe,pass123,DPO,Attendee,John Doe&#10;asmith,pass456,IT,Attendee,Alice Smith" style="font-family:monospace;font-size:0.8rem;"></textarea>
+        <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
+          <button @click="bulkImportUsers" style="width:auto;padding:0.4rem 1rem;font-size:0.85rem;">Import Users</button>
+          <button class="secondary" @click="showBulkImport=false" style="width:auto;padding:0.4rem 1rem;font-size:0.85rem;">Cancel</button>
+        </div>
       </div>
 
       <!-- Users Table -->
@@ -838,6 +865,8 @@ import { baseUrl } from '../config.js';
 import { authFetch, authHeaders, getUser, getToken, getTokenForRole, clearAuth } from '../auth.js';
 import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 import { renderMarkdown } from '../utils/safeMd.js';
+import { t, setLocale, getLocale, getAvailableLocales } from '../utils/i18n.js';
+import { requestNotificationPermission, sendNotification, isSupported as notifSupported } from '../utils/notify.js';
 import SurveyResults from './SurveyResults.vue';
 import MediaManager from './MediaManager.vue';
 import SlideCanvas from './SlideCanvas.vue';
@@ -923,7 +952,17 @@ export default {
       errorMessage: '',
       timerSeconds: 0,
       timerRunning: false,
-      timerInterval: null
+      timerInterval: null,
+      // #4 Timer sound config
+      timerSound: localStorage.getItem('pedrra_timer_sound') || 'chime',
+      // #8 Notifications
+      notificationsEnabled: false,
+      // #9 i18n
+      locale: getLocale(),
+      availableLocales: getAvailableLocales(),
+      // #10 Bulk import
+      showBulkImport: false,
+      bulkCsvText: '',
     }
   },
   computed: {
@@ -1036,6 +1075,10 @@ export default {
     this.socket.on('hand:raised', (data) => {
       this.handRaisedCount++;
       this._playNotifSound(800, 0.15);
+      // Desktop notification (#8)
+      if (this.notificationsEnabled) {
+        sendNotification('Hand Raised', { body: `${data.display_name || data.username} raised their hand` });
+      }
       // Show fly-up notification in fullscreen
       if (this.isFullscreen) {
         const notif = { id: Date.now() + Math.random(), name: data.display_name || data.username };
@@ -1871,20 +1914,31 @@ export default {
       } catch (e) { /* audio not supported */ }
     },
     _playTimerEndSound() {
+      if (this.timerSound === 'none') return;
       try {
         const ctx = this._getAudioCtx();
         if (!ctx) return;
-        const playTone = (freq, start, dur) => {
+        const playTone = (freq, start, dur, vol = 0.3) => {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'sine'; osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.3, ctx.currentTime + start);
+          gain.gain.setValueAtTime(vol, ctx.currentTime + start);
           gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + start + dur);
           osc.connect(gain).connect(ctx.destination);
           osc.start(ctx.currentTime + start); osc.stop(ctx.currentTime + start + dur);
         };
-        playTone(523, 0, 0.2); playTone(659, 0.25, 0.2); playTone(784, 0.5, 0.4);
+        if (this.timerSound === 'bell') {
+          playTone(800, 0, 0.6, 0.4); playTone(600, 0.7, 0.6, 0.3); playTone(800, 1.4, 0.8, 0.4);
+        } else if (this.timerSound === 'countdown') {
+          playTone(440, 0, 0.15); playTone(440, 0.2, 0.15); playTone(440, 0.4, 0.15); playTone(880, 0.6, 0.5, 0.4);
+        } else { // 'chime' default
+          playTone(523, 0, 0.2); playTone(659, 0.25, 0.2); playTone(784, 0.5, 0.4);
+        }
       } catch (e) { /* audio not supported */ }
+      // Also send desktop notification
+      if (this.notificationsEnabled) {
+        sendNotification('Timer Complete', { body: 'The countdown has finished!' });
+      }
     },
     _startTimerTick() {
       clearInterval(this.timerInterval);
@@ -1981,6 +2035,68 @@ export default {
       w.document.write(html);
       w.document.close();
       w.onload = () => w.print();
+    },
+    // #9 — i18n
+    t(key, params) { return t(key, params); },
+    changeLocale(locale) {
+      setLocale(locale);
+      this.locale = locale;
+    },
+    // #8 — Desktop notifications
+    async enableNotifications() {
+      this.notificationsEnabled = await requestNotificationPermission();
+    },
+    // #4 — Timer sound config
+    setTimerSound(sound) {
+      this.timerSound = sound;
+      localStorage.setItem('pedrra_timer_sound', sound);
+    },
+    // #10 — Bulk user import
+    async bulkImportUsers() {
+      if (!this.bulkCsvText.trim()) return this.showError('Paste CSV data first.');
+      const lines = this.bulkCsvText.trim().split('\n').filter(l => l.trim());
+      if (lines.length < 2) return this.showError('CSV must have a header row and at least one data row.');
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+      const usernameIdx = headers.indexOf('username');
+      if (usernameIdx === -1) return this.showError('CSV must have a "username" column.');
+      const users = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
+        const user = {};
+        headers.forEach((h, j) => { if (cols[j]) user[h] = cols[j]; });
+        if (user.username) users.push(user);
+      }
+      if (users.length === 0) return this.showError('No valid users found in CSV.');
+      try {
+        const res = await authFetch(`${baseUrl}/api/users/bulk`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ users })
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Import failed'); }
+        const data = await res.json();
+        this.userMessage = `Imported ${data.created} users (${data.skipped} skipped).`;
+        if (data.errors?.length) this.userMessage += ` Errors: ${data.errors.slice(0, 3).join('; ')}`;
+        this.showBulkImport = false;
+        this.bulkCsvText = '';
+        this.fetchUsers();
+        setTimeout(() => this.userMessage = '', 8000);
+      } catch (e) { this.showError(e.message); }
+    },
+    // #2 — Consolidated session export
+    async exportFullSession() {
+      try {
+        const res = await authFetch(`${baseUrl}/api/export/session`);
+        if (!res.ok) throw new Error('Export failed');
+        const data = await res.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        link.download = `PEDRRA_Session_${new Date().toISOString().slice(0, 10)}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+      } catch (e) { this.showError('Failed to export session: ' + e.message); }
     },
     logout() {
       clearAuth();
