@@ -217,6 +217,20 @@
             <span v-for="(r, i) in reactions" :key="i" style="font-size:1.5rem;animation:reactionPop 2s ease-out forwards;" :title="r.username">{{ r.emoji }}</span>
           </div>
         </div>
+
+        <!-- #7 — Slide thumbnail strip -->
+        <div v-if="slides.length > 0" style="margin-top:1rem;">
+          <h4 style="margin:0 0 0.5rem;font-size:0.9rem;color:#64748b;">Slides</h4>
+          <div style="display:flex;flex-direction:column;gap:0.3rem;max-height:300px;overflow-y:auto;padding-right:0.3rem;">
+            <div v-for="(s, i) in slides" :key="s.id" @click="currentIndex = i"
+              :style="{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.4rem 0.5rem',borderRadius:'6px',cursor:'pointer',fontSize:'0.75rem',
+                border: i === currentIndex ? '2px solid var(--edps-blue)' : '1px solid #e2e8f0',
+                background: i === currentIndex ? '#e0f2fe' : '#f8fafc'}">
+              <div :style="{width:'28px',height:'18px',background:slideTypeColor(s.type),borderRadius:'3px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.5rem',color:'white',fontWeight:'bold',flexShrink:0}">{{ slideTypeIcon(s.type) }}</div>
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#334155;">{{ i+1 }}. {{ s.title }}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
