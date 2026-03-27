@@ -324,10 +324,17 @@ export default {
     modelValue: {
       immediate: true,
       handler(v) {
-        // Skip reset when the change came from our own emit() — prevents
-        // losing selection state and causing flickering on click
-        if (this._selfEmit) { this._selfEmit = false; return; }
-        this.localEls = JSON.parse(JSON.stringify(v || []));
+        // Only sync from parent when data actually differs from local state.
+        // This prevents the selection/editing state from being destroyed when
+        // our own emit() round-trips back through the parent binding.
+        const incoming = v || [];
+        if (this._lastEmittedJSON && this._lastEmittedJSON === JSON.stringify(incoming)) {
+          return;
+        }
+        this.localEls = JSON.parse(JSON.stringify(incoming));
+        this.selIdx = -1;
+        this.multiSelIndices = [];
+        this.editingIdx = -1;
         // Track max zIndex
         const maxZ = this.localEls.reduce((m, e) => Math.max(m, e.zIndex || 0), 0);
         if (maxZ >= _nextZIndex) _nextZIndex = maxZ + 1;
@@ -788,8 +795,9 @@ export default {
 
     emit() {
       this._saveUndoSnapshot();
-      this._selfEmit = true;
-      this.$emit('update:modelValue', JSON.parse(JSON.stringify(this.localEls)));
+      const data = JSON.parse(JSON.stringify(this.localEls));
+      this._lastEmittedJSON = JSON.stringify(data);
+      this.$emit('update:modelValue', data);
     },
   },
 };
