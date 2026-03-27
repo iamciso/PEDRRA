@@ -153,9 +153,11 @@ export default {
       );
       const csv = [headers, ...rows].join('\n');
       const link = document.createElement('a');
-      link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+      link.href = url;
       link.download = `${slide.title.replace(/[^a-z0-9]/gi, '_')}_results.csv`;
       link.click();
+      URL.revokeObjectURL(url);
     },
     getRatingCount(slide, qi, n) {
       const results = this.getSurveyResults(slide);

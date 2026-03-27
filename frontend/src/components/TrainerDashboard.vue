@@ -1298,9 +1298,11 @@ export default {
       const data = JSON.stringify(this.editSlides, null, 2);
       const blob = new Blob([data], { type: 'application/json' });
       const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
+      link.href = url;
       link.download = 'pedrra-slides.json';
       link.click();
+      URL.revokeObjectURL(url);
     },
     importSlides() {
       this.$refs.importFileInput.value = '';
@@ -1546,9 +1548,11 @@ export default {
         });
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(blob);
+        link.href = url;
         link.download = `Slide_${this.currentSlide.id}_Results.csv`;
         link.click();
+        URL.revokeObjectURL(url);
     },
     exportJSON() {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.parsedSurveyResults, null, 2));
@@ -1847,9 +1851,16 @@ export default {
         if (res.ok) { const d = await res.json(); this.sessionCode = d.code; }
       } catch (e) { /* ignore */ }
     },
+    _getAudioCtx() {
+      if (!this._audioCtx) {
+        try { this._audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch { /* audio not supported */ }
+      }
+      return this._audioCtx;
+    },
     _playNotifSound(freq = 600, vol = 0.1) {
       try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const ctx = this._getAudioCtx();
+        if (!ctx) return;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine'; osc.frequency.value = freq;
@@ -1861,7 +1872,8 @@ export default {
     },
     _playTimerEndSound() {
       try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const ctx = this._getAudioCtx();
+        if (!ctx) return;
         const playTone = (freq, start, dur) => {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();

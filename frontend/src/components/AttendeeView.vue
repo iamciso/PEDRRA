@@ -485,7 +485,10 @@ export default {
     },
     _playTimerEndSound() {
       try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (!this._audioCtx) {
+          try { this._audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
+        }
+        const ctx = this._audioCtx;
         const playTone = (freq, start, dur) => {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
