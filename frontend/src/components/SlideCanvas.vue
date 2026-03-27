@@ -45,6 +45,8 @@
 
       <!-- #10 — Grid toggle -->
       <button @click="showGrid=!showGrid" :class="showGrid?'':'secondary'" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;" :title="showGrid?'Hide grid':'Show grid'">⊞</button>
+      <!-- #14 — Preview toggle -->
+      <button @click="previewMode=!previewMode" :class="previewMode?'':'secondary'" style="width:auto;padding:0.3rem 0.7rem;font-size:0.82rem;" :title="previewMode?'Exit preview':'Preview slide'">👁</button>
 
       <!-- Hidden file input -->
       <input type="file" ref="fileInput" :accept="uploadKind==='image' ? 'image/png,image/jpeg,image/gif,image/webp' : 'video/mp4,video/webm'" style="display:none;" @change="onFileUpload" />
@@ -83,17 +85,26 @@
         <input type="number" v-model.number="sel.strokeWidth" @change="emit" min="0" max="10" title="Border width" style="width:38px;padding:0.25rem;font-size:0.8rem;border:1px solid #cbd5e1;border-radius:4px;" />
       </template>
 
-      <!-- Image/video src -->
+      <!-- Image/video src + replace button -->
       <template v-if="sel && (sel.kind==='image'||sel.kind==='video')">
-        <input v-model="sel.src" @change="emit" placeholder="URL..." style="flex:1;min-width:180px;padding:0.3rem 0.5rem;font-size:0.82rem;border:1px solid #cbd5e1;border-radius:4px;margin-bottom:0;" />
+        <input v-model="sel.src" @change="emit" placeholder="URL..." style="flex:1;min-width:140px;padding:0.3rem 0.5rem;font-size:0.82rem;border:1px solid #cbd5e1;border-radius:4px;margin-bottom:0;" />
+        <button @click="triggerUpload(sel.kind); replaceTarget=selIdx" class="secondary" style="width:auto;padding:0.2rem 0.5rem;font-size:0.78rem;" title="Replace from file">📤</button>
+        <button @click="openMediaPicker(sel.kind); replaceTarget=selIdx" class="secondary" style="width:auto;padding:0.2rem 0.5rem;font-size:0.78rem;" title="Replace from library">📂</button>
       </template>
 
       <span style="flex:1;"></span>
 
-      <!-- Position/size indicator (#10) -->
-      <span v-if="sel" style="font-size:0.7rem;color:#94a3b8;font-variant-numeric:tabular-nums;">
-        {{ sel.x }},{{ sel.y }} · {{ sel.w }}×{{ sel.h }}
-      </span>
+      <!-- Position/size inputs (editable) -->
+      <template v-if="sel">
+        <span style="font-size:0.7rem;color:#64748b;">x</span>
+        <input type="number" v-model.number="sel.x" @change="emit" style="width:42px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" />
+        <span style="font-size:0.7rem;color:#64748b;">y</span>
+        <input type="number" v-model.number="sel.y" @change="emit" style="width:42px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" />
+        <span style="font-size:0.7rem;color:#64748b;">w</span>
+        <input type="number" v-model.number="sel.w" @change="emit" min="20" style="width:42px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" />
+        <span style="font-size:0.7rem;color:#64748b;">h</span>
+        <input type="number" v-model.number="sel.h" @change="emit" min="10" style="width:42px;padding:0.15rem;font-size:0.72rem;border:1px solid #cbd5e1;border-radius:3px;text-align:center;" />
+      </template>
 
       <!-- Layer & action controls -->
       <template v-if="sel">
@@ -115,7 +126,7 @@
           @click.self="deselect"
         >
           <!-- #10 — Grid overlay -->
-          <svg v-if="showGrid" :width="W" :height="H" style="position:absolute;inset:0;pointer-events:none;z-index:1;opacity:0.15;">
+          <svg v-if="showGrid && !previewMode" :width="W" :height="H" style="position:absolute;inset:0;pointer-events:none;z-index:1;opacity:0.15;">
             <defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#000" stroke-width="0.5"/></pattern></defs>
             <rect width="100%" height="100%" fill="url(#grid)" />
             <line :x1="W/2" y1="0" :x2="W/2" :y2="H" stroke="#f00" stroke-width="0.5" stroke-dasharray="4"/>
@@ -141,8 +152,8 @@
           >
             <!-- Text (show markdown preview when not editing) -->
             <div v-if="el.kind==='text' && editingIdx!==idx" @dblclick.stop="startEdit(idx)"
-              :style="{...textStyle(el), width:'100%', height:'100%', overflow:'hidden', cursor: selIdx===idx ? 'move' : 'default', wordWrap:'break-word', whiteSpace:'pre-wrap'}"
-              v-html="renderMdPreview(el.content)"></div>
+              :style="{...textStyle(el), width:'100%', height:'100%', overflow:'hidden', cursor: selIdx===idx ? 'move' : 'default', wordWrap:'break-word', whiteSpace:'pre-wrap', opacity: el.content ? 1 : 0.4}"
+              v-html="renderMdPreview(el.content) || '<em style=&quot;color:#94a3b8&quot;>Double-click to edit...</em>'"></div>
 
             <!-- Textarea overlay for editing -->
             <textarea v-if="el.kind==='text' && editingIdx===idx" :value="el.content" @input="el.content=$event.target.value" @blur="stopEdit" @mousedown.stop ref="editTextarea"
@@ -159,13 +170,13 @@
             <!-- Shape -->
             <div v-if="el.kind==='shape'" :style="shapeStyle(el)"></div>
 
-            <!-- Selection handles -->
-            <template v-if="selectedIndices.includes(idx)">
+            <!-- Selection handles (hidden in preview mode) -->
+            <template v-if="!previewMode && selectedIndices.includes(idx)">
               <div :style="{position:'absolute',inset:'-2px',border: selIdx===idx ? '2px solid var(--edps-blue,#254A9A)' : '2px dashed #60a5fa',pointerEvents:'none'}"></div>
               <template v-if="selIdx===idx">
                 <div v-for="handle in ['nw','ne','sw','se']" :key="handle" :style="handlePos(handle)" @mousedown.stop="startResize(idx, $event, handle)"></div>
-                <div style="position:absolute;top:50%;right:-5px;width:8px;height:8px;background:#4a90d9;border-radius:50%;transform:translateY(-50%);cursor:e-resize;z-index:10;" @mousedown.stop="startResize(idx, $event,'e')"></div>
-                <div style="position:absolute;bottom:-5px;left:50%;width:8px;height:8px;background:#4a90d9;border-radius:50%;transform:translateX(-50%);cursor:s-resize;z-index:10;" @mousedown.stop="startResize(idx, $event,'s')"></div>
+                <div style="position:absolute;top:50%;right:-6px;width:12px;height:12px;background:#4a90d9;border-radius:50%;transform:translateY(-50%);cursor:e-resize;z-index:10;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);" @mousedown.stop="startResize(idx, $event,'e')"></div>
+                <div style="position:absolute;bottom:-6px;left:50%;width:12px;height:12px;background:#4a90d9;border-radius:50%;transform:translateX(-50%);cursor:s-resize;z-index:10;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);" @mousedown.stop="startResize(idx, $event,'s')"></div>
               </template>
             </template>
           </div>
@@ -219,12 +230,14 @@ export default {
       showVideoMenu: false,
       showShapeMenu: false,
       showBgMenu: false,
-      showGrid: false, // #10
+      showGrid: false,
+      previewMode: false,
       uploadKind: null,
       uploading: false,
       showMediaPicker: false,
       mediaPickerFilter: 'all',
       clipboard: null,
+      replaceTarget: -1, // index of element being replaced
       guides: { vCenter: false, hCenter: false },
       bgOptions: [
         { label: 'Template Default', value: '', preview: 'linear-gradient(135deg,#ddd,#eee)' },
@@ -343,18 +356,18 @@ export default {
     },
 
     handlePos(corner) {
-      const base = { position: 'absolute', width: '10px', height: '10px', background: 'var(--edps-blue,#254A9A)', borderRadius: '50%', zIndex: 10 };
-      if (corner === 'nw') return { ...base, top: '-5px', left: '-5px', cursor: 'nw-resize' };
-      if (corner === 'ne') return { ...base, top: '-5px', right: '-5px', cursor: 'ne-resize' };
-      if (corner === 'sw') return { ...base, bottom: '-5px', left: '-5px', cursor: 'sw-resize' };
-      return { ...base, bottom: '-5px', right: '-5px', cursor: 'se-resize' };
+      const base = { position: 'absolute', width: '14px', height: '14px', background: 'var(--edps-blue,#254A9A)', borderRadius: '50%', zIndex: 10, border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' };
+      if (corner === 'nw') return { ...base, top: '-7px', left: '-7px', cursor: 'nw-resize' };
+      if (corner === 'ne') return { ...base, top: '-7px', right: '-7px', cursor: 'ne-resize' };
+      if (corner === 'sw') return { ...base, bottom: '-7px', left: '-7px', cursor: 'sw-resize' };
+      return { ...base, bottom: '-7px', right: '-7px', cursor: 'se-resize' };
     },
 
     _newZIndex() { return _nextZIndex++; },
 
     addEl(kind) {
       const id = 'el_' + Date.now();
-      const el = { id, kind, x: 80, y: 100, w: 500, h: 80, content: 'Double-click to edit', fontSize: 18, fontFamily: 'Segoe UI', bold: false, italic: false, underline: false, color: '#333333', textAlign: 'left', zIndex: this._newZIndex() };
+      const el = { id, kind, x: 80, y: 100, w: 500, h: 80, content: '', fontSize: 18, fontFamily: 'Segoe UI', bold: false, italic: false, underline: false, color: '#333333', textAlign: 'left', zIndex: this._newZIndex() };
       this.localEls.push(el);
       this.selIdx = this.localEls.length - 1;
       this.multiSelIndices = [];
@@ -407,24 +420,36 @@ export default {
         const res = await authFetch(`${baseUrl}/api/upload`, { method: 'POST', body: fd });
         if (!res.ok) throw new Error('Upload failed');
         const data = await res.json();
-        const id = 'el_' + Date.now();
-        let el;
-        if (this.uploadKind === 'image') el = { id, kind: 'image', x: 200, y: 100, w: 350, h: 250, src: data.url, zIndex: this._newZIndex() };
-        else el = { id, kind: 'video', x: 150, y: 100, w: 500, h: 300, src: data.url, zIndex: this._newZIndex() };
-        this.localEls.push(el);
-        this.selIdx = this.localEls.length - 1;
+        // Replace existing element or add new
+        if (this.replaceTarget >= 0 && this.localEls[this.replaceTarget]) {
+          this.localEls[this.replaceTarget].src = data.url;
+          this.replaceTarget = -1;
+        } else {
+          const id = 'el_' + Date.now();
+          let el;
+          if (this.uploadKind === 'image') el = { id, kind: 'image', x: 200, y: 100, w: 350, h: 250, src: data.url, zIndex: this._newZIndex() };
+          else el = { id, kind: 'video', x: 150, y: 100, w: 500, h: 300, src: data.url, zIndex: this._newZIndex() };
+          this.localEls.push(el);
+          this.selIdx = this.localEls.length - 1;
+        }
         this.emit();
       } catch (err) { alert('Upload failed: ' + err.message); } finally { this.uploading = false; }
     },
 
     openMediaPicker(filter) { this.mediaPickerFilter = filter; this.showMediaPicker = true; },
     onMediaPicked({ url, kind }) {
-      const id = 'el_' + Date.now();
-      let el;
-      if (kind === 'image') el = { id, kind: 'image', x: 200, y: 100, w: 350, h: 250, src: url, zIndex: this._newZIndex() };
-      else el = { id, kind: 'video', x: 150, y: 100, w: 500, h: 300, src: url, zIndex: this._newZIndex() };
-      this.localEls.push(el);
-      this.selIdx = this.localEls.length - 1;
+      // Replace existing element or add new
+      if (this.replaceTarget >= 0 && this.localEls[this.replaceTarget]) {
+        this.localEls[this.replaceTarget].src = url;
+        this.replaceTarget = -1;
+      } else {
+        const id = 'el_' + Date.now();
+        let el;
+        if (kind === 'image') el = { id, kind: 'image', x: 200, y: 100, w: 350, h: 250, src: url, zIndex: this._newZIndex() };
+        else el = { id, kind: 'video', x: 150, y: 100, w: 500, h: 300, src: url, zIndex: this._newZIndex() };
+        this.localEls.push(el);
+        this.selIdx = this.localEls.length - 1;
+      }
       this.showMediaPicker = false;
       this.emit();
     },

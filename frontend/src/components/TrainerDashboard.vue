@@ -1141,7 +1141,7 @@ export default {
         if (!res.ok) throw new Error(`Failed to load slides (${res.status})`);
         const data = await res.json();
         this.slides = this.migrateQuestions(data);
-        this.editSlides = JSON.parse(JSON.stringify(this.slides)).map(s => ({ ...s, _collapsed: true }));
+        this.editSlides = JSON.parse(JSON.stringify(this.slides)).map(s => ({ ...s, _collapsed: true, _showCanvas: !!(s.elements && s.elements.length) }));
       } catch (e) { this.showError(e.message); }
       finally { this.loading = false; }
     },
@@ -1216,6 +1216,7 @@ export default {
       }
     },
     removeSlide(index) {
+      if (!confirm(`Delete slide "${this.editSlides[index]?.title || 'Untitled'}"? This cannot be undone.`)) return;
       this.saveUndoState();
       this.editSlides.splice(index, 1);
     },
@@ -1419,7 +1420,7 @@ export default {
         if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Server error'); }
         const data = await res.json();
         this.slides = this.migrateQuestions(data.slides || []);
-        this.editSlides = JSON.parse(JSON.stringify(this.slides)).map(s => ({ ...s, _collapsed: true }));
+        this.editSlides = JSON.parse(JSON.stringify(this.slides)).map(s => ({ ...s, _collapsed: true, _showCanvas: !!(s.elements && s.elements.length) }));
         this.saveMessage = 'Successfully saved!';
         this.hasUnsavedChanges = false;
         setTimeout(() => this.saveMessage = '', 3000);
