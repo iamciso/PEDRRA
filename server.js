@@ -685,28 +685,39 @@ app.delete('/api/quiz/scores', authMiddleware('Trainer'), (req, res) => {
     });
 });
 
-// Analytics
-app.get('/api/analytics', authMiddleware('Trainer'), (req, res) => {
-    const analytics = {};
-    db.get("SELECT COUNT(*) as count FROM users WHERE role = 'Attendee'", (err, r) => {
-        analytics.totalAttendees = r?.count || 0;
-        db.get("SELECT COUNT(DISTINCT slide_id) as count FROM answers", (err2, r2) => {
-            analytics.slidesWithAnswers = r2?.count || 0;
-            db.get("SELECT COUNT(*) as count FROM answers", (err3, r3) => {
-                analytics.totalResponses = r3?.count || 0;
-                db.all("SELECT slide_id, COUNT(*) as responses FROM answers GROUP BY slide_id ORDER BY slide_id", (err4, r4) => {
-                    analytics.responsesPerSlide = r4 || [];
-                    db.all(`SELECT slide_id, username, answer, answered_at FROM answers ORDER BY answered_at DESC LIMIT 100`, (err5, r5) => {
-                        analytics.recentAnswers = r5 || [];
-                        db.all(`SELECT username, SUM(points) as total_points, SUM(correct) as correct FROM quiz_scores GROUP BY username ORDER BY total_points DESC`, (err6, r6) => {
-                            analytics.quizLeaderboard = r6 || [];
-                            res.json(analytics);
-                        });
-                    });
-                });
-            });
-        });
+// Analytics — run queries in parallel for better performance
+function dbGetAsync(sql) {
+    return new Promise((resolve, reject) => {
+        db.get(sql, (err, row) => err ? reject(err) : resolve(row));
     });
+}
+function dbAllAsync(sql) {
+    return new Promise((resolve, reject) => {
+        db.all(sql, (err, rows) => err ? reject(err) : resolve(rows));
+    });
+}
+
+app.get('/api/analytics', authMiddleware('Trainer'), async (req, res) => {
+    try {
+        const [attendees, slidesWithAns, totalResp, perSlide, recent, leaderboard] = await Promise.all([
+            dbGetAsync("SELECT COUNT(*) as count FROM users WHERE role = 'Attendee'"),
+            dbGetAsync("SELECT COUNT(DISTINCT slide_id) as count FROM answers"),
+            dbGetAsync("SELECT COUNT(*) as count FROM answers"),
+            dbAllAsync("SELECT slide_id, COUNT(*) as responses FROM answers GROUP BY slide_id ORDER BY slide_id"),
+            dbAllAsync("SELECT slide_id, username, answer, answered_at FROM answers ORDER BY answered_at DESC LIMIT 100"),
+            dbAllAsync("SELECT username, SUM(points) as total_points, SUM(correct) as correct FROM quiz_scores GROUP BY username ORDER BY total_points DESC"),
+        ]);
+        res.json({
+            totalAttendees: attendees?.count || 0,
+            slidesWithAnswers: slidesWithAns?.count || 0,
+            totalResponses: totalResp?.count || 0,
+            responsesPerSlide: perSlide || [],
+            recentAnswers: recent || [],
+            quizLeaderboard: leaderboard || [],
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to load analytics' });
+    }
 });
 
 // Attendee list for spinning wheel — Trainer only

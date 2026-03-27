@@ -376,6 +376,11 @@ export default {
 
     this.socket.on('slide:visibility', v => { this.isSlideVisible = v; });
 
+    // Keep slides in sync when trainer saves changes
+    this.socket.on('slides:updated', (slides) => {
+      if (Array.isArray(slides)) this.slides = slides;
+    });
+
     // #8 — Fix reactivity: reassign object instead of delete
     this.socket.on('poll:reset', slideId => {
       const sid = String(slideId);

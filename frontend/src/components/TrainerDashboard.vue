@@ -1075,6 +1075,7 @@ export default {
     clearInterval(this.autoSaveInterval);
     clearInterval(this.timerInterval);
     clearInterval(this.slideElapsedInterval);
+    if (this.slotAnimFrame) cancelAnimationFrame(this.slotAnimFrame);
   },
   watch: {
     autoSaveEnabled() { this._setupAutoSave(); },
@@ -1089,6 +1090,11 @@ export default {
     }
   },
   methods: {
+    // Escape HTML to prevent injection in print/export windows
+    esc(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    },
     onFullscreenChange() {
       this.isFullscreen = !!document.fullscreenElement;
       if (this.isFullscreen) {
@@ -1632,11 +1638,7 @@ export default {
         await pptx.writeFile({ fileName: 'PEDRRA_Presentation.pptx' });
       } catch (e) { this.showError('PPTX export failed: ' + e.message); }
     },
-    escHtml(str) {
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
-    },
+    escHtml(str) { return this.esc(str); },
     toggleDarkMode() {
       this.darkMode = !this.darkMode;
       localStorage.setItem('darkMode', this.darkMode);
@@ -1667,7 +1669,8 @@ export default {
       clearInterval(this.autoSaveInterval);
       if (this.autoSaveEnabled) {
         this.autoSaveInterval = setInterval(() => {
-          if (this.hasUnsavedChanges && this.activeTab === 'content') {
+          if (this.hasUnsavedChanges && this.activeTab === 'content' && !this._isSaving) {
+            this._isSaving = true;
             this.autoSaveStatus = 'saving';
             this.autoSaveLabel = 'Saving...';
             this.saveSlides().then(() => {
@@ -1675,7 +1678,7 @@ export default {
               this.autoSaveStatus = 'saved';
               this.autoSaveLabel = '✓ Saved';
               setTimeout(() => { this.autoSaveStatus = ''; this.autoSaveLabel = ''; }, 3000);
-            });
+            }).finally(() => { this._isSaving = false; });
           }
         }, 30000);
       }
@@ -1808,7 +1811,7 @@ export default {
       }
       if (a.quizLeaderboard?.length) {
         html += `<h2>Quiz Leaderboard</h2><table><tr><th>#</th><th>Username</th><th>Points</th><th>Correct</th></tr>`;
-        a.quizLeaderboard.forEach((q, i) => { html += `<tr><td>${i+1}</td><td>${q.username}</td><td>${q.total_points}</td><td>${q.correct}</td></tr>`; });
+        a.quizLeaderboard.forEach((q, i) => { html += `<tr><td>${i+1}</td><td>${this.esc(q.username)}</td><td>${q.total_points}</td><td>${q.correct}</td></tr>`; });
         html += `</table>`;
       }
       html += `</body></html>`;
@@ -1901,10 +1904,10 @@ export default {
       <div class="grid">`;
       attendees.forEach(u => {
         html += `<div class="card">`;
-        if (u.avatar) html += `<img class="avatar" src="${this.resolveUrl(u.avatar)}" />`;
-        html += `<h3>${u.display_name || u.username}</h3>`;
-        html += `<div class="pin">${u.pin || '----'}</div>`;
-        html += `<div class="user">Username: ${u.username}</div>`;
+        if (u.avatar) html += `<img class="avatar" src="${this.esc(this.resolveUrl(u.avatar))}" />`;
+        html += `<h3>${this.esc(u.display_name || u.username)}</h3>`;
+        html += `<div class="pin">${this.esc(u.pin || '----')}</div>`;
+        html += `<div class="user">Username: ${this.esc(u.username)}</div>`;
         html += `</div>`;
       });
       html += `</div></body></html>`;
@@ -1937,13 +1940,13 @@ export default {
       // Attendee list
       html += `<h2>Attendees</h2><table><tr><th>Display Name</th><th>Username</th><th>Team</th></tr>`;
       this.usersList.filter(u => u.role === 'Attendee').forEach(u => {
-        html += `<tr><td>${u.display_name || u.username}</td><td>${u.username}</td><td>${u.team || '-'}</td></tr>`;
+        html += `<tr><td>${this.esc(u.display_name || u.username)}</td><td>${this.esc(u.username)}</td><td>${this.esc(u.team || '-')}</td></tr>`;
       });
       html += `</table>`;
       // Slides summary
       html += `<h2>Slides</h2><table><tr><th>#</th><th>Type</th><th>Title</th></tr>`;
       this.slides.forEach((s, i) => {
-        html += `<tr><td>${i+1}</td><td>${s.type}</td><td>${s.title}</td></tr>`;
+        html += `<tr><td>${i+1}</td><td>${this.esc(s.type)}</td><td>${this.esc(s.title)}</td></tr>`;
       });
       html += `</table>`;
       html += `</body></html>`;

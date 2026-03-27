@@ -102,12 +102,23 @@ export default {
         this.fetchFiles();
       } catch(e) { console.error(e); }
     },
-    copyUrl(file) {
+    async copyUrl(file) {
       const url = this.fullUrl(file.url);
-      navigator.clipboard.writeText(url).then(() => {
-        this.copiedFile = file.filename;
-        setTimeout(() => this.copiedFile = '', 2000);
-      });
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        // Fallback for older browsers or denied clipboard permission
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      this.copiedFile = file.filename;
+      setTimeout(() => this.copiedFile = '', 2000);
     },
   },
 };
