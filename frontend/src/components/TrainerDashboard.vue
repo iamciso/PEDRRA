@@ -356,6 +356,7 @@
           <button class="secondary" @click="addSlide('survey')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">+ Survey</button>
           <button class="secondary" @click="addSlide('timer')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">⏱ Timer</button>
           <button class="secondary" @click="addSlide('rating')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">😀 Rating</button>
+          <button class="secondary" @click="addSlide('wordcloud')" style="width: auto; padding: 0.5rem 0.8rem; font-size:0.82rem;">☁️ Word Cloud</button>
           <div style="position:relative;" ref="templateMenuRef">
             <button class="secondary" @click="showTemplateMenu=!showTemplateMenu" style="width:auto;padding:0.5rem 0.8rem;font-size:0.82rem;">📐 Template ▾</button>
             <div v-if="showTemplateMenu" style="position:absolute;top:100%;left:0;z-index:200;background:white;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:200px;margin-top:4px;">
@@ -514,6 +515,14 @@
         <!-- Section Slide Edit -->
         <template v-if="slide.type === 'section'">
           <input v-model="slide.subtitle" placeholder="Subtitle (Optional)" />
+        </template>
+
+        <!-- Word Cloud Slide Edit -->
+        <template v-if="slide.type === 'wordcloud'">
+          <input v-model="slide.question" placeholder="What word comes to mind when you think of...?" />
+          <div style="margin-top:0.5rem;font-size:0.85rem;color:#64748b;">
+            Attendees will type a word or short phrase. All responses are displayed as a live word cloud — bigger words = more popular answers.
+          </div>
         </template>
 
         <!-- Rating toggle (all slide types) -->
@@ -1442,6 +1451,8 @@ export default {
         this.editSlides.push({ ...base, id, type: 'rating', title: 'Rate this session', question: 'How would you rate this topic?', ratingType: 'emoji' });
       } else if (type === 'section') {
         this.editSlides.push({ ...base, id, type: 'section', title: 'Section Title', subtitle: '' });
+      } else if (type === 'wordcloud') {
+        this.editSlides.push({ ...base, id, type: 'wordcloud', title: 'Word Cloud', question: 'What comes to mind?' });
       } else {
         this.editSlides.push({ ...base, id, type: 'content', title: 'Content Slide', subtitle: '', content: '', image: '', video: '' });
       }

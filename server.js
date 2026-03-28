@@ -480,7 +480,7 @@ app.get('/api/slides', (req, res) => {
 });
 
 // #2 — Slide data validation
-const VALID_SLIDE_TYPES = ['title', 'content', 'section', 'poll', 'survey', 'timer', 'rating'];
+const VALID_SLIDE_TYPES = ['title', 'content', 'section', 'poll', 'survey', 'timer', 'rating', 'wordcloud'];
 function validateSlides(req, res, next) {
     if (!Array.isArray(req.body)) {
         return res.status(400).json({ error: 'Slides must be an array.' });
@@ -801,6 +801,7 @@ io.on('connection', (socket) => {
         db.run('INSERT OR REPLACE INTO quiz_scores (username, slide_id, correct, time_ms, points) VALUES (?, ?, ?, ?, ?)',
             [socket.user.username, slideId, correct ? 1 : 0, safeTimeMs, safePoints], (err) => {
             if (err) { log.error('quiz:score save failed:', err.message); return; }
+            checkBadgesAfterScore(socket.user.username);
         });
         // Broadcast updated leaderboard
         db.all(`SELECT username, SUM(points) as total_points FROM quiz_scores GROUP BY username ORDER BY total_points DESC`, (err, rows) => {
@@ -913,12 +914,23 @@ app.get('/api/quiz/leaderboard', (req, res) => {
             if (err2) return res.status(500).json({ error: err2.message });
             const userMap = {};
             (users || []).forEach(u => { userMap[u.username] = u; });
-            const result = rows.map(r => ({
-                ...r,
-                display_name: userMap[r.username]?.display_name || r.username,
-                avatar: userMap[r.username]?.avatar || ''
-            }));
-            res.json(result);
+            // Add badge counts
+            db.all('SELECT username, COUNT(*) as badge_count FROM achievements GROUP BY username', (err3, badges) => {
+                const badgeMap = {};
+                (badges || []).forEach(b => { badgeMap[b.username] = b.badge_count; });
+                const result = rows.map((r, i) => {
+                    // Award top_scorer badge to #1
+                    if (i === 0 && r.total_points > 0) awardBadge(r.username, 'top_scorer');
+                    return {
+                        ...r,
+                        display_name: userMap[r.username]?.display_name || r.username,
+                        avatar: userMap[r.username]?.avatar || '',
+                        badges: badgeMap[r.username] || 0,
+                        level: Math.floor((r.total_points || 0) / 100) + 1,
+                    };
+                });
+                res.json(result);
+            });
         });
     });
 });
@@ -964,6 +976,62 @@ app.get('/api/analytics', authMiddleware('Trainer'), async (req, res) => {
         res.status(500).json({ error: 'Failed to load analytics' });
     }
 });
+
+// ── GAMIFICATION ────────────────────────────────────────
+const BADGES = {
+  first_answer: { name: 'First!', icon: '🥇', desc: 'First to answer a question' },
+  streak_3: { name: 'On Fire', icon: '🔥', desc: '3 correct answers in a row' },
+  streak_5: { name: 'Unstoppable', icon: '⚡', desc: '5 correct answers in a row' },
+  perfect: { name: 'Perfect', icon: '💎', desc: 'All answers correct' },
+  speed_demon: { name: 'Speed Demon', icon: '⚡', desc: 'Answered in under 3 seconds' },
+  participant: { name: 'Team Player', icon: '🤝', desc: 'Answered every question' },
+  top_scorer: { name: 'Champion', icon: '🏆', desc: 'Highest score in session' },
+  helper: { name: 'Helping Hand', icon: '✋', desc: 'Raised hand 3+ times' },
+};
+
+// Get badges for a user
+app.get('/api/badges/:username', (req, res) => {
+    db.all('SELECT badge, earned_at FROM achievements WHERE username = ?', [req.params.username], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const badges = (rows || []).map(r => ({ ...BADGES[r.badge], id: r.badge, earned_at: r.earned_at }));
+        res.json(badges);
+    });
+});
+
+// Get all badges definitions
+app.get('/api/badges', (req, res) => {
+    res.json(BADGES);
+});
+
+// Award badge (internal helper + socket broadcast)
+function awardBadge(username, badgeId) {
+    if (!BADGES[badgeId]) return;
+    db.run('INSERT OR IGNORE INTO achievements (username, badge) VALUES (?, ?)', [username, badgeId], function(err) {
+        if (!err && this.changes > 0) {
+            io.emit('badge:earned', { username, badge: { ...BADGES[badgeId], id: badgeId } });
+            log.info(`Badge awarded: ${username} → ${badgeId}`);
+        }
+    });
+}
+
+// Check badges after quiz score submission
+function checkBadgesAfterScore(username) {
+    // Check streak
+    db.all('SELECT correct FROM quiz_scores WHERE username = ? ORDER BY id DESC LIMIT 5', [username], (err, rows) => {
+        if (err || !rows) return;
+        const streak = rows.reduce((acc, r) => r.correct ? acc + 1 : 0, 0);
+        if (streak >= 3) awardBadge(username, 'streak_3');
+        if (streak >= 5) awardBadge(username, 'streak_5');
+    });
+    // Check speed
+    db.get('SELECT time_ms FROM quiz_scores WHERE username = ? ORDER BY id DESC LIMIT 1', [username], (err, row) => {
+        if (!err && row && row.time_ms > 0 && row.time_ms < 3000) awardBadge(username, 'speed_demon');
+    });
+    // Check perfect (all correct)
+    db.all('SELECT correct FROM quiz_scores WHERE username = ?', [username], (err, rows) => {
+        if (!err && rows && rows.length >= 3 && rows.every(r => r.correct)) awardBadge(username, 'perfect');
+    });
+}
 
 // Attendee list for spinning wheel — Trainer only
 app.get('/api/attendees', authMiddleware('Trainer'), (req, res) => {

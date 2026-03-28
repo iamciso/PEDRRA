@@ -87,6 +87,17 @@ const initDb = () => {
             )
         `);
 
+        // Achievements / badges table
+        db.run(`
+            CREATE TABLE IF NOT EXISTS achievements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT,
+                badge TEXT,
+                earned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(username, badge)
+            )
+        `);
+
         // Session code table
         db.run(`
             CREATE TABLE IF NOT EXISTS session_config (

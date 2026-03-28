@@ -157,6 +157,20 @@
             </form>
           </template>
 
+          <!-- Word Cloud -->
+          <template v-if="currentSlide.type === 'wordcloud'">
+            <div style="font-weight:bold;margin-bottom:1rem;font-size:1.1rem;color:var(--edps-blue,#1b4293);">{{ currentSlide.question }}</div>
+            <div v-if="hasAnswered" style="padding:1rem;background:#e0f2fe;color:var(--edps-blue);font-weight:bold;border-radius:6px;">✅ Word submitted!</div>
+            <div v-else>
+              <input v-model="wordCloudInput" type="text" maxlength="30" placeholder="Type a word or short phrase..." @keyup.enter="submitWordCloud" style="width:100%;padding:0.75rem;border:2px solid var(--edps-blue);border-radius:6px;font-size:1rem;box-sizing:border-box;margin-bottom:0.5rem;" />
+              <button @click="submitWordCloud" :disabled="!wordCloudInput.trim()" style="width:100%;background:var(--edps-blue);color:white;border:none;padding:0.75rem;border-radius:6px;font-size:1rem;font-weight:bold;cursor:pointer;">Submit</button>
+            </div>
+            <!-- Live word cloud display -->
+            <div v-if="publishedResults && publishedResults.length" style="margin-top:1.5rem;min-height:150px;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:0.4rem;">
+              <span v-for="(w, i) in wordCloudWords" :key="i" :style="{fontSize: w.size+'px', color: w.color, fontWeight:'bold', padding:'0.2rem 0.5rem', opacity: 0.8 + Math.random()*0.2, transition:'all 0.5s'}">{{ w.text }}</span>
+            </div>
+          </template>
+
           <!-- Timer -->
           <template v-if="currentSlide.type === 'timer'">
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;min-height:280px;">
@@ -261,6 +275,13 @@
       <button v-for="emoji in reactionEmojis" :key="emoji" @click="sendReaction(emoji)" style="background:none;border:none;font-size:1.4rem;cursor:pointer;padding:0.2rem 0.4rem;transition:transform 0.15s;" @mouseenter="$event.target.style.transform='scale(1.3)'" @mouseleave="$event.target.style.transform='scale(1)'" :title="reactionLabel(emoji)">{{ emoji }}</button>
     </div>
 
+    <!-- Badge notification toast -->
+    <div v-if="badgeNotification" style="position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:10001;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:white;padding:1rem 2rem;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.3);text-align:center;animation:podiumRise 0.5s ease-out;min-width:200px;">
+      <div style="font-size:2.5rem;">{{ badgeNotification.icon }}</div>
+      <div style="font-weight:900;font-size:1.2rem;margin-top:0.3rem;">{{ badgeNotification.name }}</div>
+      <div style="font-size:0.8rem;opacity:0.85;margin-top:0.2rem;">{{ badgeNotification.desc }}</div>
+    </div>
+
     <!-- #13 — Hand raise button -->
     <button v-if="isSlideVisible" :class="['hand-raise-btn', {raised: handRaised}]" @click="toggleHandRaise" :title="handRaised ? 'Lower hand' : 'Raise hand'">
       {{ handRaised ? '🙋' : '✋' }}
@@ -279,6 +300,7 @@ import { baseUrl } from '../config.js';
 import { getUser, getToken, getTokenForRole, clearAuth } from '../auth.js';
 import { toEmbedUrl, isLocalVideo } from '../utils/media.js';
 import { renderMarkdown } from '../utils/safeMd.js';
+import { playPollSubmit, playCorrect, playWheelWinner, playBadge, launchConfetti } from '../utils/sounds.js';
 import DrawingOverlay from './DrawingOverlay.vue';
 
 const W = 1024, H = 576;
@@ -301,6 +323,8 @@ export default {
       socket: null,
       answeredPolls: {},
       surveyForm: {},
+      wordCloudInput: '',
+      badgeNotification: null, // { icon, name, desc }
       publishedResults: null,
       currentTime: '',
       clockInterval: null,
@@ -346,6 +370,18 @@ export default {
     },
     totalPublicAnswers() {
       return Array.isArray(this.publishedResults) ? this.publishedResults.length : 0;
+    },
+    wordCloudWords() {
+      const counts = this.publicPollAggregated;
+      const words = Object.entries(counts);
+      if (!words.length) return [];
+      const max = Math.max(...words.map(w => w[1]));
+      const colors = ['#254A9A', '#F1C064', '#ef4444', '#10b981', '#7c3aed', '#d97706', '#0891b2', '#be185d'];
+      return words.map(([text, count], i) => ({
+        text,
+        size: Math.max(14, Math.min(48, 14 + (count / max) * 34)),
+        color: colors[i % colors.length],
+      })).sort(() => Math.random() - 0.5);
     },
     timerDisplay() {
       const s = Math.max(0, this.timerSeconds);
@@ -466,10 +502,24 @@ export default {
       if (data.type === 'wheel-spinning' && data.data) {
         this._startWheelAnimation(data.data);
       }
+      if (data.type === 'wheel') {
+        playWheelWinner();
+        launchConfetti();
+      }
     });
     this.socket.on('overlay:hide', () => {
       this.overlay = null;
       clearTimeout(this._wheelAnimTimer);
+    });
+
+    // Badge earned
+    this.socket.on('badge:earned', (data) => {
+      if (data.username === this.user?.username) {
+        this.badgeNotification = data.badge;
+        playBadge();
+        launchConfetti();
+        setTimeout(() => { this.badgeNotification = null; }, 5000);
+      }
     });
 
     // Freeze mode
@@ -505,10 +555,17 @@ export default {
     textStyle(el) {
       return { fontSize: el.fontSize + 'px', fontFamily: el.fontFamily || 'Segoe UI', fontWeight: el.bold ? 'bold' : 'normal', fontStyle: el.italic ? 'italic' : 'normal', color: el.color || '#333', textAlign: el.textAlign || 'left', whiteSpace: 'pre-wrap', display: 'block' };
     },
+    submitWordCloud() {
+      const word = this.wordCloudInput.trim();
+      if (!word || !this.socket || !this.currentSlide) return;
+      this.submitPollAnswer(word);
+      this.wordCloudInput = '';
+    },
     submitPollAnswer(answer) {
       if (!this.socket || !this.currentSlide) return;
       this.socket.emit('poll:answer', { slideId: this.currentSlide.id, username: this.user.username, answer });
       this.answeredPolls = { ...this.answeredPolls, [this.currentSlide.id]: true };
+      playPollSubmit();
     },
     submitSurvey() {
       if (!this.socket || !this.currentSlide) return;
