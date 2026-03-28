@@ -75,7 +75,23 @@
 
       <!-- ═══ CONTENT / POLL / SURVEY ═══ -->
       <template v-else>
-        <!-- Header: EDPS logo + title (matches official template) -->
+        <!-- Canvas elements rendered as FULL SLIDE OVERLAY (exact match to editor 1024x576) -->
+        <template v-if="currentSlide.type === 'content' && currentSlide.elements && currentSlide.elements.length">
+          <!-- Elements fill entire 1024x576 slide — same coordinates as editor -->
+          <div style="position:absolute;inset:0;overflow:hidden;">
+            <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden',zIndex:el.zIndex||10,opacity:el.opacity??1,transform:el.rotation?`rotate(${el.rotation}deg)`:'none',filter:el.shadow?'drop-shadow(2px 4px 6px rgba(0,0,0,0.3))':'none'}">
+              <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize||18)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',textDecoration:el.underline?'underline':'none',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block',lineHeight:1.4,wordWrap:'break-word',whiteSpace:'pre-wrap'}" v-html="renderMd(el.content)"></span>
+              <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" alt="Slide element" />
+              <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
+              <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+              <div v-if="el.kind==='shape'" :style="shapeStyle(el)"></div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Non-canvas content (legacy slides without elements) -->
+        <template v-else>
+        <!-- Header: EDPS logo + title -->
         <div style="display:flex;align-items:center;padding:0.9rem 2rem 0.7rem;flex-shrink:0;">
           <img src="/template/edps_logo.png" style="height:46px;margin-right:1rem;" onerror="this.style.display='none'" alt="EDPS logo" />
           <h2 style="margin:0;font-size:1.5rem;font-weight:900;color:var(--edps-blue,#3B5998);">{{ currentSlide.title }}</h2>
@@ -84,25 +100,7 @@
         <div style="padding:1rem 2rem 4rem;flex:1;overflow-y:auto;position:relative;">
           <div v-if="currentSlide.subtitle" style="color:var(--edps-blue,#1b4293);font-size:1.1rem;font-weight:bold;margin-bottom:1rem;">{{ currentSlide.subtitle }}</div>
 
-          <!-- Content: render canvas elements with absolute positioning -->
           <template v-if="currentSlide.type === 'content'">
-            <template v-if="currentSlide.elements && currentSlide.elements.length">
-              <!-- Elements container: uses same 1024x576 canvas, scaled to fit the content area -->
-              <div style="position:relative;width:100%;padding-bottom:56.25%;overflow:hidden;">
-                <div style="position:absolute;inset:0;transform-origin:top left;" :style="{transform:'scale('+(contentAreaWidth/1024)+')'}">
-                  <div style="position:relative;width:1024px;height:576px;">
-                    <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden',zIndex:el.zIndex||10,opacity:el.opacity??1,transform:el.rotation?`rotate(${el.rotation}deg)`:'none',filter:el.shadow?'drop-shadow(2px 4px 6px rgba(0,0,0,0.3))':'none'}">
-                      <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize||18)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',textDecoration:el.underline?'underline':'none',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block',lineHeight:1.4,wordWrap:'break-word',whiteSpace:'pre-wrap'}" v-html="renderMd(el.content)"></span>
-                      <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" alt="Slide element" />
-                      <video v-if="el.kind==='video' && isLocalVideoCheck(el.src)" :src="resolveUrl(el.src)" controls style="width:100%;height:100%;object-fit:contain;"></video>
-                      <iframe v-else-if="el.kind==='video'" :src="toEmbedUrlCheck(el.src)" style="width:100%;height:100%;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-                      <div v-if="el.kind==='shape'" :style="shapeStyle(el)"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-            <template v-else>
               <!-- Fallback: legacy content field -->
               <div v-if="currentSlide.content" style="line-height:1.8;font-size:1.05rem;color:#333;margin-bottom:1rem;" v-html="renderMd(currentSlide.content)"></div>
               <div v-if="currentSlide.image" style="text-align:center;"><img :src="resolveUrl(currentSlide.image)" style="max-width:100%;max-height:270px;border-radius:6px;" alt="Slide image" /></div>
@@ -110,7 +108,6 @@
                 <video v-if="isLocalVideoCheck(currentSlide.video)" :src="resolveUrl(currentSlide.video)" controls style="width:100%;max-height:260px;border-radius:6px;"></video>
                 <iframe v-else :src="toEmbedUrlCheck(currentSlide.video)" style="width:100%;height:260px;border-radius:6px;border:none;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
               </div>
-            </template>
           </template>
 
           <!-- Poll -->
@@ -190,6 +187,7 @@
             </div>
           </template>
         </div>
+        </template><!-- end v-else (non-canvas slides) -->
 
         <!-- Inline rating (when enabled on this slide) -->
         <div v-if="currentSlide.ratingEnabled" style="position:absolute;bottom:42px;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:0.3rem;padding:0.3rem;background:rgba(255,255,255,0.9);z-index:5;">

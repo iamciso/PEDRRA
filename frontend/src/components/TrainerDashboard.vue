@@ -27,31 +27,27 @@
 
           <!-- CONTENT / POLL / SURVEY / TIMER / RATING -->
           <template v-else>
+            <!-- Canvas elements as FULL SLIDE OVERLAY (exact match to editor 1024x576) -->
+            <template v-if="currentSlide.type==='content' && currentSlide.elements && currentSlide.elements.length">
+              <div style="position:absolute;inset:0;overflow:hidden;">
+                <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden',zIndex:el.zIndex||10,opacity:el.opacity??1,transform:el.rotation?`rotate(${el.rotation}deg)`:'none',filter:el.shadow?'drop-shadow(2px 4px 6px rgba(0,0,0,0.3))':'none'}">
+                  <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize||18)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',textDecoration:el.underline?'underline':'none',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block',lineHeight:1.4,wordWrap:'break-word',whiteSpace:'pre-wrap'}" v-html="renderMd(el.content)"></span>
+                  <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" alt="Slide element" />
+                  <div v-if="el.kind==='shape'" :style="shapeStyle(el)"></div>
+                </div>
+              </div>
+            </template>
+            <!-- Non-canvas slides -->
+            <template v-else>
             <div style="display:flex;align-items:center;padding:0.9rem 2rem 0.7rem;flex-shrink:0;">
               <img src="/template/edps_logo.png" style="height:46px;margin-right:1rem;" onerror="this.style.display='none'" alt="EDPS logo" />
               <h2 style="margin:0;font-size:1.5rem;font-weight:900;color:var(--edps-blue);">{{ currentSlide.title }}</h2>
             </div>
             <div style="padding:1rem 2rem 4rem;flex:1;overflow-y:auto;position:relative;">
               <div v-if="currentSlide.subtitle" style="color:var(--edps-blue);font-size:1.1rem;font-weight:bold;margin-bottom:1rem;">{{ currentSlide.subtitle }}</div>
-              <!-- Content elements -->
               <template v-if="currentSlide.type==='content'">
-                <template v-if="currentSlide.elements && currentSlide.elements.length">
-                  <div style="position:relative;width:100%;padding-bottom:56.25%;overflow:hidden;">
-                    <div style="position:absolute;inset:0;transform-origin:top left;" :style="{transform:'scale('+(940/1024)+')'}">
-                      <div style="position:relative;width:1024px;height:576px;">
-                        <div v-for="el in currentSlide.elements" :key="el.id" :style="{position:'absolute',left:el.x+'px',top:el.y+'px',width:el.w+'px',height:el.h+'px',overflow:'hidden',zIndex:el.zIndex||10,opacity:el.opacity??1,transform:el.rotation?`rotate(${el.rotation}deg)`:'none'}">
-                          <span v-if="el.kind==='text'" :style="{fontSize:(el.fontSize||18)+'px',fontFamily:el.fontFamily||'Segoe UI',fontWeight:el.bold?'bold':'normal',fontStyle:el.italic?'italic':'normal',textDecoration:el.underline?'underline':'none',color:el.color||'#333',textAlign:el.textAlign||'left',display:'block',lineHeight:1.4,wordWrap:'break-word',whiteSpace:'pre-wrap'}" v-html="renderMd(el.content)"></span>
-                          <img v-if="el.kind==='image'" :src="resolveUrl(el.src)" style="width:100%;height:100%;object-fit:contain;" alt="Slide element" />
-                          <div v-if="el.kind==='shape'" :style="shapeStyle(el)"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </template>
-                <template v-else>
                   <div v-if="currentSlide.content" style="line-height:1.8;font-size:1.05rem;" v-html="renderMd(currentSlide.content)"></div>
                   <div v-if="currentSlide.image" style="text-align:center;"><img :src="resolveUrl(currentSlide.image)" style="max-width:100%;max-height:300px;border-radius:6px;" alt="Slide image" /></div>
-                </template>
               </template>
               <!-- Poll -->
               <template v-if="currentSlide.type==='poll'">
@@ -71,6 +67,7 @@
                 </div>
               </template>
             </div>
+            </template>
           </template>
 
           <!-- Drawing overlay (sender mode — draw on full presentation) -->
