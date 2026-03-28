@@ -2068,8 +2068,8 @@ export default {
       w.onload = () => w.print();
     },
     openPresenterMode() {
-      const url = window.location.origin + '/attendee';
-      this.presenterWindow = window.open(url, 'presenter', 'width=1024,height=576');
+      const url = window.location.origin + '/projector';
+      this.presenterWindow = window.open(url, 'projector', 'width=1280,height=720');
       if (!this.presenterWindow) this.showError('Pop-up blocked. Please allow pop-ups for presenter mode.');
     },
     openProjector() {
