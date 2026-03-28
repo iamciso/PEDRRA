@@ -13,8 +13,17 @@
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
     <script>
+      // Unregister any old service workers that cache stale JS
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          registrations.forEach(function(reg) { reg.unregister(); });
+        });
+        // Also clear all caches
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            names.forEach(function(name) { caches.delete(name); });
+          });
+        }
       }
     </script>
   </body>
