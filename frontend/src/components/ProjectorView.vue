@@ -149,9 +149,10 @@
     <!-- Clock -->
     <div style="position:fixed;top:1rem;right:1.5rem;font-size:1.4rem;font-weight:bold;color:white;text-shadow:0 2px 8px rgba(0,0,0,0.8);z-index:100;font-variant-numeric:tabular-nums;">{{ currentTime }}</div>
 
-    <!-- Slide counter -->
-    <div style="position:fixed;bottom:0.5rem;left:1rem;color:rgba(255,255,255,0.4);font-size:0.8rem;z-index:100;">
-      Slide {{ currentSlideNumber }} / {{ slides.length }} · Projector Mode
+    <!-- Slide counter + fullscreen button -->
+    <div style="position:fixed;bottom:0.5rem;left:1rem;color:rgba(255,255,255,0.4);font-size:0.8rem;z-index:100;display:flex;align-items:center;gap:1rem;">
+      <span>Slide {{ currentSlideNumber }} / {{ slides.length }}</span>
+      <button @click="toggleFullscreen" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:rgba(255,255,255,0.7);padding:0.3rem 0.8rem;border-radius:6px;cursor:pointer;font-size:0.8rem;" aria-label="Toggle fullscreen">⛶ Fullscreen</button>
     </div>
   </div>
 </template>
@@ -293,6 +294,13 @@ export default {
   methods: {
     computeScale() {
       this.scale = Math.min(window.innerWidth / W, window.innerHeight / H) * 0.98;
+    },
+    toggleFullscreen() {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      } else {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
     },
     resolveUrl(url) {
       if (!url) return '';
