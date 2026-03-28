@@ -28,7 +28,7 @@
         placeholder="• • • •"
         aria-label="4-digit PIN"
       />
-      <button type="submit" :disabled="pinValue.length < 4 || loading" style="width:100%;" aria-label="Log in with PIN">
+      <button type="submit" :disabled="loading" style="width:100%;" aria-label="Log in with PIN">
         <span v-if="loading">⏳ Connecting...</span>
         <span v-else>Enter Session</span>
       </button>
@@ -77,8 +77,17 @@ export default {
     },
     async loginWithPin() {
       this.error = '';
-      const pin = this.pinValue.trim();
-      if (pin.length < 4 || this.loading) return;
+      // Primary: use v-model value
+      let pin = this.pinValue.replace(/\D/g, '').trim();
+      // Fallback: read directly from DOM input (handles Android IME edge cases)
+      if (pin.length < 4) {
+        const input = this.$refs.pinInput;
+        if (input) pin = (input.value || '').replace(/\D/g, '').trim();
+      }
+      if (pin.length < 4 || this.loading) {
+        if (pin.length < 4) this.error = 'Please enter 4 digits';
+        return;
+      }
       this.loading = true;
       try {
         const res = await fetch(`${baseUrl}/api/login`, {
