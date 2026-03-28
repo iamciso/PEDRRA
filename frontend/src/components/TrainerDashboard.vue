@@ -1,9 +1,9 @@
 <template>
   <!-- ═══ REMOTE CONTROL MODE — Full-screen presentation with floating controls ═══ -->
-  <div v-if="remoteMode" style="position:fixed;inset:0;background:#000;z-index:9999;overflow:hidden;">
+  <div v-if="remoteMode" ref="remoteContainer" style="position:fixed;inset:0;background:#000;z-index:9999;overflow:hidden;">
 
-    <!-- Full-screen presentation (fills space above control bar) -->
-    <div style="position:absolute;top:0;left:0;right:0;bottom:140px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+    <!-- Full-screen presentation (fills ENTIRE screen, controls overlay on top) -->
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
       <div :style="{width:'1024px',height:'576px',transform:`scale(${remoteScale})`,transformOrigin:'center center',flexShrink:0}">
         <div class="edps-presentation" style="width:100%;height:100%;position:relative;">
 
@@ -1114,11 +1114,8 @@ export default {
       return 700;
     },
     remoteScale() {
-      // Reactive to _winW/_winH (updated on resize)
-      // Reserve 140px for the floating control bar, use rest for slide
-      const w = this._winW - 8;
-      const h = this._winH - 140;
-      return Math.min(w / 1024, h / 576, 1); // cap at 1x
+      // Fill the entire screen — controls float on top
+      return Math.min(this._winW / 1024, this._winH / 576, 1.2);
     },
     pollAggregated() {
       const counts = {};

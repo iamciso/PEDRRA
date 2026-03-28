@@ -11,13 +11,24 @@
       <button @click="mode='password'" :style="{flex:1,padding:'0.6rem',border:'none',cursor:'pointer',fontWeight:'bold',fontSize:'0.9rem',background:mode==='password'?'var(--edps-blue)':'#f8fafc',color:mode==='password'?'white':'#64748b'}">🔑 Username</button>
     </div>
 
-    <!-- PIN login -->
+    <!-- PIN login — single input field, simpler and more reliable on mobile -->
     <form v-if="mode==='pin'" @submit.prevent="loginWithPin">
       <div style="text-align:center;margin-bottom:1rem;color:#64748b;font-size:0.9rem;">Enter your 4-digit PIN</div>
-      <div style="display:flex;gap:0.5rem;justify-content:center;margin-bottom:1.5rem;">
-        <input v-for="(d, i) in 4" :key="i" :ref="'pin'+i" type="text" inputmode="numeric" maxlength="1" :value="pinDigits[i]" @input="onPinInput(i, $event)" @keydown.backspace="onPinBackspace(i, $event)" :disabled="loading" style="width:55px;height:60px;text-align:center;font-size:1.8rem;font-weight:bold;border-radius:8px;margin-bottom:0;" aria-label="PIN digit" />
-      </div>
-      <button type="submit" :disabled="pinDigits.join('').length < 4 || loading" style="width:100%;" aria-label="Log in with PIN">
+      <input
+        ref="pinInput"
+        v-model="pinValue"
+        type="tel"
+        inputmode="numeric"
+        pattern="[0-9]*"
+        maxlength="4"
+        autocomplete="one-time-code"
+        :disabled="loading"
+        @input="onPinChange"
+        style="width:100%;height:70px;text-align:center;font-size:2.5rem;font-weight:bold;border-radius:8px;margin-bottom:1rem;letter-spacing:16px;border:2px solid var(--border-color);"
+        placeholder="• • • •"
+        aria-label="4-digit PIN"
+      />
+      <button type="submit" :disabled="pinValue.length < 4 || loading" style="width:100%;" aria-label="Log in with PIN">
         <span v-if="loading">⏳ Connecting...</span>
         <span v-else>Enter Session</span>
       </button>
@@ -50,39 +61,23 @@ export default {
     return {
       mode: 'pin',
       form: { username: '', password: '' },
-      pinDigits: ['', '', '', ''],
+      pinValue: '',
       error: '',
       loading: false
     }
   },
   methods: {
-    onPinInput(i, e) {
-      const val = e.target.value.replace(/\D/g, '');
-      const digit = val.slice(-1);
-      // Use splice for guaranteed Vue reactivity
-      this.pinDigits.splice(i, 1, digit);
-      e.target.value = digit;
-      if (digit && i < 3) {
-        const next = this.$refs['pin' + (i + 1)];
-        if (next) (Array.isArray(next) ? next[0] : next).focus();
-      }
-      // Check if all 4 digits are filled
-      const pin = this.pinDigits.join('');
-      if (pin.length === 4 && /^\d{4}$/.test(pin) && !this.loading) {
+    onPinChange() {
+      // Strip non-digits
+      this.pinValue = this.pinValue.replace(/\D/g, '').slice(0, 4);
+      // Auto-submit when 4 digits entered
+      if (this.pinValue.length === 4 && !this.loading) {
         this.loginWithPin();
-      }
-    },
-    onPinBackspace(i, e) {
-      if (!this.pinDigits[i] && i > 0) {
-        this.pinDigits[i - 1] = '';
-        const prev = this.$refs['pin' + (i - 1)];
-        if (prev) (Array.isArray(prev) ? prev[0] : prev).focus();
-        e.preventDefault();
       }
     },
     async loginWithPin() {
       this.error = '';
-      const pin = this.pinDigits.join('');
+      const pin = this.pinValue.trim();
       if (pin.length < 4 || this.loading) return;
       this.loading = true;
       try {
@@ -97,11 +92,8 @@ export default {
         this.$router.push(data.user.role === 'Trainer' ? '/trainer' : '/attendee');
       } catch (err) {
         this.error = err.message;
-        this.pinDigits = ['', '', '', ''];
-        this.$nextTick(() => {
-          const first = this.$refs['pin0'];
-          if (first) (Array.isArray(first) ? first[0] : first).focus();
-        });
+        this.pinValue = '';
+        this.$nextTick(() => { this.$refs.pinInput?.focus(); });
       } finally {
         this.loading = false;
       }

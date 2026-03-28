@@ -1,5 +1,5 @@
 // PEDRRA Service Worker — Offline support (#1 PWA)
-const CACHE_NAME = 'pedrra-v2';
+const CACHE_NAME = 'pedrra-v3';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
