@@ -5,8 +5,7 @@
       "type": "title",
       "title": "PEDRRA Training Exercise",
       "subtitle": "PErsonal Data bReach Risk Assessment",
-      "content": "Welcome to the training. Please follow along closely as we begin our interactive scenarios on Data Breach Risk Management.",
-      "_showCanvas": true,
+      "content": "Just a test. ",
       "elements": [
         {
           "id": "el_1774532969696",
@@ -31,8 +30,43 @@
           "italic": false,
           "color": "#333333",
           "textAlign": "left"
+        },
+        {
+          "id": "el_1774699454681_1",
+          "kind": "text",
+          "x": 80,
+          "y": 100,
+          "w": 500,
+          "h": 80,
+          "content": "",
+          "fontSize": 18,
+          "fontFamily": "Segoe UI",
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "color": "#333333",
+          "textAlign": "left",
+          "zIndex": 100
+        },
+        {
+          "id": "el_1774699536196_1",
+          "kind": "text",
+          "x": 80,
+          "y": 100,
+          "w": 500,
+          "h": 80,
+          "content": "",
+          "fontSize": 18,
+          "fontFamily": "Segoe UI",
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "color": "#333333",
+          "textAlign": "left",
+          "zIndex": 101
         }
-      ]
+      ],
+      "ratingEnabled": false
     },
     {
       "id": 2,
@@ -40,7 +74,8 @@
       "title": "Welcome & Context",
       "subtitle": "Learning Objectives",
       "content": "Not every security incident is a data breach, but every data breach is a security incident. Today we enhance practical skills in Risk Assessment and inter-disciplinary communication between IT, DPOs, and Management.",
-      "image": "/uploads/1774522144796_LINUX.png"
+      "image": "/uploads/1774522144796_LINUX.png",
+      "ratingEnabled": false
     },
     {
       "id": 3,
@@ -48,7 +83,6 @@
       "title": "Scenario 1: The Encrypted Gateway",
       "subtitle": "Stolen Laptop",
       "content": "An external consultant's laptop holding 150 expert contacts was stolen from a locked home office overnight. It has full-disk encryption and a strong passphrase. A remote wipe was initiated, but remains pending connection.",
-      "_showCanvas": true,
       "elements": [
         {
           "id": "el_1774530885334",
@@ -74,7 +108,8 @@
           "color": "#cf0707",
           "textAlign": "left"
         }
-      ]
+      ],
+      "ratingEnabled": false
     },
     {
       "id": 4,
@@ -85,7 +120,8 @@
         "Unlikely Risk (No EDPS Notification)",
         "Risk (EDPS Notification Required)",
         "High Risk (Notify EDPS & Data Subjects)"
-      ]
+      ],
+      "ratingEnabled": false
     },
     {
       "id": 5,
@@ -93,7 +129,6 @@
       "title": "Lecture: Data Breach Essentials",
       "subtitle": "EDPS Perspective",
       "content": "A personal data breach is a security breach leading to the accidental or unlawful destruction, loss, alteration, unauthorized disclosure or access to personal data. Note the strict 72-hour EDPS notification deadline!",
-      "_showCanvas": true,
       "elements": [
         {
           "id": "el_1774524076371",
@@ -113,7 +148,8 @@
           "h": 389,
           "src": "https://youtu.be/-m3WiB4wd-g?si=GxwKBnW9jNs295w3"
         }
-      ]
+      ],
+      "ratingEnabled": false
     },
     {
       "id": 6,
@@ -125,14 +161,16 @@
         "Within 24 hours.",
         "Without undue delay, max 72 hours.",
         "Only if the breach is High Risk."
-      ]
+      ],
+      "ratingEnabled": false
     },
     {
       "id": 7,
       "type": "content",
       "title": "Scenario 2: Inter-Agency Data Leak",
       "subtitle": "Cloud Service Compromise",
-      "content": "CloudVault was breached via phishing. 750,000 pseudonymized records were accessed containing demographic data and a 'health status indicator'. Data was NOT encrypted at rest, a severe violation of the processor's DPA."
+      "content": "CloudVault was breached via phishing. 750,000 pseudonymized records were accessed containing demographic data and a 'health status indicator'. Data was NOT encrypted at rest, a severe violation of the processor's DPA.",
+      "ratingEnabled": false
     },
     {
       "id": 8,
@@ -144,14 +182,16 @@
         "The Health Status Indicator (Sensitive)",
         "The inter-agency cross-border scope",
         "The missing encryption at rest"
-      ]
+      ],
+      "ratingEnabled": false
     },
     {
       "id": 9,
       "type": "title",
       "title": "Final Debrief & Feedback",
       "subtitle": "End of PEDRRA Exercise",
-      "content": "Thank you for participating. We will now reflect on inter-disciplinary collaboration, strategic decision-making, and fill out our evaluation forms."
+      "content": "Thank you for participating. We will now reflect on inter-disciplinary collaboration, strategic decision-making, and fill out our evaluation forms.",
+      "ratingEnabled": false
     },
     {
       "id": 1774519177211,
@@ -161,7 +201,8 @@
       "options": [
         "Option 1",
         "Option 2"
-      ]
+      ],
+      "ratingEnabled": false
     },
     {
       "id": 1774519182258,
@@ -179,7 +220,8 @@
           "type": "text",
           "options": []
         }
-      ]
+      ],
+      "ratingEnabled": false
     },
     {
       "id": 1774519890837,
@@ -201,7 +243,8 @@
             "c"
           ]
         }
-      ]
+      ],
+      "ratingEnabled": false
     },
     {
       "id": 1774522133799,
@@ -211,7 +254,6 @@
       "content": "asdfasdf",
       "image": "https://academy.hackthebox.com/storage/modules/18/logo.png",
       "video": "",
-      "_showCanvas": true,
       "elements": [
         {
           "id": "el_1774523846831",
@@ -228,7 +270,8 @@
           "color": "#333333",
           "textAlign": "left"
         }
-      ]
+      ],
+      "ratingEnabled": false
     }
   ]
 }

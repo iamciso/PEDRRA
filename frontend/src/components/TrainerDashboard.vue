@@ -118,7 +118,7 @@
         </select> |
         <a v-if="!notificationsEnabled" href="#" @click.prevent="enableNotifications" style="font-size:0.8rem;margin:0 0.3rem;" title="Enable desktop notifications">🔔</a>
         <span v-else style="font-size:0.8rem;margin:0 0.3rem;opacity:0.5;" title="Notifications enabled">🔔✓</span> |
-        <a href="#" @click.prevent="remoteMode=true" style="font-size:0.8rem;margin:0 0.3rem;" title="Remote control mode for mobile">📱 Remote</a> |
+        <button @click="remoteMode=true" style="background:var(--edps-blue);color:white;border:none;padding:0.3rem 0.7rem;border-radius:6px;font-size:0.8rem;cursor:pointer;margin:0 0.3rem;" title="Remote control mode for mobile" aria-label="Remote control mode">📱 Remote</button> |
         <a href="#" @click.prevent="logout" style="color: var(--primary);">Log Out</a>
       </div>
     </div>
