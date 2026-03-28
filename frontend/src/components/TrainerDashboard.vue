@@ -1979,34 +1979,40 @@ export default {
       this.fullscreenWheelWinner = null;
       this.wheelSpinState = true;
 
-      // Build a long list of shuffled items to scroll through
-      const items = [];
-      const totalCycles = 4 + Math.floor(Math.random() * 3); // 4-6 cycles (fast)
-      for (let c = 0; c < totalCycles; c++) {
-        const shuffled = [...this.wheelAttendees].sort(() => Math.random() - 0.5);
-        items.push(...shuffled);
-      }
-      // Pick winner and put at the end
+      // Pick winner
       const winnerIdx = Math.floor(Math.random() * this.wheelAttendees.length);
       const winner = this.wheelAttendees[winnerIdx];
+      const duration = 2000; // ms — fast
+
+      // Broadcast spinning to all screens IMMEDIATELY (attendees see the animation)
+      if (this.socket) this.socket.emit('overlay:show', {
+        type: 'wheel-spinning',
+        data: {
+          attendees: this.wheelAttendees.map(a => ({ display_name: a.display_name || a.username, avatar: a.avatar })),
+          winner: { display_name: winner.display_name || winner.username, avatar: winner.avatar },
+          duration,
+        }
+      });
+
+      // Build slot items for trainer's local animation
+      const items = [];
+      const totalCycles = 3 + Math.floor(Math.random() * 2);
+      for (let c = 0; c < totalCycles; c++) {
+        items.push(...[...this.wheelAttendees].sort(() => Math.random() - 0.5));
+      }
       items.push(winner);
       this.slotItems = items;
 
-      // Animate: start fast, decelerate to stop on the last item
-      const itemH = 70; // px per item
-      const totalItems = items.length;
-      const targetOffset = -((totalItems - 1) * itemH) + itemH; // center the last item
-      const duration = 2500; // total animation time ms (fast picker)
+      const itemH = 70;
+      const targetOffset = -((items.length - 1) * itemH) + itemH;
       const startTime = performance.now();
-      const startOffset = 0;
-      this.slotOffset = startOffset;
+      this.slotOffset = 0;
 
       const animate = (now) => {
         const elapsed = now - startTime;
         const progress = Math.min(elapsed / duration, 1);
-        // Ease out cubic for dramatic slow-down
         const eased = 1 - Math.pow(1 - progress, 3);
-        this.slotOffset = startOffset + (targetOffset - startOffset) * eased;
+        this.slotOffset = (targetOffset) * eased;
 
         if (progress < 1) {
           this.slotAnimFrame = requestAnimationFrame(animate);
@@ -2014,7 +2020,7 @@ export default {
           this.slotOffset = targetOffset;
           this.wheelSpinState = false;
           this.fullscreenWheelWinner = winner;
-          // Broadcast to all screens (attendees, projector)
+          // Broadcast winner to all screens
           if (this.socket) this.socket.emit('overlay:show', { type: 'wheel', data: { display_name: winner.display_name || winner.username, avatar: winner.avatar } });
         }
       };

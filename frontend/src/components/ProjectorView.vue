@@ -110,8 +110,24 @@
       <DrawingOverlay :strokes="drawStrokes" :pointer="drawPointer" />
     </div>
 
-    <!-- ═══ TRAINER OVERLAY (wheel result, leaderboard) ═══ -->
-    <div v-if="overlay" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.8);animation:overlayFadeIn 0.3s ease-out;">
+    <!-- ═══ TRAINER OVERLAY (wheel spinning + result, leaderboard) ═══ -->
+    <div v-if="overlay" style="position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f172a,#1e293b);animation:overlayFadeIn 0.3s ease-out;">
+
+      <!-- Wheel SPINNING (projector — larger for big screen) -->
+      <template v-if="overlay.type==='wheel-spinning' && overlay.data">
+        <div style="color:white;font-size:2.5rem;font-weight:bold;margin-bottom:2rem;text-shadow:0 2px 8px rgba(0,0,0,0.5);">🎲 Who's next?</div>
+        <div style="position:relative;width:500px;height:250px;overflow:hidden;border-radius:20px;border:4px solid var(--edps-gold);box-shadow:0 0 60px rgba(241,192,100,0.3);background:#1e293b;">
+          <div style="position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);height:80px;border-top:3px solid var(--edps-gold);border-bottom:3px solid var(--edps-gold);background:rgba(241,192,100,0.1);z-index:5;pointer-events:none;"></div>
+          <div :style="{position:'absolute',left:0,right:0,display:'flex',flexDirection:'column',alignItems:'center',transform:'translateY('+wheelScrollOffset+'px)',transition:wheelScrollTransition}">
+            <div v-for="(att, i) in wheelDisplayItems" :key="'wp-'+i" style="height:80px;display:flex;align-items:center;justify-content:center;gap:1rem;width:100%;padding:0 2rem;">
+              <div style="width:50px;height:50px;border-radius:50%;background:var(--edps-blue);display:flex;align-items:center;justify-content:center;color:white;font-size:1.3rem;font-weight:bold;flex-shrink:0;">{{ (att.display_name || '?')[0] }}</div>
+              <span style="color:white;font-size:1.6rem;font-weight:bold;text-shadow:0 1px 4px rgba(0,0,0,0.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ att.display_name }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Wheel WINNER -->
       <div v-if="overlay.type==='wheel' && overlay.data" style="text-align:center;animation:podiumRise 0.5s ease-out;">
         <div style="font-size:5rem;margin-bottom:1rem;">🎉</div>
         <div v-if="overlay.data.avatar" style="margin:0 auto 1rem;"><img :src="resolveUrl(overlay.data.avatar)" style="width:120px;height:120px;border-radius:50%;object-fit:cover;border:4px solid var(--edps-gold);" alt="Winner avatar" /></div>
@@ -168,7 +184,10 @@ export default {
       pollResults: [],
       pollProgress: { answered: 0, total: 0 },
       _prevSlideId: null,
-      overlay: null, // { type: 'wheel'|'leaderboard', data: ... }
+      overlay: null,
+      wheelDisplayItems: [],
+      wheelScrollOffset: 0,
+      wheelScrollTransition: 'none',
       drawStrokes: [],
       drawPointer: { x: 0, y: 0, visible: false },
     };
@@ -251,8 +270,13 @@ export default {
     this.socket.on('draw:clear', () => { this.drawStrokes = []; });
     this.socket.on('draw:pointer', p => { this.drawPointer = p; });
 
-    // Overlay events (wheel, leaderboard)
-    this.socket.on('overlay:show', (data) => { this.overlay = data; });
+    // Overlay events (wheel spinning + result, leaderboard)
+    this.socket.on('overlay:show', (data) => {
+      this.overlay = data;
+      if (data.type === 'wheel-spinning' && data.data) {
+        this._startWheelAnim(data.data);
+      }
+    });
     this.socket.on('overlay:hide', () => { this.overlay = null; });
 
     // Clock
@@ -287,6 +311,25 @@ export default {
       return base;
     },
     getPct(count) { return this.totalPollAnswers > 0 ? (count||0)/this.totalPollAnswers*100 : 0; },
+    _startWheelAnim(data) {
+      const { attendees, winner, duration } = data;
+      if (!attendees || attendees.length < 2) return;
+      const items = [];
+      const cycles = 3 + Math.floor(Math.random() * 2);
+      for (let c = 0; c < cycles; c++) items.push(...[...attendees].sort(() => Math.random() - 0.5));
+      items.push(winner);
+      this.wheelDisplayItems = items;
+      const itemH = 80; // projector uses larger items
+      const targetOffset = -((items.length - 1) * itemH) + itemH;
+      this.wheelScrollOffset = 0;
+      this.wheelScrollTransition = 'none';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          this.wheelScrollTransition = `transform ${duration}ms cubic-bezier(0.17, 0.67, 0.12, 0.99)`;
+          this.wheelScrollOffset = targetOffset;
+        });
+      });
+    },
     _handleTimer(state) {
       clearInterval(this.timerInterval);
       if (!state) { this.timerSeconds = 0; this.timerRunning = false; return; }

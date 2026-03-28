@@ -214,9 +214,26 @@
       <DrawingOverlay :strokes="drawStrokes" :pointer="drawPointer" />
     </div>
 
-    <!-- ═══ TRAINER OVERLAY (wheel result, leaderboard) visible to attendees ═══ -->
-    <div v-if="overlay" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.8);animation:overlayFadeIn 0.3s ease-out;">
-      <!-- Wheel winner -->
+    <!-- ═══ TRAINER OVERLAY (wheel spinning + result, leaderboard) visible to attendees ═══ -->
+    <div v-if="overlay" style="position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f172a,#1e293b);animation:overlayFadeIn 0.3s ease-out;">
+
+      <!-- Wheel SPINNING animation -->
+      <template v-if="overlay.type==='wheel-spinning' && overlay.data">
+        <div style="color:white;font-size:1.8rem;font-weight:bold;margin-bottom:1.5rem;text-shadow:0 2px 8px rgba(0,0,0,0.5);">🎲 Who's next?</div>
+        <div style="position:relative;width:320px;height:180px;overflow:hidden;border-radius:16px;border:3px solid var(--edps-gold);box-shadow:0 0 40px rgba(241,192,100,0.3);background:#1e293b;">
+          <!-- Selection indicator -->
+          <div style="position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);height:60px;border-top:2px solid var(--edps-gold);border-bottom:2px solid var(--edps-gold);background:rgba(241,192,100,0.1);z-index:5;pointer-events:none;"></div>
+          <!-- Scrolling names -->
+          <div :style="{position:'absolute',left:0,right:0,display:'flex',flexDirection:'column',alignItems:'center',transform:'translateY('+wheelScrollOffset+'px)',transition: wheelScrollTransition}">
+            <div v-for="(att, i) in wheelDisplayItems" :key="'ws-'+i" style="height:60px;display:flex;align-items:center;justify-content:center;gap:0.8rem;width:100%;padding:0 1rem;">
+              <div style="width:40px;height:40px;border-radius:50%;background:var(--edps-blue);display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;flex-shrink:0;">{{ (att.display_name || '?')[0] }}</div>
+              <span style="color:white;font-size:1.2rem;font-weight:bold;text-shadow:0 1px 4px rgba(0,0,0,0.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ att.display_name }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Wheel WINNER result -->
       <div v-if="overlay.type==='wheel' && overlay.data" style="text-align:center;animation:podiumRise 0.5s ease-out;">
         <div style="font-size:4rem;margin-bottom:1rem;">🎉</div>
         <div v-if="overlay.data.avatar" style="margin:0 auto 1rem;">
@@ -273,7 +290,11 @@ export default {
     return {
       drawStrokes: [],
       drawPointer: { x: 0, y: 0, visible: false },
-      overlay: null, // { type: 'wheel'|'leaderboard', data: ... }
+      overlay: null, // { type: 'wheel'|'wheel-spinning'|'leaderboard', data: ... }
+      wheelDisplayItems: [],
+      wheelScrollOffset: 0,
+      wheelScrollTransition: 'none',
+      _wheelAnimTimer: null,
       _prevResultsSlideId: null,
       slides: [],
       currentSlideId: null,
@@ -441,9 +462,17 @@ export default {
     this.socket.on('draw:clear', () => { this.drawStrokes = []; });
     this.socket.on('draw:pointer', p => { this.drawPointer = p; });
 
-    // Overlays (wheel result, leaderboard) broadcast by trainer
-    this.socket.on('overlay:show', (data) => { this.overlay = data; });
-    this.socket.on('overlay:hide', () => { this.overlay = null; });
+    // Overlays (wheel spinning + result, leaderboard) broadcast by trainer
+    this.socket.on('overlay:show', (data) => {
+      this.overlay = data;
+      if (data.type === 'wheel-spinning' && data.data) {
+        this._startWheelAnimation(data.data);
+      }
+    });
+    this.socket.on('overlay:hide', () => {
+      this.overlay = null;
+      clearTimeout(this._wheelAnimTimer);
+    });
 
     // Freeze mode
     this.socket.on('slide:freeze', (frozen) => { this.frozen = frozen; });
@@ -526,6 +555,31 @@ export default {
     reactionLabel(emoji) {
       const labels = { '👍': 'Like', '❓': 'Question', '🐌': 'Slow down', '👏': 'Applause', '🎉': 'Celebrate' };
       return labels[emoji] || '';
+    },
+    _startWheelAnimation(data) {
+      const { attendees, winner, duration } = data;
+      if (!attendees || attendees.length < 2) return;
+      // Build display list: several shuffled cycles + winner at end
+      const items = [];
+      const cycles = 3 + Math.floor(Math.random() * 2);
+      for (let c = 0; c < cycles; c++) {
+        items.push(...[...attendees].sort(() => Math.random() - 0.5));
+      }
+      items.push(winner);
+      this.wheelDisplayItems = items;
+      // Animate scroll
+      const itemH = 60;
+      const targetOffset = -((items.length - 1) * itemH) + itemH;
+      // Start at top, no transition
+      this.wheelScrollOffset = 0;
+      this.wheelScrollTransition = 'none';
+      // After a frame, start the CSS transition
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          this.wheelScrollTransition = `transform ${duration}ms cubic-bezier(0.17, 0.67, 0.12, 0.99)`;
+          this.wheelScrollOffset = targetOffset;
+        });
+      });
     },
     _playTimerEndSound() {
       try {
