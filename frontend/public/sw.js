@@ -1,5 +1,5 @@
 // PEDRRA Service Worker — Offline support (#1 PWA)
-const CACHE_NAME = 'pedrra-v1';
+const CACHE_NAME = 'pedrra-v2';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
@@ -10,16 +10,19 @@ const STATIC_ASSETS = [
   '/template/section_bg.png',
 ];
 
-// Install: cache static assets
+// Install: cache static assets, immediately activate
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then(cache =>
-      cache.addAll(STATIC_ASSETS).catch(() => {
-        // Some assets may not exist yet — that's OK
-      })
+      cache.addAll(STATIC_ASSETS).catch(() => {})
     )
   );
   self.skipWaiting();
+});
+
+// Message handler: allow page to request cache clear
+self.addEventListener('message', (e) => {
+  if (e.data === 'skipWaiting') self.skipWaiting();
 });
 
 // Activate: clean old caches
@@ -36,10 +39,12 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
-  // Skip non-GET, socket.io, and API requests
+  // Skip non-GET, socket.io requests
   if (e.request.method !== 'GET') return;
   if (url.pathname.startsWith('/socket.io')) return;
-  if (url.pathname.startsWith('/api/')) {
+
+  // Network-first for API AND JS/CSS assets (ensures deploys are picked up)
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/assets/')) {
     // Network-first for API (with cache fallback for offline reads)
     e.respondWith(
       fetch(e.request)

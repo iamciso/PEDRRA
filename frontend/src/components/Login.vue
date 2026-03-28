@@ -58,17 +58,19 @@ export default {
   methods: {
     onPinInput(i, e) {
       const val = e.target.value.replace(/\D/g, '');
-      this.pinDigits[i] = val.slice(-1);
-      e.target.value = this.pinDigits[i];
-      if (val && i < 3) {
+      const digit = val.slice(-1);
+      // Use splice for guaranteed Vue reactivity
+      this.pinDigits.splice(i, 1, digit);
+      e.target.value = digit;
+      if (digit && i < 3) {
         const next = this.$refs['pin' + (i + 1)];
         if (next) (Array.isArray(next) ? next[0] : next).focus();
       }
-      // Use nextTick to ensure all digits are set before checking
-      this.$nextTick(() => {
-        const pin = this.pinDigits.join('');
-        if (pin.length === 4 && /^\d{4}$/.test(pin)) this.loginWithPin();
-      });
+      // Check if all 4 digits are filled
+      const pin = this.pinDigits.join('');
+      if (pin.length === 4 && /^\d{4}$/.test(pin) && !this.loading) {
+        this.loginWithPin();
+      }
     },
     onPinBackspace(i, e) {
       if (!this.pinDigits[i] && i > 0) {

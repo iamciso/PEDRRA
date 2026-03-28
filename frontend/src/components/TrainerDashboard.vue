@@ -2,9 +2,9 @@
   <!-- ═══ REMOTE CONTROL MODE — Full-screen presentation with floating controls ═══ -->
   <div v-if="remoteMode" style="position:fixed;inset:0;background:#000;z-index:9999;overflow:hidden;">
 
-    <!-- Full-screen presentation (same rendering as attendee view) -->
-    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
-      <div :style="{width:'1024px',height:'576px',transform:`translate(-50%,-50%) scale(${remoteScale})`,transformOrigin:'center center',position:'absolute',top:'50%',left:'50%'}">
+    <!-- Full-screen presentation (fills space above control bar) -->
+    <div style="position:absolute;top:0;left:0;right:0;bottom:140px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+      <div :style="{width:'1024px',height:'576px',transform:`scale(${remoteScale})`,transformOrigin:'center center',flexShrink:0}">
         <div class="edps-presentation" style="width:100%;height:100%;position:relative;">
 
           <!-- TITLE SLIDE -->
@@ -1115,9 +1115,10 @@ export default {
     },
     remoteScale() {
       // Reactive to _winW/_winH (updated on resize)
-      const w = Math.min(this._winW - 16, 1024);
-      const h = Math.min(this._winH * 0.55, 576); // 55% for slide, rest for controls
-      return Math.min(w / 1024, h / 576);
+      // Reserve 140px for the floating control bar, use rest for slide
+      const w = this._winW - 8;
+      const h = this._winH - 140;
+      return Math.min(w / 1024, h / 576, 1); // cap at 1x
     },
     pollAggregated() {
       const counts = {};
