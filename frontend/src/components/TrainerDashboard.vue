@@ -80,11 +80,6 @@
       </div>
     </div>
 
-    <!-- Speaker notes (expandable panel above controls) -->
-    <div v-if="remoteShowNotes && currentSlide.notes" style="position:fixed;bottom:110px;left:0;right:0;z-index:10001;padding:0.75rem 1rem;background:rgba(0,0,0,0.85);color:#e2e8f0;font-size:0.85rem;line-height:1.4;max-height:120px;overflow-y:auto;">
-      📝 {{ currentSlide.notes }}
-    </div>
-
     <!-- Floating control bar -->
     <div style="position:fixed;bottom:0;left:0;right:0;z-index:10001;background:rgba(15,23,42,0.92);backdrop-filter:blur(8px);padding:0.5rem 0.75rem;border-top:1px solid rgba(255,255,255,0.1);">
       <!-- Navigation row -->
@@ -102,8 +97,6 @@
         <button v-if="currentSlide.type==='timer'" @click="resetTimer" style="padding:0.5rem 0.7rem;border-radius:8px;border:none;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.12);color:white;">↺</button>
         <button @click="openWheel" style="padding:0.5rem 0.7rem;border-radius:8px;border:none;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.12);color:white;">🎡</button>
         <button @click="openLeaderboard" style="padding:0.5rem 0.7rem;border-radius:8px;border:none;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.12);color:white;">🏆</button>
-        <button @click="showQR=!showQR" style="padding:0.5rem 0.7rem;border-radius:8px;border:none;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.12);color:white;">📱</button>
-        <button v-if="currentSlide.notes" @click="remoteShowNotes=!remoteShowNotes" :style="{padding:'0.5rem 0.7rem',borderRadius:'8px',border:'none',cursor:'pointer',fontSize:'0.8rem',background:remoteShowNotes?'var(--edps-gold)':'rgba(255,255,255,0.12)',color:'white'}">📝</button>
         <span style="flex:1;"></span>
         <span style="font-size:0.7rem;color:rgba(255,255,255,0.5);">{{ currentIndex+1 }}/{{ slides.length }}</span>
         <span :style="{width:'6px',height:'6px',borderRadius:'50%',background:connected?'#10b981':'#ef4444',flexShrink:0}"></span>
@@ -920,7 +913,7 @@
     <!-- ═══ FULLSCREEN OVERLAYS (only trainer sees, projected to students) ═══ -->
 
     <!-- Leaderboard overlay (fullscreen) -->
-    <div v-if="showLeaderboard" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);animation:overlayFadeIn 0.3s ease-out;" @click.self="showLeaderboard=false">
+    <div v-if="showLeaderboard" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);animation:overlayFadeIn 0.3s ease-out;" @click.self="showLeaderboard=false; if(socket) socket.emit('overlay:hide')">
       <div style="background:white;border-radius:24px;padding:2.5rem;width:85%;max-width:600px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
         <h2 style="margin:0 0 1.5rem;text-align:center;color:var(--edps-blue);font-size:2.2rem;">🏆 Leaderboard</h2>
         <div v-if="leaderboardEntries.length >= 1" class="podium-container">
@@ -934,7 +927,7 @@
           <span style="font-weight:bold;color:var(--edps-blue);font-size:1.1rem;">{{ e.total_points || 0 }}</span>
         </div>
         <div style="text-align:center;margin-top:1.5rem;">
-          <button @click.stop="showLeaderboard=false" class="secondary" style="width:auto;padding:0.7rem 2rem;border-radius:20px;">Close</button>
+          <button @click.stop="showLeaderboard=false; if(socket) socket.emit('overlay:hide')" class="secondary" style="width:auto;padding:0.7rem 2rem;border-radius:20px;">Close</button>
         </div>
       </div>
     </div>
@@ -989,7 +982,7 @@
 
     <div style="margin-top:2rem;display:flex;gap:1rem;">
       <button @click.stop="spinSlotMachine" :disabled="wheelSpinState || wheelAttendees.length < 2" style="padding:1rem 3rem;font-size:1.2rem;border-radius:30px;background:var(--edps-gold);color:white;border:none;font-weight:bold;cursor:pointer;box-shadow:0 4px 20px rgba(241,192,100,0.4);">🎲 Pick Someone!</button>
-      <button @click.stop="showWheel=false" style="padding:1rem 2rem;font-size:1.1rem;border-radius:30px;background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);cursor:pointer;">✕ Close</button>
+      <button @click.stop="showWheel=false; if(socket) socket.emit('overlay:hide')" style="padding:1rem 2rem;font-size:1.1rem;border-radius:30px;background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);cursor:pointer;">✕ Close</button>
     </div>
   </div>
 
@@ -1118,7 +1111,7 @@ export default {
     remoteScale() {
       // Scale the 1024x576 canvas to fit the mobile viewport
       const w = Math.min(window.innerWidth - 20, 1024);
-      const h = Math.min(window.innerHeight * 0.5, 576);
+      const h = Math.min(window.innerHeight * 0.82, 576);
       return Math.min(w / 1024, h / 576);
     },
     pollAggregated() {
@@ -1302,7 +1295,8 @@ export default {
       }
     },
     handleKeydown(e) {
-      if (!this.isFullscreen) return;
+      if (e.key === 'Escape' && this.remoteMode) { this.remoteMode = false; return; }
+      if (!this.isFullscreen && !this.remoteMode) return;
       if (e.key === 'ArrowRight' || e.key === ' ') this.nextSlide();
       if (e.key === 'ArrowLeft') this.prevSlide();
     },
@@ -1968,6 +1962,8 @@ export default {
         if (res.ok) this.leaderboardEntries = await res.json();
       } catch (e) { /* ignore */ }
       this.showLeaderboard = true;
+      // Broadcast to all screens
+      if (this.socket) this.socket.emit('overlay:show', { type: 'leaderboard', data: this.leaderboardEntries });
     },
     showQROverlay() {
       this.showQR = !this.showQR;
@@ -2012,6 +2008,8 @@ export default {
           this.slotOffset = targetOffset;
           this.wheelSpinState = false;
           this.fullscreenWheelWinner = winner;
+          // Broadcast to all screens (attendees, projector)
+          if (this.socket) this.socket.emit('overlay:show', { type: 'wheel', data: { display_name: winner.display_name || winner.username, avatar: winner.avatar } });
         }
       };
       this.slotAnimFrame = requestAnimationFrame(animate);

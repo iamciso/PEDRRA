@@ -214,6 +214,33 @@
       <DrawingOverlay :strokes="drawStrokes" :pointer="drawPointer" />
     </div>
 
+    <!-- ═══ TRAINER OVERLAY (wheel result, leaderboard) visible to attendees ═══ -->
+    <div v-if="overlay" style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.8);animation:overlayFadeIn 0.3s ease-out;">
+      <!-- Wheel winner -->
+      <div v-if="overlay.type==='wheel' && overlay.data" style="text-align:center;animation:podiumRise 0.5s ease-out;">
+        <div style="font-size:4rem;margin-bottom:1rem;">🎉</div>
+        <div v-if="overlay.data.avatar" style="margin:0 auto 1rem;">
+          <img :src="resolveUrl(overlay.data.avatar)" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:4px solid var(--edps-gold);" alt="Winner avatar" />
+        </div>
+        <div style="font-size:2.5rem;font-weight:900;color:white;text-shadow:0 2px 8px rgba(0,0,0,0.5);">{{ overlay.data.display_name }}</div>
+        <div style="font-size:1.2rem;color:var(--edps-gold);margin-top:0.5rem;font-weight:bold;">Selected!</div>
+      </div>
+      <!-- Leaderboard -->
+      <div v-if="overlay.type==='leaderboard' && Array.isArray(overlay.data)" style="background:white;border-radius:24px;padding:2rem;width:85%;max-width:500px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+        <h2 style="margin:0 0 1.5rem;text-align:center;color:var(--edps-blue);font-size:2rem;">🏆 Leaderboard</h2>
+        <div v-if="overlay.data.length >= 1" class="podium-container">
+          <div v-if="overlay.data[1]" class="podium-place silver"><div class="podium-rank">🥈</div><div class="podium-name">{{ overlay.data[1].display_name || overlay.data[1].username }}</div><div class="podium-points">{{ overlay.data[1].total_points || 0 }} pts</div></div>
+          <div class="podium-place gold"><div class="podium-rank">🥇</div><div class="podium-name">{{ overlay.data[0].display_name || overlay.data[0].username }}</div><div class="podium-points">{{ overlay.data[0].total_points || 0 }} pts</div></div>
+          <div v-if="overlay.data[2]" class="podium-place bronze"><div class="podium-rank">🥉</div><div class="podium-name">{{ overlay.data[2].display_name || overlay.data[2].username }}</div><div class="podium-points">{{ overlay.data[2].total_points || 0 }} pts</div></div>
+        </div>
+        <div v-for="(e, i) in (overlay.data || []).slice(3)" :key="i" style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0.75rem;margin-bottom:0.3rem;background:#f8fafc;border-radius:8px;">
+          <span style="width:24px;text-align:center;font-weight:bold;color:#94a3b8;">{{ i+4 }}</span>
+          <span style="flex:1;font-weight:600;">{{ e.display_name || e.username }}</span>
+          <span style="font-weight:bold;color:var(--edps-blue);">{{ e.total_points || 0 }}</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Reaction buttons (floating bottom) -->
     <div v-if="isSlideVisible" style="position:fixed;bottom:0.8rem;left:50%;transform:translateX(-50%);z-index:200;display:flex;gap:0.4rem;background:rgba(0,0,0,0.6);padding:0.4rem 0.8rem;border-radius:24px;">
       <button v-for="emoji in reactionEmojis" :key="emoji" @click="sendReaction(emoji)" style="background:none;border:none;font-size:1.4rem;cursor:pointer;padding:0.2rem 0.4rem;transition:transform 0.15s;" @mouseenter="$event.target.style.transform='scale(1.3)'" @mouseleave="$event.target.style.transform='scale(1)'" :title="reactionLabel(emoji)">{{ emoji }}</button>
@@ -246,6 +273,7 @@ export default {
     return {
       drawStrokes: [],
       drawPointer: { x: 0, y: 0, visible: false },
+      overlay: null, // { type: 'wheel'|'leaderboard', data: ... }
       _prevResultsSlideId: null,
       slides: [],
       currentSlideId: null,
@@ -412,6 +440,10 @@ export default {
     this.socket.on('draw:stroke', s => { this.drawStrokes = [...this.drawStrokes, s]; });
     this.socket.on('draw:clear', () => { this.drawStrokes = []; });
     this.socket.on('draw:pointer', p => { this.drawPointer = p; });
+
+    // Overlays (wheel result, leaderboard) broadcast by trainer
+    this.socket.on('overlay:show', (data) => { this.overlay = data; });
+    this.socket.on('overlay:hide', () => { this.overlay = null; });
 
     // Freeze mode
     this.socket.on('slide:freeze', (frozen) => { this.frozen = frozen; });

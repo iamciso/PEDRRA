@@ -790,6 +790,17 @@ io.on('connection', (socket) => {
             visible: !!data?.visible,
         });
     });
+
+    // ── OVERLAYS (visible to all screens) ────────────────────
+    socket.on('overlay:show', (data) => {
+        if (socket.user.role !== 'Trainer') return;
+        if (!data || !data.type) return;
+        io.emit('overlay:show', { type: data.type, data: data.data || null });
+    });
+    socket.on('overlay:hide', () => {
+        if (socket.user.role !== 'Trainer') return;
+        io.emit('overlay:hide');
+    });
 });
 
 // Quiz scores
