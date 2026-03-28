@@ -80,27 +80,27 @@
       </div>
     </div>
 
-    <!-- Floating control bar -->
-    <div style="position:fixed;bottom:0;left:0;right:0;z-index:10001;background:rgba(15,23,42,0.92);backdrop-filter:blur(8px);padding:0.5rem 0.75rem;border-top:1px solid rgba(255,255,255,0.1);">
+    <!-- Floating control bar (touch-optimized: min 44px targets, high contrast) -->
+    <div style="position:fixed;bottom:0;left:0;right:0;z-index:10001;background:rgba(15,23,42,0.95);backdrop-filter:blur(8px);padding:0.6rem;border-top:1px solid rgba(255,255,255,0.15);max-height:45vh;overflow-y:auto;">
       <!-- Navigation row -->
-      <div style="display:flex;gap:0.4rem;margin-bottom:0.4rem;">
-        <button @click="prevSlide" :disabled="currentIndex===0" style="flex:1;padding:0.75rem;font-size:1rem;border-radius:10px;background:var(--edps-blue);color:white;border:none;cursor:pointer;" :style="{opacity:currentIndex===0?0.3:1}" aria-label="Previous slide">◀</button>
-        <button @click="toggleVisibility" :style="{flex:2,padding:'0.75rem',fontSize:'0.9rem',borderRadius:'10px',border:'none',cursor:'pointer',fontWeight:'bold',background:isSlideVisible?'#ef4444':'#10b981',color:'white'}">{{ isSlideVisible ? '⏹ Stop' : '▶ Go Live' }}</button>
-        <button @click="nextSlide" :disabled="currentIndex>=slides.length-1" style="flex:1;padding:0.75rem;font-size:1rem;border-radius:10px;background:var(--edps-blue);color:white;border:none;cursor:pointer;" :style="{opacity:currentIndex>=slides.length-1?0.3:1}" aria-label="Next slide">▶</button>
+      <div style="display:flex;gap:0.4rem;margin-bottom:0.5rem;">
+        <button @click="prevSlide" :disabled="currentIndex===0" style="flex:1;min-height:48px;font-size:1.2rem;border-radius:12px;background:var(--edps-blue);color:white;border:none;cursor:pointer;" :style="{opacity:currentIndex===0?0.3:1}" aria-label="Previous slide">◀</button>
+        <button @click="toggleVisibility" :style="{flex:2,minHeight:'48px',fontSize:'1rem',borderRadius:'12px',border:'none',cursor:'pointer',fontWeight:'bold',background:isSlideVisible?'#ef4444':'#10b981',color:'white'}">{{ isSlideVisible ? '⏹ Stop' : '▶ Go Live' }}</button>
+        <button @click="nextSlide" :disabled="currentIndex>=slides.length-1" style="flex:1;min-height:48px;font-size:1.2rem;border-radius:12px;background:var(--edps-blue);color:white;border:none;cursor:pointer;" :style="{opacity:currentIndex>=slides.length-1?0.3:1}" aria-label="Next slide">▶</button>
       </div>
       <!-- Tools row -->
-      <div style="display:flex;gap:0.3rem;flex-wrap:wrap;align-items:center;">
-        <button @click="drawingActive=!drawingActive" :style="{padding:'0.5rem 0.7rem',borderRadius:'8px',border:'none',cursor:'pointer',fontSize:'0.8rem',fontWeight:'bold',background:drawingActive?'#ef4444':'rgba(255,255,255,0.12)',color:'white'}">✏️</button>
-        <button @click="toggleFreeze" :style="{padding:'0.5rem 0.7rem',borderRadius:'8px',border:'none',cursor:'pointer',fontSize:'0.8rem',background:frozen?'#f59e0b':'rgba(255,255,255,0.12)',color:'white'}">{{ frozen ? '❄️' : '🧊' }}</button>
-        <button v-if="handRaisedCount>0" @click="clearHands" style="padding:0.5rem 0.7rem;border-radius:8px;border:none;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.12);color:white;">✋{{ handRaisedCount }}</button>
-        <button v-if="currentSlide.type==='timer'" @click="timerRunning?pauseTimer():startTimer()" :style="{padding:'0.5rem 0.7rem',borderRadius:'8px',border:'none',cursor:'pointer',fontSize:'0.8rem',background:timerRunning?'#f59e0b':'#10b981',color:'white'}">{{ timerRunning ? '⏸' : '▶' }}</button>
-        <button v-if="currentSlide.type==='timer'" @click="resetTimer" style="padding:0.5rem 0.7rem;border-radius:8px;border:none;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.12);color:white;">↺</button>
-        <button @click="openWheel" style="padding:0.5rem 0.7rem;border-radius:8px;border:none;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.12);color:white;">🎡</button>
-        <button @click="openLeaderboard" style="padding:0.5rem 0.7rem;border-radius:8px;border:none;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.12);color:white;">🏆</button>
+      <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;">
+        <button @click="drawingActive=!drawingActive" :style="{minHeight:'44px',padding:'0.6rem 1rem',borderRadius:'10px',border:'none',cursor:'pointer',fontSize:'0.9rem',fontWeight:'bold',background:drawingActive?'#ef4444':'#334155',color:'white'}" aria-label="Toggle drawing">✏️ Draw</button>
+        <button @click="toggleFreeze" :style="{minHeight:'44px',padding:'0.6rem 1rem',borderRadius:'10px',border:'none',cursor:'pointer',fontSize:'0.9rem',background:frozen?'#f59e0b':'#334155',color:'white'}" aria-label="Toggle freeze">{{ frozen ? '❄️ Frozen' : '🧊 Freeze' }}</button>
+        <button v-if="handRaisedCount>0" @click="clearHands" style="min-height:44px;padding:0.6rem 1rem;border-radius:10px;border:none;cursor:pointer;font-size:0.9rem;background:#334155;color:white;" aria-label="Clear hands">✋ {{ handRaisedCount }}</button>
+        <button v-if="currentSlide.type==='timer'" @click="timerRunning?pauseTimer():startTimer()" :style="{minHeight:'44px',padding:'0.6rem 1rem',borderRadius:'10px',border:'none',cursor:'pointer',fontSize:'0.9rem',background:timerRunning?'#f59e0b':'#10b981',color:'white'}" aria-label="Timer control">{{ timerRunning ? '⏸ Pause' : '▶ Timer' }}</button>
+        <button v-if="currentSlide.type==='timer'" @click="resetTimer" style="min-height:44px;padding:0.6rem 1rem;border-radius:10px;border:none;cursor:pointer;font-size:0.9rem;background:#334155;color:white;" aria-label="Reset timer">↺ Reset</button>
+        <button @click="openWheel" style="min-height:44px;padding:0.6rem 1rem;border-radius:10px;border:none;cursor:pointer;font-size:0.9rem;background:#334155;color:white;" aria-label="Random picker">🎡 Pick</button>
+        <button @click="openLeaderboard" style="min-height:44px;padding:0.6rem 1rem;border-radius:10px;border:none;cursor:pointer;font-size:0.9rem;background:#334155;color:white;" aria-label="Leaderboard">🏆 Score</button>
         <span style="flex:1;"></span>
-        <span style="font-size:0.7rem;color:rgba(255,255,255,0.5);">{{ currentIndex+1 }}/{{ slides.length }}</span>
-        <span :style="{width:'6px',height:'6px',borderRadius:'50%',background:connected?'#10b981':'#ef4444',flexShrink:0}"></span>
-        <button @click="remoteMode=false" style="padding:0.5rem 0.7rem;border-radius:8px;border:none;cursor:pointer;font-size:0.75rem;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);">✕</button>
+        <span style="font-size:0.8rem;color:rgba(255,255,255,0.6);white-space:nowrap;">{{ currentIndex+1 }}/{{ slides.length }}</span>
+        <span :style="{width:'8px',height:'8px',borderRadius:'50%',background:connected?'#10b981':'#ef4444',flexShrink:0}"></span>
+        <button @click="remoteMode=false" style="min-height:44px;padding:0.6rem 0.8rem;border-radius:10px;border:none;cursor:pointer;font-size:0.9rem;background:#475569;color:white;" aria-label="Exit remote mode">✕ Exit</button>
       </div>
     </div>
   </div>
@@ -580,8 +580,11 @@
       <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin:1rem 0;">
         <button class="secondary" @click="printPinCards" style="width:auto;padding:0.4rem 1rem;font-size:0.8rem;">🖨 Print PIN Cards</button>
         <button class="secondary" @click="exportSessionPDF" style="width:auto;padding:0.4rem 1rem;font-size:0.8rem;">📄 Session Report</button>
-        <button class="secondary" @click="exportFullSession" style="width:auto;padding:0.4rem 1rem;font-size:0.8rem;">📦 Export All Data</button>
+        <button class="secondary" @click="exportFullSession" style="width:auto;padding:0.4rem 1rem;font-size:0.8rem;">📦 Export Data</button>
         <button class="secondary" @click="showBulkImport=!showBulkImport" style="width:auto;padding:0.4rem 1rem;font-size:0.8rem;">📋 Import CSV</button>
+        <button class="secondary" @click="downloadBackup" style="width:auto;padding:0.4rem 1rem;font-size:0.8rem;background:#059669;color:white;">💾 Backup</button>
+        <button class="secondary" @click="$refs.restoreInput.click()" style="width:auto;padding:0.4rem 1rem;font-size:0.8rem;background:#d97706;color:white;">📥 Restore</button>
+        <input type="file" ref="restoreInput" accept=".json" style="display:none;" @change="onRestoreBackup" />
       </div>
 
       <!-- Bulk CSV Import (#10) -->
@@ -1033,6 +1036,8 @@ export default {
       reactions: [],
       frozen: false,
       handRaisedCount: 0,
+      _winW: window.innerWidth,
+      _winH: window.innerHeight,
       autoSaveEnabled: false,
       autoSaveInterval: null,
       autoSaveStatus: '',
@@ -1109,9 +1114,9 @@ export default {
       return 700;
     },
     remoteScale() {
-      // Scale the 1024x576 canvas to fit the mobile viewport
-      const w = Math.min(window.innerWidth - 20, 1024);
-      const h = Math.min(window.innerHeight * 0.82, 576);
+      // Reactive to _winW/_winH (updated on resize)
+      const w = Math.min(this._winW - 16, 1024);
+      const h = Math.min(this._winH * 0.55, 576); // 55% for slide, rest for controls
       return Math.min(w / 1024, h / 576);
     },
     pollAggregated() {
@@ -1249,6 +1254,8 @@ export default {
     // Fullscreen Listeners
     document.addEventListener('fullscreenchange', this.onFullscreenChange);
     window.addEventListener('resize', this.resizeSlide);
+    this._onResize = () => { this._winW = window.innerWidth; this._winH = window.innerHeight; };
+    window.addEventListener('resize', this._onResize);
     window.addEventListener('keydown', this.handleKeydown);
 
     // #17 — Clock with immediate first tick
@@ -1262,6 +1269,7 @@ export default {
     if (this.socket) this.socket.disconnect();
     document.removeEventListener('fullscreenchange', this.onFullscreenChange);
     window.removeEventListener('resize', this.resizeSlide);
+    if (this._onResize) window.removeEventListener('resize', this._onResize);
     window.removeEventListener('keydown', this.handleKeydown);
     if (this._keyHandler) window.removeEventListener('keydown', this._keyHandler);
     clearInterval(this.clockInterval);
@@ -1975,7 +1983,7 @@ export default {
 
       // Build a long list of shuffled items to scroll through
       const items = [];
-      const totalCycles = 8 + Math.floor(Math.random() * 4); // 8-12 full cycles
+      const totalCycles = 4 + Math.floor(Math.random() * 3); // 4-6 cycles (fast)
       for (let c = 0; c < totalCycles; c++) {
         const shuffled = [...this.wheelAttendees].sort(() => Math.random() - 0.5);
         items.push(...shuffled);
@@ -1990,7 +1998,7 @@ export default {
       const itemH = 70; // px per item
       const totalItems = items.length;
       const targetOffset = -((totalItems - 1) * itemH) + itemH; // center the last item
-      const duration = 4500; // total animation time ms
+      const duration = 2500; // total animation time ms (fast picker)
       const startTime = performance.now();
       const startOffset = 0;
       this.slotOffset = startOffset;
@@ -2306,6 +2314,46 @@ export default {
         link.click();
         URL.revokeObjectURL(url);
       } catch (e) { this.showError('Failed to export session: ' + e.message); }
+    },
+    async downloadBackup() {
+      try {
+        const res = await authFetch(`${baseUrl}/api/backup`);
+        if (!res.ok) throw new Error('Backup failed');
+        const data = await res.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        link.download = `PEDRRA_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+        this.userMessage = 'Backup downloaded!';
+        setTimeout(() => this.userMessage = '', 3000);
+      } catch (e) { this.showError('Backup failed: ' + e.message); }
+    },
+    async onRestoreBackup(e) {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!confirm('This will REPLACE all users, slides, answers, and quiz scores. Are you sure?')) {
+        e.target.value = ''; return;
+      }
+      try {
+        const text = await file.text();
+        const backup = JSON.parse(text);
+        if (!backup.version || !Array.isArray(backup.slides)) throw new Error('Invalid backup format');
+        const res = await authFetch(`${baseUrl}/api/backup/restore`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: text,
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Restore failed'); }
+        const result = await res.json();
+        this.userMessage = `Restored ${result.users} users, ${result.slides} slides!`;
+        this.fetchSlides();
+        this.fetchUsers();
+        setTimeout(() => this.userMessage = '', 5000);
+      } catch (err) { this.showError('Restore failed: ' + err.message); }
+      e.target.value = '';
     },
     logout() {
       clearAuth();

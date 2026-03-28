@@ -64,7 +64,11 @@ export default {
         const next = this.$refs['pin' + (i + 1)];
         if (next) (Array.isArray(next) ? next[0] : next).focus();
       }
-      if (this.pinDigits.join('').length === 4) this.loginWithPin();
+      // Use nextTick to ensure all digits are set before checking
+      this.$nextTick(() => {
+        const pin = this.pinDigits.join('');
+        if (pin.length === 4 && /^\d{4}$/.test(pin)) this.loginWithPin();
+      });
     },
     onPinBackspace(i, e) {
       if (!this.pinDigits[i] && i > 0) {

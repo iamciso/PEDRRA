@@ -176,7 +176,9 @@ app.post('/api/login', loginLimiter, (req, res) => {
 
     // PIN-based login (no password needed)
     if (pin) {
-        db.get('SELECT id, username, password, team, role, display_name, avatar, pin FROM users WHERE pin = ?', [pin], (err, row) => {
+        const cleanPin = String(pin).trim();
+        if (!cleanPin || cleanPin.length < 4) return res.status(400).json({ error: 'PIN must be 4 digits.' });
+        db.get('SELECT id, username, password, team, role, display_name, avatar, pin FROM users WHERE pin = ?', [cleanPin], (err, row) => {
             if (err) return res.status(500).json({ error: err.message });
             if (!row) return res.status(401).json({ error: 'Invalid PIN.' });
             const userData = { id: row.id, username: row.username, team: row.team, role: row.role, display_name: row.display_name, avatar: row.avatar };
@@ -279,6 +281,94 @@ app.post('/api/users/bulk', authMiddleware('Trainer'), async (req, res) => {
 });
 
 // Consolidated session export (#2)
+// Full platform backup (users + slides + answers + scores + config)
+app.get('/api/backup', authMiddleware('Trainer'), async (req, res) => {
+    try {
+        const [users, answers, quizScores, sessionConfig] = await Promise.all([
+            dbAllAsync("SELECT username, password, team, role, display_name, avatar, pin FROM users"),
+            dbAllAsync("SELECT slide_id, username, answer, answered_at FROM answers"),
+            dbAllAsync("SELECT username, slide_id, correct, time_ms, points FROM quiz_scores"),
+            dbAllAsync("SELECT key, value FROM session_config"),
+        ]);
+        res.json({
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            slides: presentationData.slides,
+            users,
+            answers,
+            quizScores,
+            sessionConfig,
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Backup failed: ' + err.message });
+    }
+});
+
+// Restore platform from backup
+app.post('/api/backup/restore', authMiddleware('Trainer'), async (req, res) => {
+    const backup = req.body;
+    if (!backup || !backup.version || !Array.isArray(backup.slides)) {
+        return res.status(400).json({ error: 'Invalid backup format.' });
+    }
+    try {
+        // Restore slides
+        const newData = { slides: backup.slides };
+        const tmpPath = contentFilePath + '.tmp';
+        fs.writeFileSync(tmpPath, JSON.stringify(newData, null, 2));
+        fs.renameSync(tmpPath, contentFilePath);
+        presentationData = newData;
+
+        // Restore users (skip if empty)
+        if (Array.isArray(backup.users) && backup.users.length > 0) {
+            await new Promise((r, rej) => db.run('DELETE FROM users', e => e ? rej(e) : r()));
+            for (const u of backup.users) {
+                await new Promise((r, rej) => {
+                    db.run('INSERT OR REPLACE INTO users (username, password, team, role, display_name, avatar, pin) VALUES (?,?,?,?,?,?,?)',
+                        [u.username, u.password, u.team || '', u.role || 'Attendee', u.display_name || '', u.avatar || '', u.pin || ''], e => e ? rej(e) : r());
+                });
+            }
+        }
+
+        // Restore answers
+        if (Array.isArray(backup.answers)) {
+            await new Promise((r, rej) => db.run('DELETE FROM answers', e => e ? rej(e) : r()));
+            for (const a of backup.answers) {
+                await new Promise((r, rej) => {
+                    db.run('INSERT INTO answers (slide_id, username, answer, answered_at) VALUES (?,?,?,?)',
+                        [a.slide_id, a.username, a.answer, a.answered_at || new Date().toISOString()], e => e ? rej(e) : r());
+                });
+            }
+        }
+
+        // Restore quiz scores
+        if (Array.isArray(backup.quizScores)) {
+            await new Promise((r, rej) => db.run('DELETE FROM quiz_scores', e => e ? rej(e) : r()));
+            for (const q of backup.quizScores) {
+                await new Promise((r, rej) => {
+                    db.run('INSERT INTO quiz_scores (username, slide_id, correct, time_ms, points) VALUES (?,?,?,?,?)',
+                        [q.username, q.slide_id, q.correct || 0, q.time_ms || 0, q.points || 0], e => e ? rej(e) : r());
+                });
+            }
+        }
+
+        // Restore session config
+        if (Array.isArray(backup.sessionConfig)) {
+            for (const c of backup.sessionConfig) {
+                await new Promise((r, rej) => {
+                    db.run('INSERT OR REPLACE INTO session_config (key, value) VALUES (?,?)', [c.key, c.value], e => e ? rej(e) : r());
+                });
+            }
+        }
+
+        io.emit('slides:updated', presentationData.slides);
+        log.info(`Backup restored: ${backup.users?.length || 0} users, ${backup.slides?.length || 0} slides`);
+        res.json({ success: true, users: backup.users?.length || 0, slides: backup.slides?.length || 0 });
+    } catch (err) {
+        log.error('Restore failed:', err.message);
+        res.status(500).json({ error: 'Restore failed: ' + err.message });
+    }
+});
+
 app.get('/api/export/session', authMiddleware('Trainer'), async (req, res) => {
     try {
         const [users, answers, quizScores, slides] = await Promise.all([

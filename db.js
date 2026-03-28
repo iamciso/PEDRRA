@@ -120,15 +120,20 @@ const initDb = () => {
         });
 
         // Assign PINs and display_names to users without them
-        db.all("SELECT id, username, display_name, pin FROM users WHERE pin = '' OR pin IS NULL", (err, rows) => {
-            if (!rows || rows.length === 0) return;
-            let charIdx = 0;
-            rows.forEach(row => {
-                const pin = generatePin();
-                const name = row.display_name || FICTIONAL_CHARACTERS[charIdx % FICTIONAL_CHARACTERS.length];
-                charIdx++;
-                db.run("UPDATE users SET pin = ?, display_name = ? WHERE id = ? AND (pin = '' OR pin IS NULL)",
-                    [pin, name, row.id]);
+        db.all("SELECT pin FROM users WHERE pin != '' AND pin IS NOT NULL", (err, existingRows) => {
+            const existingPins = (existingRows || []).map(r => r.pin);
+            db.all("SELECT id, username, display_name, pin FROM users WHERE pin = '' OR pin IS NULL", (err2, rows) => {
+                if (!rows || rows.length === 0) return;
+                let charIdx = 0;
+                const usedPins = new Set(existingPins);
+                rows.forEach(row => {
+                    const pin = generatePin(Array.from(usedPins));
+                    usedPins.add(pin);
+                    const name = row.display_name || FICTIONAL_CHARACTERS[charIdx % FICTIONAL_CHARACTERS.length];
+                    charIdx++;
+                    db.run("UPDATE users SET pin = ?, display_name = ? WHERE id = ? AND (pin = '' OR pin IS NULL)",
+                        [pin, name, row.id]);
+                });
             });
         });
     });
