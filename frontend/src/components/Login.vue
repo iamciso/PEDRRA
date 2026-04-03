@@ -11,20 +11,21 @@
       <button @click="mode='password'" :style="{flex:1,padding:'0.6rem',border:'none',cursor:'pointer',fontWeight:'bold',fontSize:'0.9rem',background:mode==='password'?'var(--edps-blue)':'#f8fafc',color:mode==='password'?'white':'#64748b'}">🔑 Username</button>
     </div>
 
-    <!-- PIN login — single input field, simpler and more reliable on mobile -->
+    <!-- PIN login -->
     <form v-if="mode==='pin'" @submit.prevent="loginWithPin">
       <div style="text-align:center;margin-bottom:1rem;color:#64748b;font-size:0.9rem;">Enter your 4-digit PIN</div>
       <input
         ref="pinInput"
-        v-model="pinValue"
-        type="tel"
+        type="text"
         inputmode="numeric"
         pattern="[0-9]*"
         maxlength="4"
         autocomplete="one-time-code"
         :disabled="loading"
-        @input="onPinChange"
-        style="width:100%;height:70px;text-align:center;font-size:2.5rem;font-weight:bold;border-radius:8px;margin-bottom:1rem;letter-spacing:16px;border:2px solid var(--border-color);"
+        :value="pinDisplay"
+        @input="onPinInput"
+        @keypress="onPinKeypress"
+        style="width:100%;height:70px;text-align:center;font-size:2.5rem;font-weight:bold;border-radius:8px;margin-bottom:1rem;letter-spacing:16px;border:2px solid var(--border-color);box-sizing:border-box;"
         placeholder="• • • •"
         aria-label="4-digit PIN"
       />
@@ -61,47 +62,63 @@ export default {
     return {
       mode: 'pin',
       form: { username: '', password: '' },
-      pinValue: '',
+      pinRaw: '', // raw digits only (no formatting)
       error: '',
       loading: false
     }
   },
+  computed: {
+    pinDisplay() { return this.pinRaw; }
+  },
   methods: {
-    onPinChange() {
-      // Strip non-digits
-      this.pinValue = this.pinValue.replace(/\D/g, '').slice(0, 4);
-      // Auto-submit when 4 digits entered
-      if (this.pinValue.length === 4 && !this.loading) {
-        this.loginWithPin();
+    onPinKeypress(e) {
+      // Only allow digits
+      if (e.key && e.key.length === 1 && !/\d/.test(e.key)) {
+        e.preventDefault();
+      }
+    },
+    onPinInput(e) {
+      // Extract only digits from whatever the browser/IME gives us
+      const raw = (e.target.value || '').replace(/\D/g, '').slice(0, 4);
+      this.pinRaw = raw;
+      // Force the DOM input to show only digits (handles IME/autocomplete quirks)
+      e.target.value = raw;
+      // Auto-submit when 4 digits
+      if (raw.length === 4 && !this.loading) {
+        this.$nextTick(() => this.loginWithPin());
       }
     },
     async loginWithPin() {
       this.error = '';
-      // Primary: use v-model value
-      let pin = this.pinValue.replace(/\D/g, '').trim();
-      // Fallback: read directly from DOM input (handles Android IME edge cases)
+      // Read from reactive data first, fallback to DOM
+      let pin = this.pinRaw;
       if (pin.length < 4) {
-        const input = this.$refs.pinInput;
-        if (input) pin = (input.value || '').replace(/\D/g, '').trim();
+        const el = this.$refs.pinInput;
+        if (el) pin = (el.value || '').replace(/\D/g, '');
       }
-      if (pin.length < 4 || this.loading) {
-        if (pin.length < 4) this.error = 'Please enter 4 digits';
+      if (pin.length < 4) {
+        this.error = 'Please enter 4 digits';
         return;
       }
+      if (this.loading) return;
       this.loading = true;
+      this.error = '';
       try {
         const res = await fetch(`${baseUrl}/api/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pin })
         });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'Invalid PIN');
+        }
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Invalid PIN');
         setAuth(data.user, data.token);
         this.$router.push(data.user.role === 'Trainer' ? '/trainer' : '/attendee');
       } catch (err) {
-        this.error = err.message;
-        this.pinValue = '';
+        this.error = err.message || 'Connection error. Please try again.';
+        this.pinRaw = '';
         this.$nextTick(() => { this.$refs.pinInput?.focus(); });
       } finally {
         this.loading = false;
