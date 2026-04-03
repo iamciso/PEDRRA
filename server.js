@@ -1044,8 +1044,27 @@ app.get('/api/attendees', authMiddleware('Trainer'), (req, res) => {
 // Serve frontend
 const frontendPath = path.join(__dirname, 'frontend', 'dist');
 if (fs.existsSync(frontendPath)) {
-    app.use(express.static(frontendPath));
+    // SW file — never cache
+    app.get('/sw.js', (req, res) => {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Service-Worker-Allowed', '/');
+        res.sendFile(path.join(frontendPath, 'sw.js'));
+    });
+    // Static assets (JS/CSS with content hashes) — cache long
+    app.use('/assets', express.static(path.join(frontendPath, 'assets'), {
+        maxAge: '1y', immutable: true
+    }));
+    // Other static files (images, fonts) — short cache
+    app.use(express.static(frontendPath, {
+        maxAge: '1h',
+        // Don't serve index.html via static — we handle it below with no-cache
+        index: false,
+    }));
+    // ALL HTML routes — NEVER cache (SPA fallback)
     app.get('*', (req, res) => {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         res.sendFile(path.join(frontendPath, 'index.html'));
     });
 } else {
